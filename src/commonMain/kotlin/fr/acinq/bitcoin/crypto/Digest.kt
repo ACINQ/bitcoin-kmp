@@ -44,4 +44,14 @@ interface Digest {
      * reset the digest back to it's initial state.
      */
     fun reset()
+
+    fun hash(input: ByteArray, inputOffset: Int, len: Int) : ByteArray {
+        reset()
+        update(input, inputOffset, len)
+        val output = ByteArray(getDigestSize())
+        doFinal(output, 0)
+        return output
+    }
+
+    fun hash(input: ByteArray) = hash(input, 0, input.size)
 }

@@ -34,6 +34,10 @@ object Crypto {
 
     fun hash160(input: ByteVector) = hash160(input.toByteArray(), 0, input.size())
 
+    fun hmac512(key: ByteArray, data: ByteArray) : ByteArray {
+        return HMac.hmac(key, data, Sha512(), 128)
+    }
+
     fun isPubKeyValid(key: ByteArray): Boolean = when {
         key.size == 65 && (key[0] == 4.toByte() || key[0] == 6.toByte() || key[0] == 7.toByte()) -> true
         key.size == 33 && (key[0] == 2.toByte() || key[0] == 3.toByte()) -> true

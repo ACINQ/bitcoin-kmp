@@ -41,7 +41,7 @@ actual object Secp256k1 {
     }
 
     actual fun publicKeyAdd(pub1: ByteArray, pub2: ByteArray): ByteArray {
-        return NativeSecp256k1.pubKeyTweakAdd(pub1, pub2)
+        return NativeSecp256k1.pubKeyAdd(pub1, pub2)
     }
 
     actual fun publicKeyNegate(pub: ByteArray): ByteArray {

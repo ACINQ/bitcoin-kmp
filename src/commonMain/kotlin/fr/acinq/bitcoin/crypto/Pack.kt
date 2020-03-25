@@ -30,8 +30,8 @@ object Pack {
     fun uint32BE(bs: ByteArray, off: Int): Int {
         var off = off
         var n: Int = bs[off].toInt() shl 24
-        n = n or (bs[++off].toInt() and 0xff) shl 16
-        n = n or (bs[++off].toInt() and 0xff) shl 8
+        n = n or (bs[++off].toInt() and 0xff).shl(16)
+        n = n or (bs[++off].toInt() and 0xff).shl(8)
         n = n or (bs[++off].toInt() and 0xff)
         return n
     }

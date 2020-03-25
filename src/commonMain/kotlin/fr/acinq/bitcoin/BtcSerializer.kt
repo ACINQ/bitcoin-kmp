@@ -90,6 +90,14 @@ interface BtcSerializer<T> {
             return out.toByteArray()
         }
 
+        fun writeUInt32BE(input: Long, out: OutputStream): Unit = out.write(Pack.writeUint32BE(input.toInt()))
+
+        fun writeUInt32BE(input: Long): ByteArray {
+            val out = ByteArrayOutputStream()
+            writeUInt32BE(input, out)
+            return out.toByteArray()
+        }
+
         fun uint64(input: InputStream): Long {
             val bin = ByteArray(8)
             input.read(bin)

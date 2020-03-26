@@ -124,6 +124,14 @@ object Pack {
         bs[++off] = (n ushr 24).toByte()
     }
 
+    fun writeUint32LE(n: UInt, bs: ByteArray, off: Int) {
+        var off = off
+        bs[off] = n.toByte()
+        bs[++off] = (n shr 8).toByte()
+        bs[++off] = (n shr 16).toByte()
+        bs[++off] = (n shr 24).toByte()
+    }
+
     fun writeUint32LE(ns: IntArray): ByteArray {
         val bs = ByteArray(4 * ns.size)
         writeUint32LE(ns, bs, 0)

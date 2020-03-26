@@ -1,9 +1,13 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Pack
+import jdk.jfr.DataAmount.BITS
+
+
+
 
 class UInt256() : Comparable<UInt256> {
-    private val pn = IntArray(WIDTH)
+    private val pn = UIntArray(WIDTH)
 
     constructor(rhs: UInt256) : this() {
         rhs.pn.copyInto(pn, 0)
@@ -17,24 +21,86 @@ class UInt256() : Comparable<UInt256> {
         require(value.size <= 32)
         val reversed = value.reversedArray() + ByteArray(32 - value.size)
         for (i in 0 until WIDTH) {
-            pn[i] = Pack.uint32LE(reversed, 4 * i)
+            pn[i] = Pack.uint32LE(reversed, 4 * i).toUInt()
+        }
+    }
+
+    fun setUInt64(value: Long) {
+        pn[0] = (value and 0xffffffff).toUInt()
+        pn[1] = (value.ushr(32) and 0xffffffff).toUInt()
+        for (i in 2 until WIDTH) {
+            pn[i] = 0U
         }
     }
 
     override fun compareTo(other: UInt256): Int {
-        for(i in 0 until WIDTH) {
+        for(i in  WIDTH - 1  downTo 0) {
             if (pn[i] < other.pn[i]) return -1
             if (pn[i] > other.pn[i]) return 1
         }
         return 0
     }
 
-    fun setUInt64(value: Long) {
-        pn[0] = (value and 0xffffffff).toInt()
-        pn[1] = (value.ushr(32) and 0xffffffff).toInt()
-        for (i in 2 until WIDTH) {
-            pn[i] = 0
+    operator fun inc(): UInt256 {
+        var i = 0
+        while (i < WIDTH && ++pn[i] == 0U) i++;
+        return this;
+    }
+
+    operator fun unaryMinus() : UInt256 {
+        val a = UInt256(this)
+        for(i in a.pn.indices) {
+            a.pn[i] = a.pn[i].inv()
         }
+        return a.inc()
+    }
+
+    operator fun plusAssign(other: UInt256) {
+        var carry = 0L
+        for (i in 0 until WIDTH) {
+            val n = carry + pn[i].toLong() + other.pn[i].toLong();
+            pn[i] = (n and 0xffffffffL).toUInt()
+            carry = n ushr 32
+        }
+    }
+
+    operator fun minusAssign(other: UInt256) {
+        plusAssign(-other)
+    }
+
+    operator fun divAssign(other: UInt256) {
+        var div = other
+        var num = UInt256(this)
+        for(i in pn.indices) pn[i] = 0U
+        val num_bits = num.bits()
+        val div_bits = div.bits()
+        require(div_bits > 0){ "division by zero" }
+        if (div_bits > num_bits) return
+        var shift = num_bits - div_bits
+        div = div shl shift
+        while (shift >= 0) {
+            if (num >= div) {
+                num -= div;
+                pn[shift / 32] = pn[shift / 32] or (1U shl (shift and 31)) // set a bit of the result.
+            }
+            div = div shr 1 // shift back.
+            shift--
+        }
+    }
+
+    operator fun timesAssign(other: UInt256) {
+        var a = UInt256()
+        for (j in 0 until WIDTH) {
+            var carry = 0UL
+            var i = 0
+            while (i + j < WIDTH) {
+                val n = carry + a.pn[i + j] + pn[j].toULong() * other.pn[i]
+                a.pn[i + j] = (n and 0xffffffffUL).toUInt()
+                carry = n shr 32
+                i++
+            }
+        }
+        a.pn.copyInto(pn, 0)
     }
 
     infix fun shl(bitCount: Int): UInt256 {
@@ -43,7 +109,7 @@ class UInt256() : Comparable<UInt256> {
         val shift = bitCount % 32
         for (i in 0 until WIDTH) {
             if (i + k + 1 < WIDTH && shift != 0)
-                a.pn[i + k + 1] = a.pn[i + k + 1] or (pn[i].ushr(32 - shift))
+                a.pn[i + k + 1] = a.pn[i + k + 1] or (pn[i].shr(32 - shift))
             if (i + k < WIDTH)
                 a.pn[i + k] = a.pn[i + k] or (pn[i].shl(shift))
         }
@@ -58,16 +124,24 @@ class UInt256() : Comparable<UInt256> {
             if (i - k - 1 >= 0 && shift != 0)
                 a.pn[i - k - 1] = a.pn[i - k - 1] or (pn[i] shl (32 - shift));
             if (i - k >= 0)
-                a.pn[i - k] = a.pn[i - k] or (pn[i] ushr shift)
+                a.pn[i - k] = a.pn[i - k] or (pn[i] shr shift)
+        }
+        return a
+    }
+
+    fun inv(): UInt256 {
+        val a = UInt256(this)
+        for(i in a.pn.indices) {
+            a.pn[i] = a.pn[i].inv()
         }
         return a
     }
 
     fun bits(): Int {
         for (pos in WIDTH - 1 downTo 0) {
-            if (pn[pos] != 0) {
+            if (pn[pos] != 0U) {
                 for (nbits in 31 downTo 0) {
-                    if ((pn[pos] and 1.shl(nbits)) != 0)
+                    if ((pn[pos] and 1U.shl(nbits)) != 0U)
                         return 32 * pos + nbits + 1;
                 }
                 return 32 * pos + 1;

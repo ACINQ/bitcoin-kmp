@@ -1,8 +1,6 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Crypto
-import fr.acinq.bitcoin.OP_CHECKSIG
-import fr.acinq.bitcoin.OP_PUSHDATA
 import kotlinx.io.InputStream
 import kotlinx.io.OutputStream
 import kotlinx.serialization.InternalSerializationApi
@@ -47,7 +45,10 @@ data class BlockHeader(val version: Long, val hashPreviousBlock: ByteVector32, v
             BtcSerializer.writeUInt32(message.nonce, output)
         }
 
-        fun getDifficulty(header: BlockHeader): Any = `???`()
+        fun getDifficulty(header: BlockHeader): UInt256 {
+            val (diff, neg, overflow) = UInt256.decodeCompact(header.bits)
+            return diff
+        }
 
         /**
          *
@@ -55,9 +56,17 @@ data class BlockHeader(val version: Long, val hashPreviousBlock: ByteVector32, v
          * @return the amount of work represented by this difficulty target, as displayed
          *         by bitcoin core
          */
-        fun blockProof(bits: Long): Double = `???`()
+        fun blockProof(bits: Long): UInt256 {
+            val (target, negative, overflow) = UInt256.decodeCompact(bits)
+            return if (target == UInt256.Zero || negative || overflow) UInt256.Zero else {
+                //  (~bnTarget / (bnTarget + 1)) + 1;
+                var work = target.inv()
+                work /= target.inc()
+                work.inc()
+            }
+        }
 
-        fun blockProof(header: BlockHeader): Double = blockProof(header.bits)
+        fun blockProof(header: BlockHeader): UInt256 = blockProof(header.bits)
 
         /**
          * Proof of work: hash(header) <= target difficulty
@@ -65,9 +74,28 @@ data class BlockHeader(val version: Long, val hashPreviousBlock: ByteVector32, v
          * @param header block header
          * @return true if the input block header validates its expected proof of work
          */
-        fun checkProofOfWork(header: BlockHeader): Boolean = `???`()
+        fun checkProofOfWork(header: BlockHeader): Boolean {
+            val (target, _, _) = UInt256.decodeCompact(header.bits)
+            val hash = UInt256(header.blockId.toByteArray())
+            return hash <= target
+        }
 
-        fun calculateNextWorkRequired(lastHeader: BlockHeader, lastRetargetTime: Long): Long = `???`()
+        fun calculateNextWorkRequired(lastHeader: BlockHeader, lastRetargetTime: Long): Long {
+            var actualTimespan = lastHeader.time - lastRetargetTime
+            val targetTimespan = 14 * 24 * 60 * 60L // two weeks
+            if (actualTimespan < targetTimespan / 4) actualTimespan = targetTimespan / 4
+            if (actualTimespan > targetTimespan * 4) actualTimespan = targetTimespan * 4
+
+            var (target, isnegative, overflow) = UInt256.decodeCompact(lastHeader.bits)
+            require(!isnegative)
+            require(!overflow)
+            target *= UInt256(actualTimespan)
+            target /= UInt256(targetTimespan)
+
+            val powLimit = UInt256(Hex.decode("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+            if(target > powLimit) target = powLimit
+            return target.endodeCompact(false)
+        }
     }
 }
 

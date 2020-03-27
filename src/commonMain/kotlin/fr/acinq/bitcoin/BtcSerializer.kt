@@ -149,9 +149,6 @@ interface BtcSerializer<T> {
             val blob = ByteArray(size)
             if (size > 0) {
                 val count = input.read(blob)
-                if (count < size) {
-                    println("duh")
-                }
                 require(count >= size)
             }
             return blob

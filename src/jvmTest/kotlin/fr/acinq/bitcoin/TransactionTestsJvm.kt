@@ -49,7 +49,7 @@ class TransactionTestsJvm {
         val address = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
         val (prefix, pubkeyHash) = Base58Check.decode(address)
         assertEquals(prefix, Base58.Prefix.PubkeyAddressTestnet)
-        val amount = Satoshi(1000)
+        val amount = 1000L
 
         val privateKey = PrivateKey.fromBase58(
             "cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp",
@@ -124,7 +124,7 @@ class TransactionTestsJvm {
             ),
             txOut = listOf(
                 TxOut(
-                    amount = Satoshi(900000), // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
+                    amount = 900000, // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
                     publicKeyScript = listOf(OP_HASH160, OP_PUSHDATA(multisigAddress), OP_EQUAL)
                 )
             ),
@@ -145,7 +145,7 @@ class TransactionTestsJvm {
             ),
             txOut = listOf(
                 TxOut(
-                    amount = Satoshi(900000),
+                    amount = 900000,
                     publicKeyScript = listOf(
                         OP_DUP,
                         OP_HASH160,

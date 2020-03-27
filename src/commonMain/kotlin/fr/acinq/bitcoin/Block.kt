@@ -199,7 +199,7 @@ data class Block(val header: BlockHeader, val tx: List<Transaction>) {
                     Transaction(
                         version = 1,
                         txIn = listOf(TxIn.coinbase(script)),
-                        txOut = listOf(TxOut(amount = Satoshi(5000000000), publicKeyScript = scriptPubKey)),
+                        txOut = listOf(TxOut(amount = 5000000000, publicKeyScript = scriptPubKey)),
                         lockTime = 0
                     )
                 )

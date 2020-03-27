@@ -185,11 +185,11 @@ data class TxIn(
 
 @ExperimentalStdlibApi
 @InternalSerializationApi
-data class TxOut(val amount: Satoshi, val publicKeyScript: ByteVector) : BtcSerializable<TxOut> {
+data class TxOut(val amount: Long, val publicKeyScript: ByteVector) : BtcSerializable<TxOut> {
 
-    constructor(amount: Satoshi, publicKeyScript: ByteArray) : this(amount, publicKeyScript.byteVector())
+    constructor(amount: Long, publicKeyScript: ByteArray) : this(amount, publicKeyScript.byteVector())
 
-    constructor(amount: Satoshi, publicKeyScript: List<ScriptElt>) : this(
+    constructor(amount: Long, publicKeyScript: List<ScriptElt>) : this(
         amount,
         Script.write(publicKeyScript).byteVector()
     )
@@ -198,15 +198,15 @@ data class TxOut(val amount: Satoshi, val publicKeyScript: ByteVector) : BtcSeri
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     companion object : BtcSerializer<TxOut> {
         override fun write(t: TxOut, out: OutputStream, protocolVersion: Long) {
-            writeUInt64(t.amount.amount, out)
+            writeUInt64(t.amount, out)
             writeScript(t.publicKeyScript, out)
         }
 
         override fun read(input: InputStream, protocolVersion: Long): TxOut =
-            TxOut(Satoshi(uint64(input)), script(input))
+            TxOut(uint64(input), script(input))
 
         override fun validate(t: TxOut) {
-            require(t.amount.amount >= 0) { "invalid txout amount: $t.amount" }
+            require(t.amount >= 0) { "invalid txout amount: $t.amount" }
             // TODO require(t.amount.amount <= Bitcoin.MaxMoney) { "invalid txout amount: $t.amount" }
             require(t.publicKeyScript.size() < Script.MaxScriptElementSize) { "public key script is ${t.publicKeyScript.size()} bytes, limit is $Script.MaxScriptElementSize bytes" }
         }
@@ -403,7 +403,7 @@ data class Transaction(val version: Long, val txIn: List<TxIn>, val txOut: List<
                     val inputs = resetSequence(tx2.txIn, inputIndex)
                     val outputs = mutableListOf<TxOut>()
                     for (i in 0..inputIndex) {
-                        outputs += if (i == inputIndex) tx2.txOut[inputIndex] else TxOut(Satoshi(-1L), ByteArray(0))
+                        outputs += if (i == inputIndex) tx2.txOut[inputIndex] else TxOut(-1L, ByteArray(0))
                     }
                     tx2.copy(txIn = inputs, txOut = outputs.toList())
                 }
@@ -456,7 +456,7 @@ data class Transaction(val version: Long, val txIn: List<TxIn>, val txOut: List<
             inputIndex: Int,
             previousOutputScript: ByteArray,
             sighashType: Int,
-            amount: Satoshi,
+            amount: Long,
             signatureVersion: Int
         ): ByteArray {
             when (signatureVersion) {
@@ -518,7 +518,7 @@ data class Transaction(val version: Long, val txIn: List<TxIn>, val txOut: List<
             inputIndex: Int,
             previousOutputScript: List<ScriptElt>,
             sighashType: Int,
-            amount: Satoshi,
+            amount: Long,
             signatureVersion: Int
         ): ByteArray =
             hashForSigning(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion)
@@ -540,7 +540,7 @@ data class Transaction(val version: Long, val txIn: List<TxIn>, val txOut: List<
             inputIndex: Int,
             previousOutputScript: ByteArray,
             sighashType: Int,
-            amount: Satoshi,
+            amount: Long,
             signatureVersion: Int,
             privateKey: PrivateKey
         ): ByteArray {
@@ -554,7 +554,7 @@ data class Transaction(val version: Long, val txIn: List<TxIn>, val txOut: List<
             inputIndex: Int,
             previousOutputScript: ByteVector,
             sighashType: Int,
-            amount: Satoshi,
+            amount: Long,
             signatureVersion: Int,
             privateKey: PrivateKey
         ) = signInput(
@@ -584,7 +584,7 @@ data class Transaction(val version: Long, val txIn: List<TxIn>, val txOut: List<
             inputIndex: Int,
             previousOutputScript: List<ScriptElt>,
             sighashType: Int,
-            amount: Satoshi,
+            amount: Long,
             signatureVersion: Int,
             privateKey: PrivateKey
         ): ByteArray =
@@ -619,7 +619,7 @@ data class Transaction(val version: Long, val txIn: List<TxIn>, val txOut: List<
                 inputIndex,
                 previousOutputScript,
                 sighashType,
-                Satoshi(0L),
+                0L,
                 SigVersion.SIGVERSION_BASE,
                 privateKey
             )

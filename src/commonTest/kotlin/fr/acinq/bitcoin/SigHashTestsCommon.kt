@@ -7,6 +7,7 @@ import kotlinx.serialization.InternalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertFails
 
+@ExperimentalUnsignedTypes
 @ExperimentalStdlibApi
 @InternalSerializationApi
 class SighashSpec {

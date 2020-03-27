@@ -26,13 +26,14 @@ object DeterministicWallet {
 
         fun derive(number: Long) = KeyPath(path + listOf(number))
 
-        override fun toString() = path.map { KeyPath.childNumberToString(it) }.fold("m"){ a, b -> "$a/$b" }
+        override fun toString() = path.map { KeyPath.childNumberToString(it) }.fold("m") { a, b -> "$a/$b" }
 
         companion object {
             val empty = KeyPath(listOf())
 
-            fun computePath(path: String) : List<Long> {
-                fun toNumber(value: String): Long = if (value.last() == '\'') hardened(value.dropLast(1).toLong()) else value.toLong()
+            fun computePath(path: String): List<Long> {
+                fun toNumber(value: String): Long =
+                    if (value.last() == '\'') hardened(value.dropLast(1).toLong()) else value.toLong()
 
                 val path1 = path.removePrefix("m").removePrefix("/")
                 return if (path1.isEmpty())
@@ -41,23 +42,37 @@ object DeterministicWallet {
                     path1.split('/').map { toNumber(it) }
             }
 
-            fun fromPath(path: String) : KeyPath = KeyPath(path)
+            fun fromPath(path: String): KeyPath = KeyPath(path)
 
-            fun childNumberToString(childNumber: Long) = if (isHardened(childNumber)) ((childNumber - hardenedKeyIndex).toString() + "'") else childNumber.toString()
+            fun childNumberToString(childNumber: Long) =
+                if (isHardened(childNumber)) ((childNumber - hardenedKeyIndex).toString() + "'") else childNumber.toString()
         }
     }
 
-    data class ExtendedPrivateKey(val secretkeybytes: ByteVector32, val chaincode: ByteVector32, val depth: Int, val path: KeyPath, val parent: Long) {
+    data class ExtendedPrivateKey(
+        val secretkeybytes: ByteVector32,
+        val chaincode: ByteVector32,
+        val depth: Int,
+        val path: KeyPath,
+        val parent: Long
+    ) {
 
         val privateKey: PrivateKey = PrivateKey(secretkeybytes)
 
         val publicKey: PublicKey = privateKey.publicKey()
     }
 
-    data class ExtendedPublicKey(val publickeybytes: ByteVector, val chaincode: ByteVector32, val depth: Int, val path: KeyPath, val parent: Long) {
+    data class ExtendedPublicKey(
+        val publickeybytes: ByteVector,
+        val chaincode: ByteVector32,
+        val depth: Int,
+        val path: KeyPath,
+        val parent: Long
+    ) {
         init {
             require(publickeybytes.size() == 33)
         }
+
         val publicKey: PublicKey = PublicKey(publickeybytes)
     }
 
@@ -72,7 +87,7 @@ object DeterministicWallet {
         out.write(0)
         out.write(input.secretkeybytes.toByteArray())
         val buffer = out.toByteArray()
-        return Base58Check.encode(prefix, buffer )
+        return Base58Check.encode(prefix, buffer)
     }
 
     fun encode(input: ExtendedPublicKey, testnet: Boolean): String = encode(input, if (testnet) tpub else xpub)
@@ -106,13 +121,20 @@ object DeterministicWallet {
      * @return a "master" private key
      */
     fun generate(seed: ByteVector): ExtendedPrivateKey = generate(seed.toByteArray())
+
     /**
      *
      * @param input extended private key
      * @return the public key for this private key
      */
     fun publicKey(input: ExtendedPrivateKey): ExtendedPublicKey {
-        return ExtendedPublicKey(input.publicKey.value, input.chaincode, depth = input.depth, path = input.path, parent = input.parent)
+        return ExtendedPublicKey(
+            input.publicKey.value,
+            input.chaincode,
+            depth = input.depth,
+            path = input.path,
+            parent = input.parent
+        )
     }
 
     /**
@@ -120,7 +142,11 @@ object DeterministicWallet {
      * @param input extended public key
      * @return the fingerprint for this public key
      */
-    fun fingerprint(input: ExtendedPublicKey): Long = BtcSerializer.uint32(ByteArrayInputStream(Crypto.hash160(input.publickeybytes).take(4).reversed().toByteArray()))
+    fun fingerprint(input: ExtendedPublicKey): Long = BtcSerializer.uint32(
+        ByteArrayInputStream(
+            Crypto.hash160(input.publickeybytes).take(4).reversed().toByteArray()
+        )
+    )
 
     /**
      *
@@ -148,7 +174,13 @@ object DeterministicWallet {
 
         val key = PrivateKey(IL) + parent.privateKey
         val buffer = key.value.toByteArray()
-        return ExtendedPrivateKey(buffer.byteVector32(), chaincode = IR.byteVector32(), depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
+        return ExtendedPrivateKey(
+            buffer.byteVector32(),
+            chaincode = IR.byteVector32(),
+            depth = parent.depth + 1,
+            path = parent.path.derive(index),
+            parent = fingerprint(parent)
+        )
     }
 
     /**
@@ -157,35 +189,57 @@ object DeterministicWallet {
      * @param index  index of the child key
      * @return the derived public key at the specified index
      */
+    @ExperimentalUnsignedTypes
     fun derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey {
         require(!isHardened(index)) { "Cannot derive public keys from public hardened keys" }
 
-        val I = Crypto.hmac512(parent.chaincode.toByteArray(), parent.publickeybytes.toByteArray() + BtcSerializer.writeUInt32BE(index))
+        val I = Crypto.hmac512(
+            parent.chaincode.toByteArray(),
+            parent.publickeybytes.toByteArray() + BtcSerializer.writeUInt32BE(index)
+        )
         val IL = I.take(32).toByteArray()
         val IR = I.takeLast(32).toByteArray()
-        val p = UInt256(IL)
+
+        // TODO: add this check (extremely unlikely)
+//        val p = UInt256(IL)
 //        if (p.compareTo(Crypto.curve.n) == 1) {
 //            throw RuntimeException("cannot generated child public key")
 //        }
         val Ki = PrivateKey(IL).publicKey() + parent.publicKey
+        // TODO: add this check (extremely unlikely)
 //        if (Ki.point.isInfinity) {
 //            throw RuntimeException("cannot generated child public key")
 //        }
         val buffer = Ki.value
-        return ExtendedPublicKey(buffer, chaincode = IR.byteVector32(), depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
+        return ExtendedPublicKey(
+            buffer,
+            chaincode = IR.byteVector32(),
+            depth = parent.depth + 1,
+            path = parent.path.derive(index),
+            parent = fingerprint(parent)
+        )
     }
 
-    fun derivePrivateKey(parent: ExtendedPrivateKey, chain: List<Long>): ExtendedPrivateKey = chain.fold(parent, DeterministicWallet::derivePrivateKey)
+    fun derivePrivateKey(parent: ExtendedPrivateKey, chain: List<Long>): ExtendedPrivateKey =
+        chain.fold(parent, DeterministicWallet::derivePrivateKey)
 
-    fun derivePrivateKey(parent: ExtendedPrivateKey, keyPath: KeyPath): ExtendedPrivateKey = derivePrivateKey(parent, keyPath.path)
+    fun derivePrivateKey(parent: ExtendedPrivateKey, keyPath: KeyPath): ExtendedPrivateKey =
+        derivePrivateKey(parent, keyPath.path)
 
-    fun derivePrivateKey(parent: ExtendedPrivateKey, keyPath: String): ExtendedPrivateKey = derivePrivateKey(parent, KeyPath.fromPath(keyPath))
+    fun derivePrivateKey(parent: ExtendedPrivateKey, keyPath: String): ExtendedPrivateKey =
+        derivePrivateKey(parent, KeyPath.fromPath(keyPath))
 
-    fun derivePublicKey(parent: ExtendedPublicKey, chain: List<Long>): ExtendedPublicKey = chain.fold(parent, DeterministicWallet::derivePublicKey)
+    @ExperimentalUnsignedTypes
+    fun derivePublicKey(parent: ExtendedPublicKey, chain: List<Long>): ExtendedPublicKey =
+        chain.fold(parent, DeterministicWallet::derivePublicKey)
 
-    fun derivePublicKey(parent: ExtendedPublicKey, keyPath: KeyPath): ExtendedPublicKey = derivePublicKey(parent, keyPath.path)
+    @ExperimentalUnsignedTypes
+    fun derivePublicKey(parent: ExtendedPublicKey, keyPath: KeyPath): ExtendedPublicKey =
+        derivePublicKey(parent, keyPath.path)
 
-    fun derivePublicKey(parent: ExtendedPublicKey, keyPath: String): ExtendedPublicKey = derivePublicKey(parent, KeyPath.fromPath(keyPath))
+    @ExperimentalUnsignedTypes
+    fun derivePublicKey(parent: ExtendedPublicKey, keyPath: String): ExtendedPublicKey =
+        derivePublicKey(parent, KeyPath.fromPath(keyPath))
 
     // p2pkh mainnet
     const val xprv = 0x0488ade4

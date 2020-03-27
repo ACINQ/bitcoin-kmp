@@ -27,5 +27,5 @@ expect object Secp256k1 {
 
     fun der2compact(input: ByteArray): ByteArray
 
-    fun signatureNormalize(input: ByteArray) : Pair<ByteArray, Boolean>
+    fun signatureNormalize(input: ByteArray): Pair<ByteArray, Boolean>
 }

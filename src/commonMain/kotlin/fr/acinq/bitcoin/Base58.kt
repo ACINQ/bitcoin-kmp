@@ -71,7 +71,9 @@ object Base58 {
         }
         // Skip leading zeroes in base58 result.
         var it = size - length
-        while (it != b58.size && b58[it] == 0.toByte()) { it++ }
+        while (it != b58.size && b58[it] == 0.toByte()) {
+            it++
+        }
         // Translate the result into a string.
         val str = StringBuilder()
         repeat(zeroes) { str.append('1') }
@@ -151,7 +153,7 @@ object Base58 {
 object Base58Check {
     fun checksum(data: ByteArray): ByteArray = Crypto.hash256(data).copyOf(4)
 
-    fun encode(prefix: Int, data: ByteArray) : String  = encode(Pack.writeUint32BE(prefix), data)
+    fun encode(prefix: Int, data: ByteArray): String = encode(Pack.writeUint32BE(prefix), data)
 
     /**
      * Encode data in Base58Check format.
@@ -161,9 +163,9 @@ object Base58Check {
      * @param data   date to be encoded
      * @return a Base58 string
      */
-    fun encode(prefix: Byte, data: ByteArray): String  = encode(arrayOf(prefix).toByteArray(), data)
+    fun encode(prefix: Byte, data: ByteArray): String = encode(arrayOf(prefix).toByteArray(), data)
 
-    fun encode(prefix: Byte, data: ByteVector): String  = encode(arrayOf(prefix).toByteArray(), data.toByteArray())
+    fun encode(prefix: Byte, data: ByteVector): String = encode(arrayOf(prefix).toByteArray(), data.toByteArray())
 
     /**
      *

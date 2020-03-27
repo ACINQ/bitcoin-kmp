@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@ExperimentalUnsignedTypes
 @ExperimentalStdlibApi
 class CryptoTestsCommon {
     @Test
@@ -13,7 +14,7 @@ class CryptoTestsCommon {
         val address = "mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY"
         val privateKey = "cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp"
 
-        val (version, data) = Base58Check.decode(privateKey)
+        val (version, _) = Base58Check.decode(privateKey)
         assertEquals(Base58.Prefix.SecretKeyTestnet, version)
         val priv = PrivateKey.fromBase58(privateKey, Base58.Prefix.SecretKeyTestnet).first
         val publicKey = priv.publicKey()
@@ -25,7 +26,7 @@ class CryptoTestsCommon {
     fun `generate public keys from private keys`() {
         val privateKey = PrivateKey(Hex.decode("18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725"))
         val publicKey = privateKey.publicKey()
-        assertEquals(publicKey.value , ByteVector("0250863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b2352"))
+        assertEquals(publicKey.value, ByteVector("0250863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b2352"))
     }
 
     @Test
@@ -41,12 +42,15 @@ class CryptoTestsCommon {
     @ExperimentalStdlibApi
     @Test
     fun `sign and verify signatures`() {
-        val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet).first
+        val privateKey = PrivateKey.fromBase58(
+            "cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp",
+            Base58.Prefix.SecretKeyTestnet
+        ).first
         val publicKey = privateKey.publicKey()
         val data = Crypto.sha256("this is a test".encodeToByteArray())
         val encoded = Crypto.sign(data, privateKey)
-        val encoded1 = ByteVector64("fb36b33afe9308f9eebfcdb0f50cb9c51c72e98a578ee26cabf4a26b5aba1fbf2429e5f5081488190fb01c5165189f2c70e619a3b667e6f1e0fc861d5a8a25d1")
-        assertTrue(Crypto.verifySignature(data, encoded1, publicKey))
+        assertEquals(ByteVector64("fb36b33afe9308f9eebfcdb0f50cb9c51c72e98a578ee26cabf4a26b5aba1fbf2429e5f5081488190fb01c5165189f2c70e619a3b667e6f1e0fc861d5a8a25d1"), encoded)
+        assertTrue(Crypto.verifySignature(data, encoded, publicKey))
     }
 
     @Test
@@ -57,24 +61,31 @@ class CryptoTestsCommon {
                 "Satoshi Nakamoto",
                 "3045022100934b1ea10a4b3c1757e2b0c017d0b6143ce3c9a7e6a4a49860d7a6ab210ee3d802202442ce9d2b916064108014783e923ec36b49743e2ffa1c4496f01a512aafd9e5"
             ),
-            Triple("0000000000000000000000000000000000000000000000000000000000000001",
+            Triple(
+                "0000000000000000000000000000000000000000000000000000000000000001",
                 "Everything should be made as simple as possible, but not simpler.",
                 "3044022033a69cd2065432a30f3d1ce4eb0d59b8ab58c74f27c41a7fdb5696ad4e6108c902206f807982866f785d3f6418d24163ddae117b7db4d5fdf0071de069fa54342262"
             ),
-            Triple("0000000000000000000000000000000000000000000000000000000000000001",
+            Triple(
+                "0000000000000000000000000000000000000000000000000000000000000001",
                 "All those moments will be lost in time, like tears in rain. Time to die...",
                 "30450221008600dbd41e348fe5c9465ab92d23e3db8b98b873beecd930736488696438cb6b0220547fe64427496db33bf66019dacbf0039c04199abb0122918601db38a72cfc21"
             ),
-            Triple("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140",
+            Triple(
+                "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140",
                 "Satoshi Nakamoto",
                 "3045022100fd567d121db66e382991534ada77a6bd3106f0a1098c231e47993447cd6af2d002206b39cd0eb1bc8603e159ef5c20a5c8ad685a45b06ce9bebed3f153d10d93bed5"
             ),
-            Triple("f8b8af8ce3c7cca5e300d33939540c10d45ce001b8f252bfbc57ba0342904181",
+            Triple(
+                "f8b8af8ce3c7cca5e300d33939540c10d45ce001b8f252bfbc57ba0342904181",
                 "Alan Turing",
-                "304402207063ae83e7f62bbb171798131b4a0564b956930092b33b07b395615d9ec7e15c022058dfcc1e00a35e1572f366ffe34ba0fc47db1e7189759b9fb233c5b05ab388ea"),
-            Triple("e91671c46231f833a6406ccbea0e3e392c76c167bac1cb013f6f1013980455c2",
+                "304402207063ae83e7f62bbb171798131b4a0564b956930092b33b07b395615d9ec7e15c022058dfcc1e00a35e1572f366ffe34ba0fc47db1e7189759b9fb233c5b05ab388ea"
+            ),
+            Triple(
+                "e91671c46231f833a6406ccbea0e3e392c76c167bac1cb013f6f1013980455c2",
                 "There is a computer disease that anybody who works with computers knows about. It's a very serious disease and it interferes completely with the work. The trouble with computers is that you 'play' with them!",
-                "3045022100b552edd27580141f3b2a5463048cb7cd3e047b97c9f98076c32dbdf85a68718b0220279fa72dd19bfae05577e06c7c0c1900c371fcd5893f7e1d56a37d30174671f6")
+                "3045022100b552edd27580141f3b2a5463048cb7cd3e047b97c9f98076c32dbdf85a68718b0220279fa72dd19bfae05577e06c7c0c1900c371fcd5893f7e1d56a37d30174671f6"
+            )
         )
         dataset.forEach { it ->
             val (k, m, s) = it

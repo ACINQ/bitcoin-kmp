@@ -1,6 +1,6 @@
 package fr.acinq.bitcoin.crypto
 
-class Sha512: Digest {
+class Sha512 : Digest {
 
     private val DIGEST_LENGTH = 64
 
@@ -10,14 +10,14 @@ class Sha512: Digest {
     private var byteCount1: Long = 0
     private var byteCount2: Long = 0
 
-    private var H1:Long = 0
-    private var H2:Long = 0
-    private var H3:Long = 0
-    private var H4:Long = 0
-    private var H5:Long = 0
-    private var H6:Long = 0
-    private var H7:Long = 0
-    private var H8:Long = 0
+    private var H1: Long = 0
+    private var H2: Long = 0
+    private var H3: Long = 0
+    private var H4: Long = 0
+    private var H5: Long = 0
+    private var H6: Long = 0
+    private var H7: Long = 0
+    private var H8: Long = 0
 
     private val W = LongArray(80)
     private var wOff = 0

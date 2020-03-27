@@ -29,7 +29,8 @@ object Bech32 {
     // whenever you see Byte it means 8bits values
 
     // char -> 5 bits value
-    private val map = Array<Int5>(255){ -1 }
+    private val map = Array<Int5>(255) { -1 }
+
     init {
         for (i in 0..alphabet.lastIndex) {
             map[alphabet[i].toInt()] = i.toByte()
@@ -79,7 +80,7 @@ object Bech32 {
         val pos = input.lastIndexOf('1')
         val hrp = input.take(pos)
         require(hrp.length in 1..83) { "hrp must contain 1 to 83 characters" }
-        val data = Array<Int5>(input.length - pos - 1){ 0 }
+        val data = Array<Int5>(input.length - pos - 1) { 0 }
         for (i in 0..data.lastIndex) data[i] = map[input[pos + 1 + i].toInt()]
         val checksum = polymod(expand(hrp), data)
         require(checksum == 1) { "invalid checksum for $bech32" }
@@ -94,7 +95,8 @@ object Bech32 {
      */
     private fun checksum(hrp: String, data: Array<Int5>): Array<Int5> {
         val values = expand(hrp) + data
-        val poly = polymod(values, arrayOf(0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte())) xor 1
+        val poly =
+            polymod(values, arrayOf(0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte())) xor 1
         val result = Array(6) { i -> (poly.shr(5 * (5 - i)) and 31).toByte() }
         return result
     }
@@ -130,7 +132,7 @@ object Bech32 {
         val output = ArrayList<Byte>()
         var count = 0
         for (i in offset..input.lastIndex) {
-            val b  = input[i]
+            val b = input[i]
             buffer = (buffer shl 5) or (b.toLong() and 31)
             count += 5
             while (count >= 8) {

@@ -1,11 +1,9 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Pack
-import jdk.jfr.DataAmount.BITS
 
 
-
-
+@ExperimentalUnsignedTypes
 class UInt256() : Comparable<UInt256> {
     private val pn = UIntArray(WIDTH)
 
@@ -34,7 +32,7 @@ class UInt256() : Comparable<UInt256> {
     }
 
     override fun compareTo(other: UInt256): Int {
-        for(i in  WIDTH - 1  downTo 0) {
+        for (i in WIDTH - 1 downTo 0) {
             if (pn[i] < other.pn[i]) return -1
             if (pn[i] > other.pn[i]) return 1
         }
@@ -47,9 +45,9 @@ class UInt256() : Comparable<UInt256> {
         return this;
     }
 
-    operator fun unaryMinus() : UInt256 {
+    operator fun unaryMinus(): UInt256 {
         val a = UInt256(this)
-        for(i in a.pn.indices) {
+        for (i in a.pn.indices) {
             a.pn[i] = a.pn[i].inv()
         }
         return a.inc()
@@ -71,10 +69,10 @@ class UInt256() : Comparable<UInt256> {
     operator fun divAssign(other: UInt256) {
         var div = other
         var num = UInt256(this)
-        for(i in pn.indices) pn[i] = 0U
+        for (i in pn.indices) pn[i] = 0U
         val num_bits = num.bits()
         val div_bits = div.bits()
-        require(div_bits > 0){ "division by zero" }
+        require(div_bits > 0) { "division by zero" }
         if (div_bits > num_bits) return
         var shift = num_bits - div_bits
         div = div shl shift
@@ -131,7 +129,7 @@ class UInt256() : Comparable<UInt256> {
 
     fun inv(): UInt256 {
         val a = UInt256(this)
-        for(i in a.pn.indices) {
+        for (i in a.pn.indices) {
             a.pn[i] = a.pn[i].inv()
         }
         return a
@@ -150,11 +148,11 @@ class UInt256() : Comparable<UInt256> {
         return 0;
     }
 
-    fun getLow64() : Long = pn[0].toLong() or (pn[1].toLong().shl(32))
+    fun getLow64(): Long = pn[0].toLong() or (pn[1].toLong().shl(32))
 
     fun endodeCompact(fNegative: Boolean): Long {
         var nSize = (bits() + 7) / 8;
-        var nCompact = 0L;
+        var nCompact: Long;
         if (nSize <= 3) {
             nCompact = getLow64() shl 8 * (3 - nSize);
         } else {
@@ -164,12 +162,12 @@ class UInt256() : Comparable<UInt256> {
         // The 0x00800000 bit denotes the sign.
         // Thus, if it is already set, divide the mantissa by 256 and increase the exponent.
         if ((nCompact and 0x00800000L) != 0L) {
-            nCompact  = nCompact ushr 8;
+            nCompact = nCompact ushr 8;
             nSize++;
         }
         require((nCompact and 0x007fffffL.inv()) == 0L);
         require(nSize < 256);
-        nCompact  = nCompact or (nSize.toLong() shl 24);
+        nCompact = nCompact or (nSize.toLong() shl 24);
         if (fNegative && (nCompact and 0x007fffffL.inv() != 0L)) {
             nCompact = nCompact or 0x00800000
         }

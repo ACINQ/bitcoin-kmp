@@ -3,6 +3,7 @@ package fr.acinq.bitcoin
 import kotlinx.serialization.InternalSerializationApi
 import kotlin.test.Test
 
+@ExperimentalUnsignedTypes
 @InternalSerializationApi
 @ExperimentalStdlibApi
 class PuzzleTestsCommon {

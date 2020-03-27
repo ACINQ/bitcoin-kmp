@@ -6,7 +6,7 @@ sealed class ScriptElt
 
 // @formatter:off
 object OP_0 : ScriptElt()
-object OP_PUSHDATA1: ScriptElt()
+object OP_PUSHDATA1 : ScriptElt()
 object OP_PUSHDATA2 : ScriptElt()
 object OP_PUSHDATA4 : ScriptElt()
 object OP_1NEGATE : ScriptElt()
@@ -123,19 +123,22 @@ object OP_INVALIDOPCODE : ScriptElt()
 data class OP_PUSHDATA(val data: ByteVector, val code: Int) : ScriptElt() {
     constructor(data: ByteArray, code: Int) : this(data.byteVector(), code)
 
-    constructor(data: ByteArray) : this(data,
+    constructor(data: ByteArray) : this(
+        data,
         codeFromDataLength(data.count())
     )
 
-    constructor(data: ByteVector) : this(data,
+    constructor(data: ByteVector) : this(
+        data,
         codeFromDataLength(data.size())
     )
 
-    constructor(data: ByteVector32) : this(data,
+    constructor(data: ByteVector32) : this(
+        data,
         codeFromDataLength(data.size())
     )
 
-    constructor(publicKey: PublicKey): this(publicKey.value)
+    constructor(publicKey: PublicKey) : this(publicKey.value)
 
     companion object {
         fun codeFromDataLength(length: Int): Int {
@@ -151,7 +154,7 @@ data class OP_PUSHDATA(val data: ByteVector, val code: Int) : ScriptElt() {
             return code
         }
 
-        fun isMinimal(data: ByteArray, code: Int) : Boolean {
+        fun isMinimal(data: ByteArray, code: Int): Boolean {
             return when {
                 data.size == 0 -> code == ScriptEltMapping.elt2code[OP_0]
                 data.size == 1 && data[0] >= 1 && data[0] <= 16 -> code == (ScriptEltMapping.elt2code[OP_1])?.plus(data[0] - 1)
@@ -288,12 +291,15 @@ object ScriptEltMapping {
     )
     val elt2code = code2elt.map { it -> it.value to it.key }.toMap()
 
-    fun name(elt: ScriptElt) : String {
+    fun name(elt: ScriptElt): String {
         val name = elt.toString().removePrefix("fr.acinq.bitcoin.OP_")
         val name1 = name.take(name.lastIndexOf('@'))
         return name1
     }
-    val name2code = elt2code.map { it -> name(
-        it.key
-    ) to it.value}.toMap() + mapOf<String, Int>("NOP2" to 0xb1, "NOP3" to 0xb2)
+
+    val name2code = elt2code.map { it ->
+        name(
+            it.key
+        ) to it.value
+    }.toMap() + mapOf<String, Int>("NOP2" to 0xb1, "NOP3" to 0xb2)
 }

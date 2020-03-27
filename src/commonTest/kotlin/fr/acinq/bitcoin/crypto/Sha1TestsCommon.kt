@@ -4,6 +4,7 @@ import fr.acinq.bitcoin.Hex
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
+@ExperimentalUnsignedTypes
 @ExperimentalStdlibApi
 class Sha1TestsCommon {
     val testVectors = arrayOf(

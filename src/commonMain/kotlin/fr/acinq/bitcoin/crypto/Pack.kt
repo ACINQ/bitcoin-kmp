@@ -2,16 +2,14 @@ package fr.acinq.bitcoin.crypto
 
 object Pack {
     fun uint16BE(bs: ByteArray, off: Int): Int {
-        var off = off
         var n: Int = bs[off].toInt() and 0xff shl 8
-        n = n or (bs[++off].toInt() and 0xff)
+        n = n or (bs[off + 1].toInt() and 0xff)
         return n
     }
 
     fun uint16LE(bs: ByteArray, off: Int): Int {
-        var off = off
         var n: Int = bs[off].toInt() and 0xff
-        n = n or (bs[++off].toInt() and 0xff).shl(8)
+        n = n or (bs[off + 1].toInt() and 0xff).shl(8)
         return n
     }
 
@@ -22,27 +20,23 @@ object Pack {
     }
 
     fun writeUint16LE(n: Int, bs: ByteArray, off: Int) {
-        var off = off
         bs[off] = n.toByte()
-        bs[++off] = (n.toInt() ushr 8).toByte()
+        bs[off + 1] = (n.toInt() ushr 8).toByte()
     }
 
     fun uint32BE(bs: ByteArray, off: Int): Int {
-        var off = off
         var n: Int = bs[off].toInt() shl 24
-        n = n or (bs[++off].toInt() and 0xff).shl(16)
-        n = n or (bs[++off].toInt() and 0xff).shl(8)
-        n = n or (bs[++off].toInt() and 0xff)
+        n = n or (bs[off + 1].toInt() and 0xff).shl(16)
+        n = n or (bs[off + 2].toInt() and 0xff).shl(8)
+        n = n or (bs[off + 3].toInt() and 0xff)
         return n
     }
 
-    fun uint32BE(bs: ByteArray): Int= uint32BE(bs, 0)
+    fun uint32BE(bs: ByteArray): Int = uint32BE(bs, 0)
 
     fun uint32BE(bs: ByteArray, off: Int, ns: IntArray) {
-        var off = off
         for (i in ns.indices) {
-            ns[i] = uint32BE(bs, off)
-            off += 4
+            ns[i] = uint32BE(bs, off + 4 * i)
         }
     }
 
@@ -53,11 +47,10 @@ object Pack {
     }
 
     fun writeUint32BE(n: Int, bs: ByteArray, off: Int) {
-        var off = off
         bs[off] = (n ushr 24).toByte()
-        bs[++off] = (n ushr 16).toByte()
-        bs[++off] = (n ushr 8).toByte()
-        bs[++off] = n.toByte()
+        bs[off + 1] = (n ushr 16).toByte()
+        bs[off + 2] = (n ushr 8).toByte()
+        bs[off + 3] = n.toByte()
     }
 
     fun writeUint32BE(ns: IntArray): ByteArray {
@@ -67,45 +60,36 @@ object Pack {
     }
 
     fun writeUint32BE(ns: IntArray, bs: ByteArray, off: Int) {
-        var off = off
         for (i in ns.indices) {
-            writeUint32BE(ns[i], bs, off)
-            off += 4
+            writeUint32BE(ns[i], bs, off + 4 * i)
         }
     }
 
 
     fun uint32LE(bs: ByteArray, off: Int): Int {
-        var off = off
         var n: Int = bs[off].toInt() and 0xff
-        n = n or (bs[++off].toInt() and 0xff).shl(8)
-        n = n or (bs[++off].toInt() and 0xff).shl(16)
-        n = n or bs[++off].toInt().shl(24)
+        n = n or (bs[off + 1].toInt() and 0xff).shl(8)
+        n = n or (bs[off + 2].toInt() and 0xff).shl(16)
+        n = n or bs[off + 3].toInt().shl(24)
         return n
     }
 
     fun uint32LE(bs: ByteArray, off: Int, ns: IntArray) {
-        var off = off
         for (i in ns.indices) {
-            ns[i] = uint32LE(bs, off)
-            off += 4
+            ns[i] = uint32LE(bs, off + 4 * i)
         }
     }
 
     fun uint32LE(bs: ByteArray, bOff: Int, ns: IntArray, nOff: Int, count: Int) {
-        var bOff = bOff
         for (i in 0 until count) {
-            ns[nOff + i] = uint32LE(bs, bOff)
-            bOff += 4
+            ns[nOff + i] = uint32LE(bs, bOff + 4 * i)
         }
     }
 
     fun uint32LE(bs: ByteArray, off: Int, count: Int): IntArray {
-        var off = off
         val ns = IntArray(count)
         for (i in ns.indices) {
-            ns[i] = uint32LE(bs, off)
-            off += 4
+            ns[i] = uint32LE(bs, off + 4 * i)
         }
         return ns
     }
@@ -117,19 +101,18 @@ object Pack {
     }
 
     fun writeUint32LE(n: Int, bs: ByteArray, off: Int) {
-        var off = off
         bs[off] = n.toByte()
-        bs[++off] = (n ushr 8).toByte()
-        bs[++off] = (n ushr 16).toByte()
-        bs[++off] = (n ushr 24).toByte()
+        bs[off + 1] = (n ushr 8).toByte()
+        bs[off + 2] = (n ushr 16).toByte()
+        bs[off + 3] = (n ushr 24).toByte()
     }
 
+    @ExperimentalUnsignedTypes
     fun writeUint32LE(n: UInt, bs: ByteArray, off: Int) {
-        var off = off
         bs[off] = n.toByte()
-        bs[++off] = (n shr 8).toByte()
-        bs[++off] = (n shr 16).toByte()
-        bs[++off] = (n shr 24).toByte()
+        bs[off + 1] = (n shr 8).toByte()
+        bs[off + 2] = (n shr 16).toByte()
+        bs[off + 3] = (n shr 24).toByte()
     }
 
     fun writeUint32LE(ns: IntArray): ByteArray {
@@ -139,10 +122,8 @@ object Pack {
     }
 
     fun writeUint32LE(ns: IntArray, bs: ByteArray, off: Int) {
-        var off = off
         for (i in ns.indices) {
-            writeUint32LE(ns[i], bs, off)
-            off += 4
+            writeUint32LE(ns[i], bs, off + 4 * i)
         }
     }
 
@@ -159,10 +140,8 @@ object Pack {
     }
 
     fun uint64BE(bs: ByteArray, off: Int, ns: LongArray) {
-        var off = off
         for (i in ns.indices) {
-            ns[i] = uint64BE(bs, off)
-            off += 8
+            ns[i] = uint64BE(bs, off + 8 * i)
         }
     }
 
@@ -184,10 +163,8 @@ object Pack {
     }
 
     fun writeUint64BE(ns: LongArray, bs: ByteArray, off: Int) {
-        var off = off
         for (i in ns.indices) {
-            writeUint64BE(ns[i], bs, off)
-            off += 8
+            writeUint64BE(ns[i], bs, off + 8 * i)
         }
     }
 

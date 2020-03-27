@@ -5,6 +5,7 @@ import kotlinx.serialization.InternalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertFails
 
+@ExperimentalUnsignedTypes
 @InternalSerializationApi
 @ExperimentalStdlibApi
 class CheckLockTimeVerifyTestsCommon {

@@ -4,6 +4,7 @@ import org.junit.Test
 import java.math.BigInteger
 import kotlin.test.assertEquals
 
+@ExperimentalUnsignedTypes
 class UInt256TestsJvm {
     @Test
     fun `init`() {
@@ -55,7 +56,13 @@ class UInt256TestsJvm {
         assertEquals(Triple(UInt256(0x12345600), false, false), UInt256.decodeCompact(0x04123456))
         assertEquals(Triple(UInt256(0x12345600), true, false), UInt256.decodeCompact(0x04923456))
         assertEquals(Triple(UInt256(Hex.decode("92340000")), false, false), UInt256.decodeCompact(0x05009234))
-        assertEquals(Triple(UInt256(Hex.decode("1234560000000000000000000000000000000000000000000000000000000000")), false, false), UInt256.decodeCompact(0x20123456))
+        assertEquals(
+            Triple(
+                UInt256(Hex.decode("1234560000000000000000000000000000000000000000000000000000000000")),
+                false,
+                false
+            ), UInt256.decodeCompact(0x20123456)
+        )
 
         /*
         assert(decodeCompact(0x02123456) == Triple(BigInteger.valueOf(0x1234), false, false))

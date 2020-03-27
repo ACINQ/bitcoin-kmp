@@ -41,8 +41,8 @@ class Ripemd160 : Digest {
         H4 = -0x3c2d1e10
     }
 
-    override fun update(`in`: Byte) {
-        xBuf[xBufOff++] = `in`
+    override fun update(input: Byte) {
+        xBuf[xBufOff++] = input
         if (xBufOff == xBuf.size) {
             processWord(xBuf, 0)
             xBufOff = 0
@@ -50,19 +50,19 @@ class Ripemd160 : Digest {
         byteCount++
     }
 
-    override fun update(`in`: ByteArray, inOff: Int, len: Int) {
+    override fun update(input: ByteArray, inputOffset: Int, len: Int) {
         // fill the current word
-        var inOffset = inOff
+        var inOffset = inputOffset
         var length = len
         while (xBufOff != 0 && length > 0) {
-            update(`in`[inOffset])
+            update(input[inOffset])
             inOffset++
             length--
         }
 
         // process whole words.
         while (length > xBuf.size) {
-            processWord(`in`, inOffset)
+            processWord(input, inOffset)
             inOffset += xBuf.size
             length -= xBuf.size
             byteCount += xBuf.size.toLong()
@@ -70,7 +70,7 @@ class Ripemd160 : Digest {
 
         // process the remainder.
         while (length > 0) {
-            update(`in`[inOffset])
+            update(input[inOffset])
             inOffset++
             length--
         }
@@ -107,13 +107,13 @@ class Ripemd160 : Digest {
         X[15] = (bitLength ushr 32).toInt()
     }
 
-    override fun doFinal(out: ByteArray, outOff: Int): Int {
+    override fun doFinal(out: ByteArray, outOffset: Int): Int {
         finish()
-        Pack.writeUint32LE(H0, out, outOff)
-        Pack.writeUint32LE(H1, out, outOff + 4)
-        Pack.writeUint32LE(H2, out, outOff + 8)
-        Pack.writeUint32LE(H3, out, outOff + 12)
-        Pack.writeUint32LE(H4, out, outOff + 16)
+        Pack.writeUint32LE(H0, out, outOffset)
+        Pack.writeUint32LE(H1, out, outOffset + 4)
+        Pack.writeUint32LE(H2, out, outOffset + 8)
+        Pack.writeUint32LE(H3, out, outOffset + 12)
+        Pack.writeUint32LE(H4, out, outOffset + 16)
         reset()
         return DIGEST_SIZE
     }

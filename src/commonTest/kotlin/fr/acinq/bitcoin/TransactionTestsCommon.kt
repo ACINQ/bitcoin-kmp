@@ -6,6 +6,7 @@ import kotlinx.serialization.InternalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+@ExperimentalUnsignedTypes
 @InternalSerializationApi
 @ExperimentalStdlibApi
 class TransactionTestsCommon {

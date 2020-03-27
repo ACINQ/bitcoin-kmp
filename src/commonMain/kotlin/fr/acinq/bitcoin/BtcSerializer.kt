@@ -190,10 +190,19 @@ interface BtcSerializer<T> {
         fun writeScript(input: ByteVector, out: OutputStream) = writeScript(input.toByteArray(), out)
 
 
-        fun <T> readCollection(input: InputStream, reader: BtcSerializer<T>, maxElement: Int?, protocolVersion: Long): List<T>
-                = readCollection(input, reader::read, maxElement, protocolVersion)
+        fun <T> readCollection(
+            input: InputStream,
+            reader: BtcSerializer<T>,
+            maxElement: Int?,
+            protocolVersion: Long
+        ): List<T> = readCollection(input, reader::read, maxElement, protocolVersion)
 
-        fun <T> readCollection(input: InputStream, reader: (InputStream, Long) -> T, maxElement: Int?, protocolVersion: Long): List<T> {
+        fun <T> readCollection(
+            input: InputStream,
+            reader: (InputStream, Long) -> T,
+            maxElement: Int?,
+            protocolVersion: Long
+        ): List<T> {
             val count = varint(input)
             if (maxElement != null) require(count <= maxElement) { "invalid length" }
             val items = mutableListOf<T>()
@@ -203,13 +212,22 @@ interface BtcSerializer<T> {
             return items.toList()
         }
 
-        fun <T> readCollection(input: InputStream, reader: BtcSerializer<T>, protocolVersion: Long): List<T>
-                = readCollection(input, reader, null, protocolVersion)
+        fun <T> readCollection(input: InputStream, reader: BtcSerializer<T>, protocolVersion: Long): List<T> =
+            readCollection(input, reader, null, protocolVersion)
 
-        fun <T> writeCollection(seq: List<T>, output: OutputStream, writer: BtcSerializer<T>, protocolVersion: Long): Unit
-                = writeCollection(seq, output, writer::write, protocolVersion)
+        fun <T> writeCollection(
+            seq: List<T>,
+            output: OutputStream,
+            writer: BtcSerializer<T>,
+            protocolVersion: Long
+        ): Unit = writeCollection(seq, output, writer::write, protocolVersion)
 
-        fun <T> writeCollection(seq: List<T>, output: OutputStream, writer: (T, OutputStream, Long) -> Unit, protocolVersion: Long): Unit {
+        fun <T> writeCollection(
+            seq: List<T>,
+            output: OutputStream,
+            writer: (T, OutputStream, Long) -> Unit,
+            protocolVersion: Long
+        ): Unit {
             writeVarint(seq.size, output)
             seq.forEach { writer.invoke(it, output, protocolVersion) }
         }

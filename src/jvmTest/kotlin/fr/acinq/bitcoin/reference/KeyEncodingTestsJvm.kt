@@ -7,7 +7,9 @@ import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.crypto.PrivateKey
 import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
+import java.lang.IllegalArgumentException
 
+@ExperimentalUnsignedTypes
 @ExperimentalStdlibApi
 @InternalSerializationApi
 class KeyEncodingTestsJvm {
@@ -18,33 +20,61 @@ class KeyEncodingTestsJvm {
         val stream = javaClass.getResourceAsStream("/data/key_io_valid.json")
         val tests = mapper.readValue<Array<Array<JsonNode>>>(stream)
         tests.filter { it.size == 3 }.forEach {
-            val encoded: String = it[0].textValue()
+            var encoded: String = it[0].textValue()
             val hex: String = it[1].textValue()
             val isPrivkey = it[2]["isPrivkey"].booleanValue()
             val chain = it[2]["chain"].textValue()
-            val isCompressed = it[2]["isCompressed"]?.booleanValue()
-            val tryCaseFlip = it[2]["tryCaseFlip"]?.booleanValue()
+            val tryCaseFlip = it[2]["tryCaseFlip"]?.booleanValue() ?: false
             if (isPrivkey) {
                 val (version, data) = Base58Check.decode(encoded)
                 assert(version == Base58.Prefix.SecretKey || version == Base58.Prefix.SecretKeyTestnet)
                 assert(Hex.encode(data.take(32).toByteArray()) == hex)
-            } else when (encoded.first()) {
-                '1', 'm', 'n' -> {
-                    val (version, data) = Base58Check.decode(encoded)
-                    assert(version == Base58.Prefix.PubkeyAddress || version == Base58.Prefix.PubkeyAddressTestnet)
-                    assert(Script.parse(hex) == listOf(OP_DUP, OP_HASH160, OP_PUSHDATA(data), OP_EQUALVERIFY, OP_CHECKSIG))
+                val isCompressed = it[2]["isCompressed"]?.booleanValue()
+                isCompressed?.let {
+                    when (it) {
+                        false -> assert(data.size == 32)
+                        true -> assert(data.size == 33 && data.last() == 1.toByte())
+                    }
                 }
-                '2', '3' -> {
-                    val (version, data) = Base58Check.decode(encoded)
-                    assert(version == Base58.Prefix.ScriptAddress || version == Base58.Prefix.ScriptAddressTestnet)
-                    assert(Script.parse(hex) == listOf(OP_HASH160, OP_PUSHDATA(data), OP_EQUAL))
-                }
-                else -> {
-                    when (encoded.substring(0, 2)) {
-                        "bc", "tb", "bcrt" -> {
-                            val (_, tag, program) = Bech32.decodeWitnessAddress(encoded)
-                            assert(Script.parse(hex) == listOf(Script.fromSimpleValue(tag), OP_PUSHDATA(program)))
+            } else {
+                when (encoded.first()) {
+                    '1', 'm', 'n' -> {
+                        val (version, data) = Base58Check.decode(encoded)
+                        assert(version == Base58.Prefix.PubkeyAddress || version == Base58.Prefix.PubkeyAddressTestnet)
+                        assert(
+                            Script.parse(hex) == listOf(
+                                OP_DUP,
+                                OP_HASH160,
+                                OP_PUSHDATA(data),
+                                OP_EQUALVERIFY,
+                                OP_CHECKSIG
+                            )
+                        )
+                    }
+                    '2', '3' -> {
+                        val (version, data) = Base58Check.decode(encoded)
+                        assert(version == Base58.Prefix.ScriptAddress || version == Base58.Prefix.ScriptAddressTestnet)
+                        assert(Script.parse(hex) == listOf(OP_HASH160, OP_PUSHDATA(data), OP_EQUAL))
+                    }
+                    else -> {
+                        if (tryCaseFlip) {
+                            encoded = encoded.map { c ->
+                                when (c) {
+                                    in 'a'..'z' -> 'A' + (c - 'a')
+                                    in 'A'..'Z' -> 'a' + (c - 'A')
+                                    else -> c
+                                }
+                            }.joinToString("")
                         }
+                        val prefix = when(chain) {
+                            "main" -> "bc"
+                            "test" -> "tb"
+                            "regtest" -> "bcrt"
+                            else -> throw IllegalArgumentException("invalid chain $chain")
+                        }
+                        require(encoded.startsWith(prefix, ignoreCase = true))
+                        val (_, tag, program) = Bech32.decodeWitnessAddress(encoded)
+                        assert(Script.parse(hex) == listOf(Script.fromSimpleValue(tag), OP_PUSHDATA(program)))
                     }
                 }
             }
@@ -62,7 +92,7 @@ class KeyEncodingTestsJvm {
         }
     }
 
-    private fun isValidBase58(value: String) : Boolean {
+    private fun isValidBase58(value: String): Boolean {
         return try {
             val (prefix, bin) = Base58Check.decode(value)
             when (prefix) {
@@ -73,8 +103,7 @@ class KeyEncodingTestsJvm {
                 Base58.Prefix.PubkeyAddress, Base58.Prefix.PubkeyAddressTestnet -> bin.size == 20
                 else -> false
             }
-        }
-        catch (e: Exception) {
+        } catch (e: Exception) {
             false
         }
     }
@@ -86,8 +115,7 @@ class KeyEncodingTestsJvm {
                 flag == 0.toByte() && (hrp == "bc" || hrp == "tb" || hrp == "bcrt") && (bin.size == 20 || bin.size == 32) -> true
                 else -> false
             }
-        }
-        catch (e: Exception) {
+        } catch (e: Exception) {
             false
         }
     }

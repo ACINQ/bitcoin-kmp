@@ -24,7 +24,7 @@ data class PublicKey(val value: ByteVector) {
 
     override fun toString() = value.toString()
 
-    fun toUncompressedBin(): ByteArray  {
+    fun toUncompressedBin(): ByteArray {
         return Secp256k1.parsePublicKey(value.toByteArray())
     }
 

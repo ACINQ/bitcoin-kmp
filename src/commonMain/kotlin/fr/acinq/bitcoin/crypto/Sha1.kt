@@ -1,5 +1,6 @@
 package fr.acinq.bitcoin.crypto
 
+@ExperimentalUnsignedTypes
 class Sha1 : Digest {
     private var H1 = 0
     private var H2 = 0
@@ -40,15 +41,14 @@ class Sha1 : Digest {
     }
 
     override fun update(input: ByteArray, inputOffset: Int, len: Int) {
-        var len = len
-        len = kotlin.math.max(0, len)
+        val len1 = kotlin.math.max(0, len)
 
         //
         // fill the current word
         //
         var i = 0
         if (xBufOff != 0) {
-            while (i < len) {
+            while (i < len1) {
                 xBuf[xBufOff++] = input[inputOffset + i++]
                 if (xBufOff == 4) {
                     processWord(xBuf, 0)
@@ -61,7 +61,7 @@ class Sha1 : Digest {
         //
         // process whole words.
         //
-        val limit = (len - i and 3.inv()) + i
+        val limit = (len1 - i and 3.inv()) + i
         while (i < limit) {
             processWord(input, inputOffset + i)
             i += 4
@@ -70,20 +70,19 @@ class Sha1 : Digest {
         //
         // load in the remainder.
         //
-        while (i < len) {
+        while (i < len1) {
             xBuf[xBufOff++] = input[inputOffset + i++]
         }
-        byteCount += len.toLong()
+        byteCount += len1.toLong()
     }
 
     private fun processWord(`in`: ByteArray, inOff: Int) {
         // Note: Inlined for performance
 //        X[xOff] = Pack.bigEndianToInt(in, inOff);
-        var inOff = inOff
         var n: Int = (`in`[inOff].toInt() and 0xff) shl 24
-        n = n or ((`in`[++inOff].toInt() and 0xff) shl 16)
-        n = n or ((`in`[++inOff].toInt() and 0xff) shl 8)
-        n = n or ((`in`[++inOff].toInt() and 0xff))
+        n = n or ((`in`[inOff + 1].toInt() and 0xff) shl 16)
+        n = n or ((`in`[inOff + 2].toInt() and 0xff) shl 8)
+        n = n or ((`in`[inOff + 3].toInt() and 0xff))
         X[xOff] = n
         if (++xOff == 16) {
             processBlock()
@@ -98,13 +97,13 @@ class Sha1 : Digest {
         X[15] = bitLength.toInt()
     }
 
-    override fun doFinal(out: ByteArray, outOff: Int ): Int {
+    override fun doFinal(out: ByteArray, outOffset: Int): Int {
         finish()
-        Pack.writeUint32BE(H1, out, outOff)
-        Pack.writeUint32BE(H2, out, outOff + 4)
-        Pack.writeUint32BE(H3, out, outOff + 8)
-        Pack.writeUint32BE(H4, out, outOff + 12)
-        Pack.writeUint32BE(H5, out, outOff + 16)
+        Pack.writeUint32BE(H1, out, outOffset)
+        Pack.writeUint32BE(H2, out, outOffset + 4)
+        Pack.writeUint32BE(H3, out, outOffset + 8)
+        Pack.writeUint32BE(H4, out, outOffset + 12)
+        Pack.writeUint32BE(H5, out, outOffset + 16)
         reset()
         return DIGEST_LENGTH
     }
@@ -122,6 +121,7 @@ class Sha1 : Digest {
         processLength(bitLength)
         processBlock()
     }
+
     /**
      * reset the chaining variables
      */

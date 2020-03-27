@@ -28,7 +28,12 @@ import kotlin.test.Test
 class Base58RerenceTestsJvm {
     val mapper = jacksonObjectMapper()
 
-    data class TestData(val isCompressed: Boolean?, val addrType: String?, val isPrivkey: Boolean, val isTesnet: Boolean)
+    data class TestData(
+        val isCompressed: Boolean?,
+        val addrType: String?,
+        val isPrivkey: Boolean,
+        val isTesnet: Boolean
+    )
 
     @Test
     fun `reference encode-decode test`() {

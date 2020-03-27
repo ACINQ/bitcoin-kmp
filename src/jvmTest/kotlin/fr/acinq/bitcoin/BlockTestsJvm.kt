@@ -5,6 +5,7 @@ import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 import kotlin.test.assertEquals
 
+@ExperimentalUnsignedTypes
 @ExperimentalStdlibApi
 @InternalSerializationApi
 class BlockTestsJvm {
@@ -42,10 +43,22 @@ class BlockTestsJvm {
 
     @Test
     fun `compute proof of work`() {
-        assertEquals(UInt256(Hex.decode("0000000000000000000000000000000000000000000000000000000400040004")), BlockHeader.blockProof(473956288))
-        assertEquals(UInt256(Hex.decode("0000000000000000000000000000000000000000000000000000010fc306ae30")), BlockHeader.blockProof(469823783))
-        assertEquals(UInt256(Hex.decode("000000000000000000000000000000000000000000000000000003177fdc0ed1")), BlockHeader.blockProof(458411200))
-        assertEquals(UInt256(Hex.decode("0000000000000000000000000000000000000000000000000000000672b107dd")), BlockHeader.blockProof(472363968))
+        assertEquals(
+            UInt256(Hex.decode("0000000000000000000000000000000000000000000000000000000400040004")),
+            BlockHeader.blockProof(473956288)
+        )
+        assertEquals(
+            UInt256(Hex.decode("0000000000000000000000000000000000000000000000000000010fc306ae30")),
+            BlockHeader.blockProof(469823783)
+        )
+        assertEquals(
+            UInt256(Hex.decode("000000000000000000000000000000000000000000000000000003177fdc0ed1")),
+            BlockHeader.blockProof(458411200)
+        )
+        assertEquals(
+            UInt256(Hex.decode("0000000000000000000000000000000000000000000000000000000672b107dd")),
+            BlockHeader.blockProof(472363968)
+        )
     }
 
     @Test
@@ -62,10 +75,32 @@ class BlockTestsJvm {
 
     @Test
     fun `calculate next work required`() {
-        val header = BlockHeader(version = 2, hashPreviousBlock = ByteVector32.Zeroes, hashMerkleRoot = ByteVector32.Zeroes, time = 0L, bits = 0L, nonce = 0L)
+        val header = BlockHeader(
+            version = 2,
+            hashPreviousBlock = ByteVector32.Zeroes,
+            hashMerkleRoot = ByteVector32.Zeroes,
+            time = 0L,
+            bits = 0L,
+            nonce = 0L
+        )
 
-        assert(BlockHeader.calculateNextWorkRequired(header.copy(time = 1262152739, bits = 0x1d00ffff), 1261130161) == 0x1d00d86aL)
-        assert(BlockHeader.calculateNextWorkRequired(header.copy(time = 1233061996, bits = 0x1d00ffff), 1231006505) == 0x1d00ffffL)
-        assert(BlockHeader.calculateNextWorkRequired(header.copy(time = 1279297671, bits = 0x1c05a3f4), 1279008237) == 0x1c0168fdL)
+        assert(
+            BlockHeader.calculateNextWorkRequired(
+                header.copy(time = 1262152739, bits = 0x1d00ffff),
+                1261130161
+            ) == 0x1d00d86aL
+        )
+        assert(
+            BlockHeader.calculateNextWorkRequired(
+                header.copy(time = 1233061996, bits = 0x1d00ffff),
+                1231006505
+            ) == 0x1d00ffffL
+        )
+        assert(
+            BlockHeader.calculateNextWorkRequired(
+                header.copy(time = 1279297671, bits = 0x1c05a3f4),
+                1279008237
+            ) == 0x1c0168fdL
+        )
     }
 }

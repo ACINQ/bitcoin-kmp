@@ -97,9 +97,10 @@ class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 32
 class ByteVector64(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 64) {
     constructor(bytes: ByteArray) : this(bytes, 0)
     constructor(input: String) : this(Hex.decode(input), 0)
+
     init {
         require(offset >= 0 && offset < bytes.size)
-        require(bytes.size - offset == 64){ "ByteVector64 must contain 64 bytes, not ${bytes.size - offset}"}
+        require(bytes.size - offset == 64) { "ByteVector64 must contain 64 bytes, not ${bytes.size - offset}" }
     }
 }
 

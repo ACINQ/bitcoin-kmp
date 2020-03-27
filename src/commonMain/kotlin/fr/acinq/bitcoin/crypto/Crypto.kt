@@ -8,6 +8,7 @@ import kotlinx.io.ByteArrayInputStream
 import kotlinx.serialization.InternalSerializationApi
 
 object Crypto {
+    @ExperimentalUnsignedTypes
     fun sha1(input: ByteVector): ByteArray = Sha1.hash(input.toByteArray())
 
     fun sha256(input: ByteArray, offset: Int, len: Int) = Sha256.hash(input, offset, len)
@@ -34,7 +35,7 @@ object Crypto {
 
     fun hash160(input: ByteVector) = hash160(input.toByteArray(), 0, input.size())
 
-    fun hmac512(key: ByteArray, data: ByteArray) : ByteArray {
+    fun hmac512(key: ByteArray, data: ByteArray): ByteArray {
         return HMac.hmac(key, data, Sha512(), 128)
     }
 
@@ -64,8 +65,8 @@ object Crypto {
      * @return a (r, s) ECDSA signature pair
      */
     fun sign(data: ByteArray, privateKey: PrivateKey): ByteVector64 {
-         val bin = Secp256k1.sign(data, privateKey.value.toByteArray())
-         return ByteVector64(bin)
+        val bin = Secp256k1.sign(data, privateKey.value.toByteArray())
+        return ByteVector64(bin)
     }
 
     fun sign(data: ByteVector32, privateKey: PrivateKey): ByteVector64 = sign(data.toByteArray(), privateKey)
@@ -80,12 +81,13 @@ object Crypto {
         return Secp256k1.verify(data, signature.toByteArray(), publicKey.value.toByteArray())
     }
 
-    fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean = verifySignature(data.toByteArray(), signature, publicKey)
+    fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean =
+        verifySignature(data.toByteArray(), signature, publicKey)
 
-    fun compact2der(signature: ByteVector64) : ByteVector = ByteVector(Secp256k1.compact2der(signature.toByteArray()))
+    fun compact2der(signature: ByteVector64): ByteVector = ByteVector(Secp256k1.compact2der(signature.toByteArray()))
 
     @InternalSerializationApi
-    fun der2compact(signature: ByteArray) : ByteVector64 = ByteVector64(Secp256k1.der2compact(signature))
+    fun der2compact(signature: ByteArray): ByteVector64 = ByteVector64(Secp256k1.der2compact(signature))
 
     fun isDERSignature(sig: ByteArray): Boolean {
         // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S] [sighash]
@@ -153,7 +155,7 @@ object Crypto {
     }
 
     @InternalSerializationApi
-    fun isLowDERSignature(sig: ByteArray): Boolean  = !Secp256k1.signatureNormalize(sig).second
+    fun isLowDERSignature(sig: ByteArray): Boolean = !Secp256k1.signatureNormalize(sig).second
 
     fun isDefinedHashtypeSignature(sig: ByteArray): Boolean = if (sig.isEmpty()) false else {
         val hashType = (sig.last().toInt() and 0xff) and (SigHash.SIGHASH_ANYONECANPAY.inv())
@@ -165,7 +167,10 @@ object Crypto {
         // Empty signature. Not strictly DER encoded, but allowed to provide a
         // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
         return if (sig.isEmpty()) true
-        else if ((flags and (SCRIPT_VERIFY_DERSIG or SCRIPT_VERIFY_LOW_S or SCRIPT_VERIFY_STRICTENC)) != 0 && !isDERSignature(sig)) false
+        else if ((flags and (SCRIPT_VERIFY_DERSIG or SCRIPT_VERIFY_LOW_S or SCRIPT_VERIFY_STRICTENC)) != 0 && !isDERSignature(
+                sig
+            )
+        ) false
         else if ((flags and SCRIPT_VERIFY_LOW_S) != 0 && !isLowDERSignature(sig)) false
         else if ((flags and SCRIPT_VERIFY_STRICTENC) != 0 && !isDefinedHashtypeSignature(sig)) false
         else true

@@ -4,8 +4,8 @@ import kotlin.experimental.xor
 
 object Pbkdf2 {
     interface Prf {
-        fun outputLen() : Int
-        fun process(input: ByteArray) : ByteArray
+        fun outputLen(): Int
+        fun process(input: ByteArray): ByteArray
     }
 
     class Hmac512(val password: ByteArray) : Prf {
@@ -28,8 +28,8 @@ object Pbkdf2 {
             }
         }
 
-        fun f(i: Int): ByteArray {
-            var u = prf.process(salt + Pack.writeUint32BE(i))
+        fun f(index: Int): ByteArray {
+            var u = prf.process(salt + Pack.writeUint32BE(index))
             var output = u.copyOf()
             for (i in 1 until count) {
                 u = prf.process(u)
@@ -40,7 +40,7 @@ object Pbkdf2 {
 
         var t = f(1)
         for (i in 2 until l) {
-            t += f(i)
+            t += if (i == l - 1) f(i).take(r).toByteArray() else f(i)
         }
         return t
     }

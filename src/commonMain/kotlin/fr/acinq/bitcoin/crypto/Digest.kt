@@ -45,7 +45,7 @@ interface Digest {
      */
     fun reset()
 
-    fun hash(input: ByteArray, inputOffset: Int, len: Int) : ByteArray {
+    fun hash(input: ByteArray, inputOffset: Int, len: Int): ByteArray {
         reset()
         update(input, inputOffset, len)
         val output = ByteArray(getDigestSize())

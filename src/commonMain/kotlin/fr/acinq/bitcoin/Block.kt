@@ -17,11 +17,21 @@ import kotlinx.serialization.InternalSerializationApi
  */
 @ExperimentalStdlibApi
 @InternalSerializationApi
-data class BlockHeader(val version: Long, val hashPreviousBlock: ByteVector32, val hashMerkleRoot: ByteVector32, val time: Long, val bits: Long, val nonce: Long) {
+data class BlockHeader(
+    val version: Long,
+    val hashPreviousBlock: ByteVector32,
+    val hashMerkleRoot: ByteVector32,
+    val time: Long,
+    val bits: Long,
+    val nonce: Long
+) {
+    @ExperimentalUnsignedTypes
     val hash: ByteVector32 by lazy { ByteVector32(Crypto.hash256(BlockHeader.write(this))) }
 
+    @ExperimentalUnsignedTypes
     val blockId: ByteVector32 by lazy { hash.reversed() }
 
+    @ExperimentalUnsignedTypes
     @ExperimentalStdlibApi
     @InternalSerializationApi
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
@@ -33,7 +43,14 @@ data class BlockHeader(val version: Long, val hashPreviousBlock: ByteVector32, v
             val time = BtcSerializer.uint32(input)
             val bits = BtcSerializer.uint32(input)
             val nonce = BtcSerializer.uint32(input)
-            return BlockHeader(version, hashPreviousBlock.byteVector32(), hashMerkleRoot.byteVector32(), time, bits, nonce)
+            return BlockHeader(
+                version,
+                hashPreviousBlock.byteVector32(),
+                hashMerkleRoot.byteVector32(),
+                time,
+                bits,
+                nonce
+            )
         }
 
         override fun write(message: BlockHeader, output: OutputStream, protocolVersion: Long) {
@@ -45,9 +62,10 @@ data class BlockHeader(val version: Long, val hashPreviousBlock: ByteVector32, v
             BtcSerializer.writeUInt32(message.nonce, output)
         }
 
+        @ExperimentalUnsignedTypes
         fun getDifficulty(header: BlockHeader): UInt256 {
-            val (diff, neg, overflow) = UInt256.decodeCompact(header.bits)
-            return diff
+            val (diff, neg, _) = UInt256.decodeCompact(header.bits)
+            return if (neg) -diff else diff
         }
 
         /**
@@ -93,7 +111,7 @@ data class BlockHeader(val version: Long, val hashPreviousBlock: ByteVector32, v
             target /= UInt256(targetTimespan)
 
             val powLimit = UInt256(Hex.decode("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-            if(target > powLimit) target = powLimit
+            if (target > powLimit) target = powLimit
             return target.endodeCompact(false)
         }
     }
@@ -119,6 +137,7 @@ object MerkleTree {
     }
 }
 
+@ExperimentalUnsignedTypes
 @InternalSerializationApi
 @ExperimentalStdlibApi
 data class Block(val header: BlockHeader, val tx: List<Transaction>) {
@@ -143,7 +162,8 @@ data class Block(val header: BlockHeader, val tx: List<Transaction>) {
         override fun validate(message: Block) {
             BlockHeader.validate(message.header)
             require(message.header.hashMerkleRoot == MerkleTree.computeRoot(message.tx.map { it -> it.hash })) { "invalid block:  merkle root mismatch" }
-            require(message.tx.map { it.hash }.toSet().size == message.tx.size) { "invalid block: duplicate transactions" }
+            require(message.tx.map { it.hash }
+                .toSet().size == message.tx.size) { "invalid block: duplicate transactions" }
             message.tx.map { Transaction.validate(it) }
         }
 
@@ -153,7 +173,7 @@ data class Block(val header: BlockHeader, val tx: List<Transaction>) {
          * @param block
          * @return true if the input block validates its expected proof of work
          */
-        fun checkProofOfWork(block: Block): Boolean = `???`()
+        fun checkProofOfWork(block: Block): Boolean = BlockHeader.checkProofOfWork(block.header)
 
         // genesis blocks
         val LivenetGenesisBlock = {
@@ -167,21 +187,43 @@ data class Block(val header: BlockHeader, val tx: List<Transaction>) {
                 OP_CHECKSIG
             )
             Block(
-                BlockHeader(version = 1, hashPreviousBlock = ByteVector32.Zeroes, hashMerkleRoot = ByteVector32("3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"), time = 1231006505, bits = 0x1d00ffff, nonce = 2083236893),
+                BlockHeader(
+                    version = 1,
+                    hashPreviousBlock = ByteVector32.Zeroes,
+                    hashMerkleRoot = ByteVector32("3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"),
+                    time = 1231006505,
+                    bits = 0x1d00ffff,
+                    nonce = 2083236893
+                ),
                 listOf(
-                    Transaction(version = 1,
+                    Transaction(
+                        version = 1,
                         txIn = listOf(TxIn.coinbase(script)),
                         txOut = listOf(TxOut(amount = Satoshi(5000000000), publicKeyScript = scriptPubKey)),
-                        lockTime = 0)
+                        lockTime = 0
+                    )
                 )
             )
         }.invoke()
 
-        val TestnetGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458))
+        val TestnetGenesisBlock =
+            LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458))
 
-        val RegtestGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(bits = 0x207fffffL, nonce = 2, time = 1296688602))
+        val RegtestGenesisBlock = LivenetGenesisBlock.copy(
+            header = LivenetGenesisBlock.header.copy(
+                bits = 0x207fffffL,
+                nonce = 2,
+                time = 1296688602
+            )
+        )
 
-        val SegnetGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(bits = 503447551, time = 1452831101, nonce = 0))
+        val SegnetGenesisBlock = LivenetGenesisBlock.copy(
+            header = LivenetGenesisBlock.header.copy(
+                bits = 503447551,
+                time = 1452831101,
+                nonce = 0
+            )
+        )
 
     }
 }

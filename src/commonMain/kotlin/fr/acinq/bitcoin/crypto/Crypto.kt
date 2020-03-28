@@ -6,51 +6,68 @@ import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_LOW_S
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_STRICTENC
 import kotlinx.io.ByteArrayInputStream
 import kotlinx.serialization.InternalSerializationApi
+import kotlin.jvm.JvmStatic
 
 object Crypto {
     @ExperimentalUnsignedTypes
     fun sha1(input: ByteVector): ByteArray = Sha1.hash(input.toByteArray())
 
+    @JvmStatic
     fun sha256(input: ByteArray, offset: Int, len: Int) = Sha256.hash(input, offset, len)
 
+    @JvmStatic
     fun sha256(input: ByteArray) = sha256(input, 0, input.size)
 
+    @JvmStatic
     fun sha256(input: ByteVector) = sha256(input.toByteArray(), 0, input.size())
 
+    @JvmStatic
     fun ripemd160(input: ByteArray, offset: Int, len: Int) = Ripemd160.hash(input, offset, len)
 
+    @JvmStatic
     fun ripemd160(input: ByteArray) = ripemd160(input, 0, input.size)
 
+    @JvmStatic
     fun ripemd160(input: ByteVector) = ripemd160(input.toByteArray(), 0, input.size())
 
+    @JvmStatic
     fun hash256(input: ByteArray, offset: Int, len: Int) = Sha256.hash(Sha256.hash(input, offset, len))
 
+    @JvmStatic
     fun hash256(input: ByteArray) = hash256(input, 0, input.size)
 
+    @JvmStatic
     fun hash256(input: ByteVector) = hash256(input.toByteArray(), 0, input.size())
 
+    @JvmStatic
     fun hash160(input: ByteArray, offset: Int, len: Int) = Ripemd160.hash(Sha256.hash(input, offset, len))
 
+    @JvmStatic
     fun hash160(input: ByteArray) = hash160(input, 0, input.size)
 
+    @JvmStatic
     fun hash160(input: ByteVector) = hash160(input.toByteArray(), 0, input.size())
 
+    @JvmStatic
     fun hmac512(key: ByteArray, data: ByteArray): ByteArray {
         return HMac.hmac(key, data, Sha512(), 128)
     }
 
+    @JvmStatic
     fun isPubKeyValid(key: ByteArray): Boolean = when {
         key.size == 65 && (key[0] == 4.toByte() || key[0] == 6.toByte() || key[0] == 7.toByte()) -> true
         key.size == 33 && (key[0] == 2.toByte() || key[0] == 3.toByte()) -> true
         else -> false
     }
 
+    @JvmStatic
     fun isPubKeyCompressedOrUncompressed(key: ByteArray): Boolean = when {
         key.size == 65 && key[0] == 4.toByte() -> true
         key.size == 33 && (key[0] == 2.toByte() || key[0] == 3.toByte()) -> true
         else -> false
     }
 
+    @JvmStatic
     fun isPubKeyCompressed(key: ByteArray): Boolean = when {
         key.size == 33 && (key[0] == 2.toByte() || key[0] == 3.toByte()) -> true
         else -> false
@@ -64,11 +81,13 @@ object Crypto {
      *                   the key (there is an extra "1" appended to the key)
      * @return a (r, s) ECDSA signature pair
      */
+    @JvmStatic
     fun sign(data: ByteArray, privateKey: PrivateKey): ByteVector64 {
         val bin = Secp256k1.sign(data, privateKey.value.toByteArray())
         return ByteVector64(bin)
     }
 
+    @JvmStatic
     fun sign(data: ByteVector32, privateKey: PrivateKey): ByteVector64 = sign(data.toByteArray(), privateKey)
 
     /**
@@ -77,6 +96,7 @@ object Crypto {
      * @param publicKey public key
      * @return true is signature is valid for this data with this public key
      */
+    @JvmStatic
     fun verifySignature(data: ByteArray, signature: ByteVector64, publicKey: PublicKey): Boolean {
         return Secp256k1.verify(data, signature.toByteArray(), publicKey.value.toByteArray())
     }
@@ -84,11 +104,14 @@ object Crypto {
     fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean =
         verifySignature(data.toByteArray(), signature, publicKey)
 
+    @JvmStatic
     fun compact2der(signature: ByteVector64): ByteVector = ByteVector(Secp256k1.compact2der(signature.toByteArray()))
 
     @InternalSerializationApi
+    @JvmStatic
     fun der2compact(signature: ByteArray): ByteVector64 = ByteVector64(Secp256k1.der2compact(signature))
 
+    @JvmStatic
     fun isDERSignature(sig: ByteArray): Boolean {
         // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S] [sighash]
         // * total-length: 1-byte length descriptor of everything that follows,
@@ -155,14 +178,17 @@ object Crypto {
     }
 
     @InternalSerializationApi
+    @JvmStatic
     fun isLowDERSignature(sig: ByteArray): Boolean = !Secp256k1.signatureNormalize(sig).second
 
+    @JvmStatic
     fun isDefinedHashtypeSignature(sig: ByteArray): Boolean = if (sig.isEmpty()) false else {
         val hashType = (sig.last().toInt() and 0xff) and (SigHash.SIGHASH_ANYONECANPAY.inv())
         !((hashType < SigHash.SIGHASH_ALL || hashType > SigHash.SIGHASH_SINGLE))
     }
 
     @InternalSerializationApi
+    @JvmStatic
     fun checkSignatureEncoding(sig: ByteArray, flags: Int): Boolean {
         // Empty signature. Not strictly DER encoded, but allowed to provide a
         // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
@@ -176,6 +202,7 @@ object Crypto {
         else true
     }
 
+    @JvmStatic
     fun checkPubKeyEncoding(key: ByteArray, flags: Int, sigVersion: Int): Boolean {
         if ((flags and SCRIPT_VERIFY_STRICTENC) != 0) {
             require(isPubKeyCompressedOrUncompressed(key)) { "invalid public key" }
@@ -188,6 +215,7 @@ object Crypto {
     }
 
     @InternalSerializationApi
+    @JvmStatic
     fun decodeSignatureLax(input: ByteArrayInputStream): Pair<ByteArray, ByteArray> {
         require(input.read() == 0x30)
 

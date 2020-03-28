@@ -17,6 +17,8 @@
 package fr.acinq.bitcoin
 
 import kotlinx.io.ByteArrayOutputStream
+import kotlin.jvm.JvmField
+import kotlin.jvm.JvmStatic
 
 open class ByteVector(private val bytes: ByteArray, private val offset: Int, private val size: Int) {
     constructor(bytes: ByteArray) : this(bytes, 0, bytes.size)
@@ -50,9 +52,9 @@ open class ByteVector(private val bytes: ByteArray, private val offset: Int, pri
 
     fun toByteArray() = bytes.copyOfRange(offset, offset + size)
 
-    override fun toString(): String {
-        return Hex.encode(bytes, offset, size)
-    }
+    fun toHex() = Hex.encode(bytes, offset, size)
+
+    override fun toString(): String = toHex()
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -89,8 +91,14 @@ class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 32
     override fun reversed() = ByteVector32(super.toByteArray().reversedArray())
 
     companion object {
+        @JvmField
         val Zeroes = ByteVector32("0000000000000000000000000000000000000000000000000000000000000000")
+
+        @JvmField
         val One = ByteVector32("0100000000000000000000000000000000000000000000000000000000000000")
+
+        @JvmStatic
+        fun fromValidHex(input: String) = ByteVector32(input)
     }
 }
 
@@ -101,6 +109,11 @@ class ByteVector64(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 64
     init {
         require(offset >= 0 && offset < bytes.size)
         require(bytes.size - offset == 64) { "ByteVector64 must contain 64 bytes, not ${bytes.size - offset}" }
+    }
+
+    companion object {
+        @JvmField
+        val Zeroes = ByteVector64("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
     }
 }
 

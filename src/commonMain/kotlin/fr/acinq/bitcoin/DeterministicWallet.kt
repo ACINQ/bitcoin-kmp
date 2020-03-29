@@ -26,9 +26,22 @@ object DeterministicWallet {
     data class KeyPath(val path: List<Long>) {
         constructor(path: String) : this(computePath(path))
 
+        @JvmField
         val lastChildNumber = if (path.isEmpty()) 0L else path.last()
 
         fun derive(number: Long) = KeyPath(path + listOf(number))
+
+        fun append(index: Long): KeyPath {
+            return KeyPath(path + listOf(index))
+        }
+
+        fun append(indexes: List<Long>): KeyPath {
+            return KeyPath(path + indexes)
+        }
+
+        fun append(that: KeyPath): KeyPath {
+            return KeyPath(path + that.path)
+        }
 
         override fun toString() = path.map { KeyPath.childNumberToString(it) }.fold("m") { a, b -> "$a/$b" }
 
@@ -56,11 +69,11 @@ object DeterministicWallet {
     }
 
     data class ExtendedPrivateKey(
-        val secretkeybytes: ByteVector32,
-        val chaincode: ByteVector32,
-        val depth: Int,
-        val path: KeyPath,
-        val parent: Long
+        @JvmField val secretkeybytes: ByteVector32,
+        @JvmField val chaincode: ByteVector32,
+        @JvmField val depth: Int,
+        @JvmField val path: KeyPath,
+        @JvmField val parent: Long
     ) {
         @JvmField
         val privateKey: PrivateKey = PrivateKey(secretkeybytes)
@@ -70,11 +83,11 @@ object DeterministicWallet {
     }
 
     data class ExtendedPublicKey(
-        val publickeybytes: ByteVector,
-        val chaincode: ByteVector32,
-        val depth: Int,
-        val path: KeyPath,
-        val parent: Long
+        @JvmField val publickeybytes: ByteVector,
+        @JvmField val chaincode: ByteVector32,
+        @JvmField val depth: Int,
+        @JvmField val path: KeyPath,
+        @JvmField val parent: Long
     ) {
         init {
             require(publickeybytes.size() == 33)

@@ -44,6 +44,11 @@ open class ByteVector(private val bytes: ByteArray, private val offset: Int, pri
         return ByteVector(bytes, offset + n, size - n)
     }
 
+    open fun update(i: Int, b: Byte): ByteVector {
+        bytes[offset + i] = b
+        return this
+    }
+
     fun takeLast(n: Int) = drop(size - n)
 
     fun dropLast(n: Int) = take(size - n)
@@ -87,6 +92,11 @@ open class ByteVector(private val bytes: ByteArray, private val offset: Int, pri
 class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 32) {
     constructor(bytes: ByteArray) : this(bytes, 0)
     constructor(input: String) : this(Hex.decode(input), 0)
+
+    override fun update(i: Int, b: Byte): ByteVector32 {
+        super.update(i, b)
+        return this
+    }
 
     override fun reversed() = ByteVector32(super.toByteArray().reversedArray())
 

@@ -20,50 +20,7 @@ object DeterministicWallet {
     @JvmStatic
     fun isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
-    data class KeyPath(val path: List<Long>) {
-        constructor(path: String) : this(computePath(path))
 
-        @JvmField
-        val lastChildNumber = if (path.isEmpty()) 0L else path.last()
-
-        fun derive(number: Long) = KeyPath(path + listOf(number))
-
-        fun append(index: Long): KeyPath {
-            return KeyPath(path + listOf(index))
-        }
-
-        fun append(indexes: List<Long>): KeyPath {
-            return KeyPath(path + indexes)
-        }
-
-        fun append(that: KeyPath): KeyPath {
-            return KeyPath(path + that.path)
-        }
-
-        override fun toString() = path.map { KeyPath.childNumberToString(it) }.fold("m") { a, b -> "$a/$b" }
-
-        companion object {
-            val empty = KeyPath(listOf())
-
-            @JvmStatic
-            fun computePath(path: String): List<Long> {
-                fun toNumber(value: String): Long =
-                    if (value.last() == '\'') hardened(value.dropLast(1).toLong()) else value.toLong()
-
-                val path1 = path.removePrefix("m").removePrefix("/")
-                return if (path1.isEmpty())
-                    listOf()
-                else
-                    path1.split('/').map { toNumber(it) }
-            }
-
-            @JvmStatic
-            fun fromPath(path: String): KeyPath = KeyPath(path)
-
-            fun childNumberToString(childNumber: Long) =
-                if (isHardened(childNumber)) ((childNumber - hardenedKeyIndex).toString() + "'") else childNumber.toString()
-        }
-    }
 
     data class ExtendedPrivateKey(
         @JvmField val secretkeybytes: ByteVector32,
@@ -301,4 +258,53 @@ object DeterministicWallet {
     // p2wpkh testnet
     const val vprv = 0x045f18bc
     const val vpub = 0x045f1cf6
+}
+
+@ExperimentalStdlibApi
+@InternalSerializationApi
+data class KeyPath(val path: List<Long>) {
+    constructor(path: String) : this(computePath(path))
+
+    @JvmField
+    val lastChildNumber = if (path.isEmpty()) 0L else path.last()
+
+    fun derive(number: Long) = KeyPath(path + listOf(number))
+
+    fun append(index: Long): KeyPath {
+        return KeyPath(path + listOf(index))
+    }
+
+    fun append(indexes: List<Long>): KeyPath {
+        return KeyPath(path + indexes)
+    }
+
+    fun append(that: KeyPath): KeyPath {
+        return KeyPath(path + that.path)
+    }
+
+    override fun toString() = path.map { KeyPath.childNumberToString(it) }.fold("m") { a, b -> "$a/$b" }
+
+    @InternalSerializationApi
+    @ExperimentalStdlibApi
+    companion object {
+        val empty = KeyPath(listOf())
+
+        @JvmStatic
+        fun computePath(path: String): List<Long> {
+            fun toNumber(value: String): Long =
+                if (value.last() == '\'') DeterministicWallet.hardened(value.dropLast(1).toLong()) else value.toLong()
+
+            val path1 = path.removePrefix("m").removePrefix("/")
+            return if (path1.isEmpty())
+                listOf()
+            else
+                path1.split('/').map { toNumber(it) }
+        }
+
+        @JvmStatic
+        fun fromPath(path: String): KeyPath = KeyPath(path)
+
+        fun childNumberToString(childNumber: Long) =
+            if (DeterministicWallet.isHardened(childNumber)) ((childNumber - DeterministicWallet.hardenedKeyIndex).toString() + "'") else childNumber.toString()
+    }
 }

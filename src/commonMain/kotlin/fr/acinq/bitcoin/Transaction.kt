@@ -731,6 +731,15 @@ data class Transaction(@JvmField val version: Long, @JvmField  val txIn: List<Tx
             }
             correctlySpends(tx, map.toMap(), scriptFlags, callback)
         }
+
+        @ExperimentalUnsignedTypes
+        @JvmStatic
+        fun correctlySpends(
+            tx: Transaction,
+            parent: Transaction,
+            scriptFlags: Int,
+            callback: RunnerCallback? = null
+        ): Unit= correctlySpends(tx, listOf(parent), scriptFlags, callback)
     }
 
     override fun serializer(): BtcSerializer<Transaction> = Transaction

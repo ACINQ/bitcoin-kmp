@@ -1,19 +1,7 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Protocol.PROTOCOL_VERSION
-import fr.acinq.bitcoin.crypto.*
-import fr.acinq.bitcoin.RunnerCallback
-import fr.acinq.bitcoin.Script
 import kotlinx.io.InputStream
-import fr.acinq.bitcoin.BtcSerializer.Companion.hash
-import fr.acinq.bitcoin.BtcSerializer.Companion.readCollection
-import fr.acinq.bitcoin.BtcSerializer.Companion.script
-import fr.acinq.bitcoin.BtcSerializer.Companion.uint32
-import fr.acinq.bitcoin.BtcSerializer.Companion.uint64
-import fr.acinq.bitcoin.BtcSerializer.Companion.writeCollection
-import fr.acinq.bitcoin.BtcSerializer.Companion.writeScript
-import fr.acinq.bitcoin.BtcSerializer.Companion.writeUInt32
-import fr.acinq.bitcoin.BtcSerializer.Companion.writeUInt64
 import kotlinx.io.ByteArrayOutputStream
 import kotlinx.io.OutputStream
 import kotlinx.serialization.InternalSerializationApi
@@ -135,6 +123,12 @@ data class TxIn(
     @JvmField
     val hasWitness: Boolean = witness.isNotNull()
 
+    fun updateSignatureScript(signatureScript: ByteVector) = this.copy(signatureScript = signatureScript)
+
+    fun updateSignatureScript(signatureScript: ByteArray) = this.copy(signatureScript = ByteVector(signatureScript))
+
+    fun updateWitness(witness: ScriptWitness) = this.copy(witness = witness)
+
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     companion object : BtcSerializer<TxIn>() {
         /* Setting nSequence to this value for every input in a transaction disables nLockTime. */
@@ -199,6 +193,8 @@ data class TxOut(@JvmField val amount: Long, @JvmField val publicKeyScript: Byte
         amount,
         Script.write(publicKeyScript).byteVector()
     )
+
+    fun updateAmount(newAmount: Long) = this.copy(amount = newAmount)
 
     @ExperimentalStdlibApi
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
@@ -281,7 +277,15 @@ data class Transaction(@JvmField val version: Long, @JvmField  val txIn: List<Tx
         return tx
     }
 
+    fun updateInputs(inputs: List<TxIn>) = this.copy(txIn = inputs)
+
     fun addInput(input: TxIn): Transaction = this.copy(txIn = this.txIn + input)
+
+    fun updateOutputs(outputs: List<TxOut>) = this.copy(txOut = outputs)
+
+    fun addOutput(output: TxOut): Transaction = this.copy(txOut = this.txOut + output)
+
+    fun weight(): Int = Transaction.weight(this)
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     companion object : BtcSerializer<Transaction>() {

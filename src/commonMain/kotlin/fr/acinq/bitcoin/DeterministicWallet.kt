@@ -1,8 +1,5 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Crypto
-import fr.acinq.bitcoin.crypto.PrivateKey
-import fr.acinq.bitcoin.crypto.PublicKey
 import kotlinx.io.ByteArrayInputStream
 import kotlinx.io.ByteArrayOutputStream
 import kotlinx.serialization.InternalSerializationApi
@@ -76,7 +73,8 @@ object DeterministicWallet {
         @JvmField val parent: Long
     ) {
         @JvmField
-        val privateKey: PrivateKey = PrivateKey(secretkeybytes)
+        val privateKey: PrivateKey =
+            PrivateKey(secretkeybytes)
 
         @JvmField
         val publicKey: PublicKey = privateKey.publicKey()
@@ -94,7 +92,8 @@ object DeterministicWallet {
         }
 
         @JvmField
-        val publicKey: PublicKey = PublicKey(publickeybytes)
+        val publicKey: PublicKey =
+            PublicKey(publickeybytes)
     }
 
     @JvmStatic

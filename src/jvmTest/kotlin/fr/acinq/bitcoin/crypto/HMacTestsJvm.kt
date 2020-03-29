@@ -1,9 +1,9 @@
 package fr.acinq.bitcoin.crypto
 
+import fr.acinq.bitcoin.Crypto
 import fr.acinq.bitcoin.Hex
 import org.junit.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class HMacTestsJvm {
     @Test

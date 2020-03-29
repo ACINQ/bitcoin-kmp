@@ -1,6 +1,7 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.PublicKey
+import kotlin.jvm.JvmField
+import kotlin.jvm.JvmStatic
 
 sealed class ScriptElt
 
@@ -120,7 +121,7 @@ object OP_SMALLINTEGER : ScriptElt()
 object OP_INVALIDOPCODE : ScriptElt()
 // @formatter:on
 
-data class OP_PUSHDATA(val data: ByteVector, val code: Int) : ScriptElt() {
+data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val code: Int) : ScriptElt() {
     constructor(data: ByteArray, code: Int) : this(data.byteVector(), code)
 
     constructor(data: ByteArray) : this(
@@ -141,6 +142,7 @@ data class OP_PUSHDATA(val data: ByteVector, val code: Int) : ScriptElt() {
     constructor(publicKey: PublicKey) : this(publicKey.value)
 
     companion object {
+        @JvmStatic
         fun codeFromDataLength(length: Int): Int {
             val code = when {
                 length < 0x4c -> length
@@ -154,6 +156,7 @@ data class OP_PUSHDATA(val data: ByteVector, val code: Int) : ScriptElt() {
             return code
         }
 
+        @JvmStatic
         fun isMinimal(data: ByteArray, code: Int): Boolean {
             return when {
                 data.size == 0 -> code == ScriptEltMapping.elt2code[OP_0]

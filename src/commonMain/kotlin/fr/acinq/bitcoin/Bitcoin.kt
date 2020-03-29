@@ -1,10 +1,7 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Crypto
-import fr.acinq.bitcoin.crypto.PublicKey
 import kotlinx.serialization.InternalSerializationApi
 import kotlin.jvm.JvmField
-import kotlin.jvm.JvmStatic
 
 @JvmField
 val MaxScriptElementSize = 520

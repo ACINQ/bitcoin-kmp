@@ -1,10 +1,8 @@
-package fr.acinq.bitcoin.crypto
+package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.*
 import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 @ExperimentalUnsignedTypes
 @ExperimentalStdlibApi
@@ -25,14 +23,16 @@ class CryptoTestsJvm {
 
     @Test
     fun `generate public keys from private keys`() {
-        val privateKey = PrivateKey(Hex.decode("18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725"))
+        val privateKey =
+            PrivateKey(Hex.decode("18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725"))
         val publicKey = privateKey.publicKey()
         assert(publicKey.value == ByteVector("0250863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b2352"))
     }
 
     @Test
     fun `generate public keys from private keys 2`() {
-        val privateKey = PrivateKey(Hex.decode("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55"))
+        val privateKey =
+            PrivateKey(Hex.decode("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55"))
         val publicKey = privateKey.publicKey()
         assert(publicKey.value == ByteVector("03D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE"))
 

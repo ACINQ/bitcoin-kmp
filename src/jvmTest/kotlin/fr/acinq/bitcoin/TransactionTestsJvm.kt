@@ -1,7 +1,5 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Crypto
-import fr.acinq.bitcoin.crypto.PrivateKey
 import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -90,11 +88,14 @@ class TransactionTestsJvm {
     @Test
     fun `create and sign p2sh transactions`() {
 
-        val key1 = PrivateKey(Hex.decode("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01"))
+        val key1 =
+            PrivateKey(Hex.decode("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01"))
         val pub1 = key1.publicKey()
-        val key2 = PrivateKey(Hex.decode("5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C01"))
+        val key2 =
+            PrivateKey(Hex.decode("5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C01"))
         val pub2 = key2.publicKey()
-        val key3 = PrivateKey(Hex.decode("29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C01"))
+        val key3 =
+            PrivateKey(Hex.decode("29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C01"))
         val pub3 = key3.publicKey()
 
         // we want to spend the first output of this tx

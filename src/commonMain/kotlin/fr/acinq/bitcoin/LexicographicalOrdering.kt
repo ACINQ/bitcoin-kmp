@@ -1,6 +1,5 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.PublicKey
 import kotlinx.serialization.InternalSerializationApi
 import kotlin.jvm.JvmStatic
 

@@ -1,6 +1,5 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Crypto
 import kotlinx.io.InputStream
 import kotlinx.io.OutputStream
 import kotlinx.serialization.InternalSerializationApi
@@ -74,6 +73,11 @@ data class BlockHeader(
             BtcSerializer.writeUInt32(message.time, output)
             BtcSerializer.writeUInt32(message.bits, output)
             BtcSerializer.writeUInt32(message.nonce, output)
+        }
+
+        @JvmStatic
+        override fun write(message: BlockHeader): ByteArray {
+            return super.write(message)
         }
 
         @ExperimentalUnsignedTypes
@@ -173,6 +177,11 @@ data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Trans
             BlockHeader.write(message.header, out)
             BtcSerializer.writeCollection(message.tx, out, Transaction, protocolVersion)
 
+        }
+
+        @JvmStatic
+        override fun write(message: Block): ByteArray {
+            return super.write(message)
         }
 
         override fun read(input: InputStream, protocolVersion: Long): Block {

@@ -1,7 +1,5 @@
-package fr.acinq.bitcoin.crypto
+package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.Base58
-import fr.acinq.bitcoin.Hex
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

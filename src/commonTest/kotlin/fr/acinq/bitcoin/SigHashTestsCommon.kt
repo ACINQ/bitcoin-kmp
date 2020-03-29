@@ -2,7 +2,6 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.SigHash.SIGHASH_ALL
 import fr.acinq.bitcoin.SigHash.SIGHASH_ANYONECANPAY
-import fr.acinq.bitcoin.crypto.PrivateKey
 import kotlinx.serialization.InternalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertFails

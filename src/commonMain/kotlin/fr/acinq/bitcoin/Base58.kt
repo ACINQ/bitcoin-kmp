@@ -1,6 +1,5 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Crypto
 import fr.acinq.bitcoin.crypto.Pack
 import kotlin.jvm.JvmStatic
 

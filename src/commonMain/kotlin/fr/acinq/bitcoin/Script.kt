@@ -1,6 +1,5 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.*
 import kotlinx.io.ByteArrayInputStream
 import kotlinx.io.ByteArrayOutputStream
 import kotlinx.io.InputStream
@@ -513,7 +512,9 @@ object Script {
                         context.amount,
                         signatureVersion
                     )
-                    val result = Crypto.verifySignature(hash, Crypto.der2compact(sigBytes), PublicKey(pubKey))
+                    val result = Crypto.verifySignature(hash, Crypto.der2compact(sigBytes),
+                        PublicKey(pubKey)
+                    )
                     result
                 }
             }

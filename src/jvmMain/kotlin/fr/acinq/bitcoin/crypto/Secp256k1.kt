@@ -1,6 +1,6 @@
 package fr.acinq.bitcoin.crypto
 
-import fr.acinq.bitcoin.ByteVector
+import fr.acinq.bitcoin.Crypto
 import fr.acinq.bitcoin.fixSize
 import kotlinx.io.ByteArrayInputStream
 import kotlinx.serialization.InternalSerializationApi

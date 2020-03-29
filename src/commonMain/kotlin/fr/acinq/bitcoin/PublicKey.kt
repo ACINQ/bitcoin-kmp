@@ -1,18 +1,34 @@
-package fr.acinq.bitcoin.crypto
+package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.ByteVector
+import fr.acinq.bitcoin.crypto.Secp256k1
+import kotlin.jvm.JvmField
+import kotlin.jvm.JvmStatic
 
-data class PublicKey(val value: ByteVector) {
+data class PublicKey(@JvmField val value: ByteVector) {
     constructor(data: ByteArray) : this(ByteVector(data))
 
     operator fun plus(that: PublicKey): PublicKey {
-        val pub = Secp256k1.publicKeyAdd(value.toByteArray(), that.value.toByteArray())
-        return PublicKey(compress(pub))
+        val pub = Secp256k1.publicKeyAdd(
+            value.toByteArray(),
+            that.value.toByteArray()
+        )
+        return PublicKey(
+            compress(
+                pub
+            )
+        )
     }
 
     operator fun times(that: PrivateKey): PublicKey {
-        val pub = Secp256k1.publicKeyMul(value.toByteArray(), that.value.toByteArray())
-        return PublicKey(compress(pub))
+        val pub = Secp256k1.publicKeyMul(
+            value.toByteArray(),
+            that.value.toByteArray()
+        )
+        return PublicKey(
+            compress(
+                pub
+            )
+        )
     }
 
     /**
@@ -33,6 +49,7 @@ data class PublicKey(val value: ByteVector) {
     }
 
     companion object {
+        @JvmStatic
         fun compress(pub: ByteArray): ByteArray {
             return if (Crypto.isPubKeyCompressed(pub)) pub else {
                 val pub1 = pub.copyOf(33)

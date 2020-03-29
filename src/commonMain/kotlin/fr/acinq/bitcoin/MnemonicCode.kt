@@ -1,8 +1,6 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Crypto
 import fr.acinq.bitcoin.crypto.Pbkdf2
-import fr.acinq.bitcoin.crypto.Sha512
 
 @ExperimentalStdlibApi
 object MnemonicCode {

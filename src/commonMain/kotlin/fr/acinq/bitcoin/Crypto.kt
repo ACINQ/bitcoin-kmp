@@ -1,56 +1,82 @@
-package fr.acinq.bitcoin.crypto
+package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_DERSIG
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_LOW_S
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_STRICTENC
+import fr.acinq.bitcoin.crypto.*
 import kotlinx.io.ByteArrayInputStream
 import kotlinx.serialization.InternalSerializationApi
 import kotlin.jvm.JvmStatic
 
 object Crypto {
     @ExperimentalUnsignedTypes
-    fun sha1(input: ByteVector): ByteArray = Sha1.hash(input.toByteArray())
+    fun sha1(input: ByteVector): ByteArray =
+        Sha1.hash(input.toByteArray())
 
     @JvmStatic
-    fun sha256(input: ByteArray, offset: Int, len: Int) = Sha256.hash(input, offset, len)
+    fun sha256(input: ByteArray, offset: Int, len: Int) =
+        Sha256.hash(input, offset, len)
 
     @JvmStatic
     fun sha256(input: ByteArray) = sha256(input, 0, input.size)
 
     @JvmStatic
-    fun sha256(input: ByteVector) = sha256(input.toByteArray(), 0, input.size())
+    fun sha256(input: ByteVector) =
+        sha256(input.toByteArray(), 0, input.size())
 
     @JvmStatic
-    fun ripemd160(input: ByteArray, offset: Int, len: Int) = Ripemd160.hash(input, offset, len)
+    fun ripemd160(input: ByteArray, offset: Int, len: Int) =
+        Ripemd160.hash(input, offset, len)
 
     @JvmStatic
     fun ripemd160(input: ByteArray) = ripemd160(input, 0, input.size)
 
     @JvmStatic
-    fun ripemd160(input: ByteVector) = ripemd160(input.toByteArray(), 0, input.size())
+    fun ripemd160(input: ByteVector) =
+        ripemd160(input.toByteArray(), 0, input.size())
 
     @JvmStatic
-    fun hash256(input: ByteArray, offset: Int, len: Int) = Sha256.hash(Sha256.hash(input, offset, len))
+    fun hash256(input: ByteArray, offset: Int, len: Int) =
+        Sha256.hash(
+            Sha256.hash(
+                input,
+                offset,
+                len
+            )
+        )
 
     @JvmStatic
     fun hash256(input: ByteArray) = hash256(input, 0, input.size)
 
     @JvmStatic
-    fun hash256(input: ByteVector) = hash256(input.toByteArray(), 0, input.size())
+    fun hash256(input: ByteVector) =
+        hash256(input.toByteArray(), 0, input.size())
 
     @JvmStatic
-    fun hash160(input: ByteArray, offset: Int, len: Int) = Ripemd160.hash(Sha256.hash(input, offset, len))
+    fun hash160(input: ByteArray, offset: Int, len: Int) =
+        Ripemd160.hash(
+            Sha256.hash(
+                input,
+                offset,
+                len
+            )
+        )
 
     @JvmStatic
     fun hash160(input: ByteArray) = hash160(input, 0, input.size)
 
     @JvmStatic
-    fun hash160(input: ByteVector) = hash160(input.toByteArray(), 0, input.size())
+    fun hash160(input: ByteVector) =
+        hash160(input.toByteArray(), 0, input.size())
 
     @JvmStatic
     fun hmac512(key: ByteArray, data: ByteArray): ByteArray {
-        return HMac.hmac(key, data, Sha512(), 128)
+        return HMac.hmac(
+            key,
+            data,
+            Sha512(),
+            128
+        )
     }
 
     @JvmStatic
@@ -88,7 +114,8 @@ object Crypto {
     }
 
     @JvmStatic
-    fun sign(data: ByteVector32, privateKey: PrivateKey): ByteVector64 = sign(data.toByteArray(), privateKey)
+    fun sign(data: ByteVector32, privateKey: PrivateKey): ByteVector64 =
+        sign(data.toByteArray(), privateKey)
 
     /**
      * @param data      data
@@ -98,18 +125,30 @@ object Crypto {
      */
     @JvmStatic
     fun verifySignature(data: ByteArray, signature: ByteVector64, publicKey: PublicKey): Boolean {
-        return Secp256k1.verify(data, signature.toByteArray(), publicKey.value.toByteArray())
+        return Secp256k1.verify(
+            data,
+            signature.toByteArray(),
+            publicKey.value.toByteArray()
+        )
     }
 
     fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean =
         verifySignature(data.toByteArray(), signature, publicKey)
 
     @JvmStatic
-    fun compact2der(signature: ByteVector64): ByteVector = ByteVector(Secp256k1.compact2der(signature.toByteArray()))
+    fun compact2der(signature: ByteVector64): ByteVector = ByteVector(
+        Secp256k1.compact2der(
+            signature.toByteArray()
+        )
+    )
 
     @InternalSerializationApi
     @JvmStatic
-    fun der2compact(signature: ByteArray): ByteVector64 = ByteVector64(Secp256k1.der2compact(signature))
+    fun der2compact(signature: ByteArray): ByteVector64 = ByteVector64(
+        Secp256k1.der2compact(
+            signature
+        )
+    )
 
     @JvmStatic
     fun isDERSignature(sig: ByteArray): Boolean {
@@ -179,7 +218,9 @@ object Crypto {
 
     @InternalSerializationApi
     @JvmStatic
-    fun isLowDERSignature(sig: ByteArray): Boolean = !Secp256k1.signatureNormalize(sig).second
+    fun isLowDERSignature(sig: ByteArray): Boolean = !Secp256k1.signatureNormalize(
+        sig
+    ).second
 
     @JvmStatic
     fun isDefinedHashtypeSignature(sig: ByteArray): Boolean = if (sig.isEmpty()) false else {
@@ -197,8 +238,14 @@ object Crypto {
                 sig
             )
         ) false
-        else if ((flags and SCRIPT_VERIFY_LOW_S) != 0 && !isLowDERSignature(sig)) false
-        else if ((flags and SCRIPT_VERIFY_STRICTENC) != 0 && !isDefinedHashtypeSignature(sig)) false
+        else if ((flags and SCRIPT_VERIFY_LOW_S) != 0 && !isLowDERSignature(
+                sig
+            )
+        ) false
+        else if ((flags and SCRIPT_VERIFY_STRICTENC) != 0 && !isDefinedHashtypeSignature(
+                sig
+            )
+        ) false
         else true
     }
 

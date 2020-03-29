@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import fr.acinq.bitcoin.*
-import fr.acinq.bitcoin.crypto.PrivateKey
+import fr.acinq.bitcoin.PrivateKey
 import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 import java.lang.IllegalArgumentException

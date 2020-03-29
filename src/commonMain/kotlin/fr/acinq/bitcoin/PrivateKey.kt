@@ -1,6 +1,7 @@
-package fr.acinq.bitcoin.crypto
+package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.*
+import fr.acinq.bitcoin.crypto.Secp256k1
+import kotlin.jvm.JvmStatic
 
 data class PrivateKey(val value: ByteVector32) {
     constructor(data: ByteArray) : this(
@@ -12,17 +13,37 @@ data class PrivateKey(val value: ByteVector32) {
     )
 
     operator fun plus(that: PrivateKey): PrivateKey =
-        PrivateKey(Secp256k1.privateKeyAdd(value.toByteArray(), that.value.toByteArray()))
+        PrivateKey(
+            Secp256k1.privateKeyAdd(
+                value.toByteArray(),
+                that.value.toByteArray()
+            )
+        )
 
     operator fun minus(that: PrivateKey): PrivateKey =
-        plus(PrivateKey(Secp256k1.privateKeyNegate(that.value.toByteArray())))
+        plus(
+            PrivateKey(
+                Secp256k1.privateKeyNegate(
+                    that.value.toByteArray()
+                )
+            )
+        )
 
     operator fun times(that: PrivateKey): PrivateKey =
-        PrivateKey(Secp256k1.privateKeyMul(value.toByteArray(), that.value.toByteArray()))
+        PrivateKey(
+            Secp256k1.privateKeyMul(
+                value.toByteArray(),
+                that.value.toByteArray()
+            )
+        )
 
     fun publicKey(): PublicKey {
         val pub = Secp256k1.computePublicKey(value.toByteArray())
-        return PublicKey(PublicKey.compress(pub))
+        return PublicKey(
+            PublicKey.compress(
+                pub
+            )
+        )
     }
 
     fun toBase58(prefix: Byte) = Base58Check.encode(prefix, value.toByteArray() + 1.toByte())
@@ -36,6 +57,7 @@ data class PrivateKey(val value: ByteVector32) {
             }
         }
 
+        @JvmStatic
         fun fromBase58(value: String, prefix: Byte): Pair<PrivateKey, Boolean> {
             require(
                 setOf(
@@ -46,7 +68,10 @@ data class PrivateKey(val value: ByteVector32) {
             ) { "invalid base 58 prefix for a private key" }
             val (prefix1, data) = Base58Check.decode(value)
             require(prefix1 == prefix) { "prefix $prefix1 does not match expected prefix $prefix" }
-            return Pair(PrivateKey(data), isCompressed(data))
+            return Pair(
+                PrivateKey(data),
+                isCompressed(data)
+            )
         }
     }
 }

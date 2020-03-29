@@ -388,6 +388,10 @@ data class Transaction(@JvmField val version: Long, @JvmField  val txIn: List<Tx
             totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
 
         @JvmStatic
+        fun weight(tx: Transaction): Int = weight(tx, PROTOCOL_VERSION)
+
+
+        @JvmStatic
         fun isCoinbase(input: Transaction) = input.txIn.count() == 1 && OutPoint.isCoinbase(input.txIn.first().outPoint)
 
         /**

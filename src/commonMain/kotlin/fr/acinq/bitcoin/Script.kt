@@ -282,6 +282,50 @@ object Script {
         return listOf(OP_DUP, OP_HASH160, OP_PUSHDATA(pubKeyHash), OP_EQUALVERIFY, OP_CHECKSIG)
     }
 
+    @JvmStatic
+    fun isPay2pkh(script: List<ScriptElt>): Boolean {
+        return when {
+            script.size == 5 && script[0] == OP_DUP && script[1] == OP_HASH160 && script[2].isPush(20) && script[3] == OP_EQUALVERIFY && script[4] == OP_CHECKSIG -> true
+            else -> false
+        }
+    }
+
+    @JvmStatic
+    fun isPay2pkh(script: ByteArray): Boolean = isPay2pkh(Script.parse(script))
+
+    @JvmStatic
+    fun isPay2sh(script: List<ScriptElt>): Boolean {
+        return when {
+            script.size == 3 && script[0] == OP_HASH160 && script[1].isPush(20) && script[2] == OP_EQUAL -> true
+            else -> false
+        }
+    }
+
+    @JvmStatic
+    fun isPay2sh(script: ByteArray): Boolean = isPay2sh(Script.parse(script))
+
+    @JvmStatic
+    fun isPay2wpkh(script: List<ScriptElt>): Boolean {
+        return when {
+            script.size == 2 && script[0] == OP_0 && script[1].isPush(20) -> true
+            else -> false
+        }
+    }
+
+    @JvmStatic
+    fun isPay2wpkh(script: ByteArray): Boolean = isPay2wpkh(Script.parse(script))
+
+    @JvmStatic
+    fun isPay2wsh(script: List<ScriptElt>): Boolean {
+        return when {
+            script.size == 2 && script[0] == OP_0 && script[1].isPush(32) -> true
+            else -> false
+        }
+    }
+
+    @JvmStatic
+    fun isPay2wsh(script: ByteArray): Boolean = isPay2wsh(Script.parse(script))
+
     /**
      *
      * @param pubKey public key

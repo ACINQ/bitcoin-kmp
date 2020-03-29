@@ -53,6 +53,10 @@ open class ByteVector(private val bytes: ByteArray, private val offset: Int, pri
 
     fun dropLast(n: Int) = take(size - n)
 
+    infix fun append(other: ByteVector): ByteVector {
+        return ByteVector(toByteArray() + other.toByteArray())
+    }
+
     open fun reversed() = ByteVector(toByteArray().reversedArray())
 
     fun toByteArray() = bytes.copyOfRange(offset, offset + size)

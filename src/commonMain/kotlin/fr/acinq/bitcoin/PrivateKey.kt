@@ -1,9 +1,10 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Secp256k1
+import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
-data class PrivateKey(val value: ByteVector32) {
+data class PrivateKey(@JvmField val value: ByteVector32) {
     constructor(data: ByteArray) : this(
         when {
             data.size == 32 -> ByteVector32(data.copyOf())

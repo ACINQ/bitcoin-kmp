@@ -3,7 +3,19 @@ package fr.acinq.bitcoin
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
-sealed class ScriptElt
+sealed class ScriptElt {
+    fun isPush(size: Int): Boolean = ScriptElt.isPush(this, size)
+
+    companion object {
+        @JvmStatic
+        fun isPush(op: ScriptElt, size: Int) : Boolean {
+            return when {
+                op is OP_PUSHDATA && op.data.size() == size -> true
+                else -> false
+            }
+        }
+    }
+}
 
 // @formatter:off
 object OP_0 : ScriptElt()

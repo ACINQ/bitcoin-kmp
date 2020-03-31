@@ -49,6 +49,9 @@ data class PublicKey(@JvmField val value: ByteVector) {
     }
 
     companion object {
+        @JvmField
+        val Generator = PublicKey(Hex.decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"))
+
         @JvmStatic
         fun compress(pub: ByteArray): ByteArray {
             return if (Crypto.isPubKeyCompressed(pub)) pub else {

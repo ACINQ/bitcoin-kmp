@@ -1,5 +1,6 @@
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.crypto.Secp256k1
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -99,4 +100,9 @@ class CryptoTestsCommon {
         }
     }
 
+    @Test
+    fun `check generator`() {
+        val check = Secp256k1.computePublicKey(Hex.decode("0000000000000000000000000000000000000000000000000000000000000001"))
+        assertEquals(PublicKey.Generator, PublicKey(check))
+    }
 }

@@ -79,7 +79,19 @@ abstract class BtcSerializer<T> {
         }
 
         @JvmStatic
+        fun uint16(input: ByteArray): Int = Pack.uint16LE(input, 0)
+
+        @JvmStatic
+        fun uint16BE(input: ByteArray): Int = Pack.uint16BE(input, 0)
+
+        @JvmStatic
         fun writeUInt16(input: Int, out: OutputStream): Unit = out.write(Pack.writeUint16LE(input))
+
+        @JvmStatic
+        fun writeUInt16(input: Int): ByteArray = Pack.writeUint16LE(input)
+
+        @JvmStatic
+        fun writeUInt16BE(input: Int): ByteArray = Pack.writeUint16BE(input)
 
         @JvmStatic
         fun uint32(input: InputStream): Long {

@@ -79,6 +79,18 @@ object Crypto {
         )
     }
 
+    /**
+     * Computes ecdh using secp256k1's variant: sha256(priv * pub serialized in compressed format)
+     *
+     * @param priv private value
+     * @param pub  public value
+     * @return ecdh(priv, pub) as computed by libsecp256k1
+     */
+    @JvmStatic
+    fun ecdh(priv: PrivateKey, pub: PublicKey): ByteArray {
+        return Secp256k1.ecdh(priv.value.toByteArray(), pub.value.toByteArray())
+    }
+
     @JvmStatic
     fun isPubKeyValid(key: ByteArray): Boolean = when {
         key.size == 65 && (key[0] == 4.toByte() || key[0] == 6.toByte() || key[0] == 7.toByte()) -> true

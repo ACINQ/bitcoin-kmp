@@ -16,11 +16,10 @@
 
 package fr.acinq.bitcoin
 
-import kotlinx.io.ByteArrayOutputStream
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
-open class ByteVector(private val bytes: ByteArray, private val offset: Int, private val size: Int) {
+open class ByteVector(private var bytes: ByteArray, private var offset: Int, private val size: Int) {
     constructor(bytes: ByteArray) : this(bytes, 0, bytes.size)
     constructor(input: String) : this(Hex.decode(input))
 
@@ -45,6 +44,8 @@ open class ByteVector(private val bytes: ByteArray, private val offset: Int, pri
     }
 
     open fun update(i: Int, b: Byte): ByteVector {
+        bytes = toByteArray()
+        offset = 0
         bytes[offset + i] = b
         return this
     }
@@ -53,9 +54,11 @@ open class ByteVector(private val bytes: ByteArray, private val offset: Int, pri
 
     fun dropLast(n: Int) = take(size - n)
 
-    infix fun append(other: ByteVector): ByteVector {
-        return ByteVector(toByteArray() + other.toByteArray())
+    fun append(other: ByteArray): ByteVector {
+        return ByteVector(toByteArray() + other)
     }
+
+    fun append(other: ByteVector): ByteVector = append(other.toByteArray())
 
     open fun reversed() = ByteVector(toByteArray().reversedArray())
 

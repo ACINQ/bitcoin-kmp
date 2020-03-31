@@ -262,7 +262,7 @@ object DeterministicWallet {
 
 @ExperimentalStdlibApi
 @InternalSerializationApi
-data class KeyPath(val path: List<Long>) {
+data class KeyPath(@JvmField val path: List<Long>) {
     constructor(path: String) : this(computePath(path))
 
     @JvmField

@@ -189,6 +189,7 @@ data class OP_INVALID(val code: Int) : ScriptElt()
 
 object ScriptEltMapping {
     // code -> ScriptElt
+    @JvmField
     val code2elt = hashMapOf(
         0x00 to OP_0,
         0x4c to OP_PUSHDATA1,
@@ -304,6 +305,8 @@ object ScriptEltMapping {
         0xfa to OP_SMALLINTEGER,
         0xff to OP_INVALIDOPCODE
     )
+
+    @JvmField
     val elt2code = code2elt.map { it -> it.value to it.key }.toMap()
 
     fun name(elt: ScriptElt): String {

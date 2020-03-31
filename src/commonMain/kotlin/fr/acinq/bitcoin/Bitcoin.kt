@@ -9,9 +9,6 @@ val MaxScriptElementSize = 520
 @JvmField
 val MaxBlockSize = 1000000
 
-@JvmField
-val LockTimeThreshold = 500000000L
-
 fun fixSize(data: ByteArray, size: Int): ByteArray = when {
     data.size == size -> data
     data.size < size -> ByteArray(size - data.size) + data

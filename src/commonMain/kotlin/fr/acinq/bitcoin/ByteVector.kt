@@ -54,6 +54,10 @@ open class ByteVector(private var bytes: ByteArray, private var offset: Int, pri
 
     fun dropLast(n: Int) = take(size - n)
 
+    fun append(value: Byte): ByteVector {
+        return ByteVector(toByteArray() + value)
+    }
+
     fun append(other: ByteArray): ByteVector {
         return ByteVector(toByteArray() + other)
     }
@@ -91,6 +95,7 @@ open class ByteVector(private var bytes: ByteArray, private var offset: Int, pri
     }
 
     companion object {
+        @JvmField
         val empty = ByteVector(ByteArray(0))
     }
 }

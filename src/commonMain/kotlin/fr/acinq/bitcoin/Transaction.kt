@@ -41,9 +41,19 @@ data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index: Long)
     companion object : BtcSerializer<OutPoint>() {
         override fun read(input: InputStream, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input))
 
+        @JvmStatic
+        override fun read(input: ByteArray): OutPoint {
+            return super.read(input)
+        }
+
         override fun write(message: OutPoint, out: OutputStream, protocolVersion: Long) {
             out.write(message.hash.toByteArray())
             writeUInt32(message.index, out)
+        }
+
+        @JvmStatic
+        override fun write(message: OutPoint): ByteArray {
+            return super.write(message)
         }
 
         fun isCoinbase(input: OutPoint) = input.index == 0xffffffffL && input.hash == ByteVector32.Zeroes
@@ -204,8 +214,18 @@ data class TxOut(@JvmField val amount: Long, @JvmField val publicKeyScript: Byte
             writeScript(t.publicKeyScript, out)
         }
 
+        @JvmStatic
+        override fun write(message: TxOut): ByteArray {
+            return super.write(message)
+        }
+
         override fun read(input: InputStream, protocolVersion: Long): TxOut =
             TxOut(uint64(input), script(input))
+
+        @JvmStatic
+        override fun read(input: ByteArray): TxOut {
+            return super.read(input)
+        }
 
         override fun validate(t: TxOut) {
             require(t.amount >= 0) { "invalid txout amount: $t.amount" }

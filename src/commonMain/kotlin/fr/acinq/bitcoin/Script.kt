@@ -5,6 +5,7 @@ import kotlinx.io.ByteArrayOutputStream
 import kotlinx.io.InputStream
 import kotlinx.io.OutputStream
 import kotlinx.serialization.InternalSerializationApi
+import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 @ExperimentalStdlibApi
@@ -18,6 +19,8 @@ object Script {
     val True = ByteVector("01")
     val False = ByteVector.empty
 
+    @JvmField
+    val LockTimeThreshold = 500000000L
     /**
      * parse a script from a input stream of binary data
      *

@@ -185,4 +185,17 @@ object Bech32 {
         if (version == 0.toByte()) require(bin.size == 20 || bin.size == 32) { "invalid witness program length ${bin.size}" }
         return Triple(hrp, version, bin.toByteArray())
     }
+
+    /**
+     *
+     * @param hrp   human readable prefix
+     * @param int5s 5-bit data
+     * @return hrp + data encoded as a Bech32 string
+     */
+    @JvmStatic
+    fun encode(hrp: String, int5s: ByteArray): String {
+        require(hrp.toLowerCase() == hrp || hrp.toUpperCase() == hrp){ "mixed case strings are not valid bech32 prefixes" }
+        val checksum = Bech32.checksum(hrp, int5s.toTypedArray())
+        return hrp + "1" + String((int5s.toTypedArray() + checksum).map { i -> alphabet[i.toInt()] }.toCharArray())
+    }
 }

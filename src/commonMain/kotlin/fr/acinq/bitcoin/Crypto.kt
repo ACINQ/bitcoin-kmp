@@ -304,4 +304,32 @@ object Crypto {
         input.read(s)
         return Pair(r, s)
     }
+
+    /**
+     * Recover public keys from a signature and the message that was signed. This method will return 2 public keys, and the signature
+     * can be verified with both, but only one of them matches that private key that was used to generate the signature.
+     * @param t signature
+     * @param message message that was signed
+     * @return a (pub1, pub2) tuple where pub1 and pub2 are candidates public keys. If you have the recovery id  then use
+     *         pub1 if the recovery id is even and pub2 if it is odd
+     */
+    @JvmStatic
+    fun recoverPublicKey(sig: ByteVector64, message: ByteArray): Pair<PublicKey, PublicKey> {
+        val p0 = recoverPublicKey(sig, message, 0)
+        val p1 = recoverPublicKey(sig, message, 1)
+        return Pair(p0, p1)
+    }
+
+    /**
+     * Recover public keys from a signature, the message that was signed, and the recovery id (i.e. the sign of
+     * the recovered public key)
+     * @param sig signature
+     * @param message that was signed
+     * @recid recovery id
+     * @return the recovered public key
+     */
+    @JvmStatic
+    fun recoverPublicKey(sig: ByteVector64, message: ByteArray, recid: Int): PublicKey {
+        return PublicKey(PublicKey.compress(Secp256k1.recoverPublicKey(sig.toByteArray(), message, recid)))
+    }
 }

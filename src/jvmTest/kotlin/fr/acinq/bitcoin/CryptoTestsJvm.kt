@@ -61,4 +61,56 @@ class CryptoTestsJvm {
             Crypto.der2compact(Hex.decode("304402203f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e780220ddc15ecdfc3507ac48e1681a33eb60996631bf6bf5bc0a0682c4db743ce7ca2b01"))
         )
     }
+
+    @Test
+    fun `recover public keys from signatures (secp256k1 test)`() {
+        val stream = javaClass.getResourceAsStream("/recid.txt")
+        val iterator = stream.bufferedReader(charset("UTF-8")).lines().iterator()
+        var priv: PrivateKey? = null
+        var message: ByteVector? = null
+        var pub: PublicKey? = null
+        //var sig: ByteVector? = null
+        var recid: Int
+
+        while (iterator.hasNext()) {
+            val line = iterator.next()
+            val values = line.split(" = ")
+            val lhs = values[0]
+            val rhs = values[1]
+            when (lhs) {
+                "privkey" -> priv = PrivateKey(ByteVector(rhs).toByteArray())
+                "message" -> message = ByteVector(rhs)
+                "pubkey" -> pub = PublicKey(ByteVector(rhs))
+                //"sig" -> sig = ByteVector(rhs)
+                "recid" -> {
+                    recid = rhs.toInt()
+                    assert(priv!!.publicKey() == pub)
+                    val sig1 = Crypto.sign(message!!.toByteArray(), priv)
+                    val pub1 = Crypto.recoverPublicKey(sig1, message.toByteArray(), recid)
+                    assert(pub1 == pub)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `recover public keys from signatures (random tests)`() {
+        val random = java.util.Random()
+        val privbytes = ByteArray(32)
+        val message = ByteArray(32)
+        for (i in 1..100) {
+            random.nextBytes(privbytes)
+            random.nextBytes(message)
+
+            val priv = PrivateKey(privbytes)
+            val pub = priv.publicKey()
+            val sig = Crypto.sign(message, priv)
+            val (pub1, pub2) = Crypto.recoverPublicKey(sig, message)
+
+            assert(Crypto.verifySignature(message, sig, pub1))
+            assert(Crypto.verifySignature(message, sig, pub2))
+            assert(pub == pub1 || pub == pub2)
+        }
+    }
+
 }

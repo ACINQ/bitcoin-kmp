@@ -1,6 +1,8 @@
 package fr.acinq.bitcoin.crypto
 
+import fr.acinq.bitcoin.ByteVector64
 import fr.acinq.bitcoin.Crypto
+import fr.acinq.bitcoin.PublicKey
 import fr.acinq.bitcoin.fixSize
 import kotlinx.io.ByteArrayInputStream
 import kotlinx.serialization.InternalSerializationApi
@@ -11,6 +13,10 @@ import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 
 actual object Secp256k1 {
+
+    private val N2 = BigInteger("57896044618658097711785492504343953926418782139537452191302581570759080747168")
+    private val N = BigInteger("115792089237316195423570985008687907852837564279074904382605163141518161494337")
+
     actual fun computePublicKey(priv: ByteArray): ByteArray {
         val pub = NativeSecp256k1.computePubkey(priv)
         // secp256k1 returns pubkeys in uncompressed format, we need to compress them
@@ -84,6 +90,7 @@ actual object Secp256k1 {
         } else Pair(dropZeroAndFixSize(r, 32) + dropZeroAndFixSize(s, 32), false)
     }
 
-    private val N2 = BigInteger("57896044618658097711785492504343953926418782139537452191302581570759080747168")
-    private val N = BigInteger("115792089237316195423570985008687907852837564279074904382605163141518161494337")
+    actual fun recoverPublicKey(sig: ByteArray, message: ByteArray, recid: Int): ByteArray {
+        return NativeSecp256k1.ecdsaRecover(sig, message, recid)
+    }
 }

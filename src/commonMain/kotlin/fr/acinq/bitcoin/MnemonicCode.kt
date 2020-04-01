@@ -1,6 +1,7 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Pbkdf2
+import kotlin.jvm.JvmStatic
 
 @ExperimentalStdlibApi
 object MnemonicCode {
@@ -36,6 +37,7 @@ object MnemonicCode {
      * @param wordlist optional dictionary of 2048 mnemonic words, default to the English mnemonic words if not specified
      * @throws RuntimeException if the mnemonic words are not valid
      */
+    @JvmStatic
     fun validate(mnemonics: List<String>, wordlist: List<String> = englishWordlist) {
         require(wordlist.size == 2048) { "invalid word list (size should be 2048)" }
         require(mnemonics.isNotEmpty()) { "mnemonic code cannot be empty" }
@@ -57,6 +59,7 @@ object MnemonicCode {
         require(check == checksumbits) { "invalid checksum" }
     }
 
+    @JvmStatic
     fun validate(mnemonics: String): Unit = validate(mnemonics.split(" "))
 
     /**
@@ -66,12 +69,16 @@ object MnemonicCode {
      * @param wordlist word list (must be 2048 words long)
      * @return a list of mnemonic words that encodes the input entropy
      */
-    fun toMnemonics(entropy: ByteArray, wordlist: List<String> = englishWordlist): List<String> {
+    @JvmStatic
+    fun toMnemonics(entropy: ByteArray, wordlist: List<String>): List<String> {
         require(wordlist.size == 2048) { "invalid word list (size should be 2048)" }
         val digits = toBinary(entropy) + toBinary(Crypto.sha256(entropy)).take(entropy.size / 4)
 
         return group(digits, 11).map(MnemonicCode::fromBinary).map { it -> wordlist[it] }
     }
+
+    @JvmStatic
+    fun toMnemonics(entropy: ByteArray): List<String> = toMnemonics(entropy, englishWordlist)
 
     /**
      * BIP39 seed derivation
@@ -80,6 +87,7 @@ object MnemonicCode {
      * @param passphrase passphrase
      * @return a seed derived from the mnemonic words and passphrase
      */
+    @JvmStatic
     fun toSeed(mnemonics: List<String>, passphrase: String): ByteArray {
         val password = mnemonics.joinToString(" ").encodeToByteArray()
         val salt = ("mnemonic" + passphrase).encodeToByteArray()
@@ -87,5 +95,6 @@ object MnemonicCode {
         return key
     }
 
+    @JvmStatic
     fun toSeed(mnemonics: String, passphrase: String): ByteArray = toSeed(mnemonics.split(" "), passphrase)
 }

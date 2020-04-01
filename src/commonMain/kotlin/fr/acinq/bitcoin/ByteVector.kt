@@ -50,9 +50,9 @@ open class ByteVector(private var bytes: ByteArray, private var offset: Int, pri
         return this
     }
 
-    fun takeLast(n: Int) = drop(size - n)
+    fun takeRight(n: Int) = drop(size - n)
 
-    fun dropLast(n: Int) = take(size - n)
+    fun dropRight(n: Int) = take(size - n)
 
     fun append(value: Byte): ByteVector {
         return ByteVector(toByteArray() + value)
@@ -136,6 +136,9 @@ class ByteVector64(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 64
     companion object {
         @JvmField
         val Zeroes = ByteVector64("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+
+        @JvmStatic
+        fun fromValidHex(input: String) = ByteVector64(input)
     }
 }
 

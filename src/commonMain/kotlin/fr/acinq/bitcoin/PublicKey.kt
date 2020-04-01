@@ -60,5 +60,8 @@ data class PublicKey(@JvmField val value: ByteVector) {
                 pub1
             }
         }
+
+        @JvmStatic
+        fun fromHex(hex: String) = PublicKey(Hex.decode(hex))
     }
 }

@@ -67,9 +67,19 @@ data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index: Long)
 @ExperimentalStdlibApi
 @InternalSerializationApi
 data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSerializable<ScriptWitness> {
+    constructor() : this(listOf())
+
     fun isNull() = stack.isEmpty()
 
     fun isNotNull() = !isNull()
+
+    fun push(item: ByteVector) = this.copy(stack = this.stack + item)
+
+    fun push(item: ByteArray) = push(ByteVector(item))
+
+    fun push(script: List<ScriptElt>) = push(Script.write(script))
+
+    fun last() = stack.last()
 
     @ExperimentalStdlibApi
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
@@ -206,6 +216,12 @@ data class TxOut(@JvmField val amount: Long, @JvmField val publicKeyScript: Byte
 
     fun updateAmount(newAmount: Long) = this.copy(amount = newAmount)
 
+    fun updatePublicKeyScript(input: ByteVector) = this.copy(publicKeyScript = input)
+
+    fun updatePublicKeyScript(input: ByteArray) = updatePublicKeyScript(input.byteVector())
+
+    fun updatePublicKeyScript(input: List<ScriptElt>) = updatePublicKeyScript(Script.write(input))
+
     @ExperimentalStdlibApi
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     companion object : BtcSerializer<TxOut>() {
@@ -239,7 +255,12 @@ data class TxOut(@JvmField val amount: Long, @JvmField val publicKeyScript: Byte
 
 @ExperimentalStdlibApi
 @InternalSerializationApi
-data class Transaction(@JvmField val version: Long, @JvmField  val txIn: List<TxIn>, @JvmField val txOut: List<TxOut>, @JvmField  val lockTime: Long) :
+data class Transaction(
+    @JvmField val version: Long,
+    @JvmField val txIn: List<TxIn>,
+    @JvmField val txOut: List<TxOut>,
+    @JvmField val lockTime: Long
+) :
     BtcSerializable<Transaction> {
 
     @JvmField
@@ -745,7 +766,7 @@ data class Transaction(@JvmField val version: Long, @JvmField  val txIn: List<Tx
             tx: Transaction,
             inputs: List<Transaction>,
             scriptFlags: Int,
-            callback: RunnerCallback? = null
+            callback: RunnerCallback?
         ): Unit {
             val map = mutableMapOf<OutPoint, TxOut>()
             for (outPoint in tx.txIn.map { it.outPoint }) {
@@ -760,10 +781,26 @@ data class Transaction(@JvmField val version: Long, @JvmField  val txIn: List<Tx
         @JvmStatic
         fun correctlySpends(
             tx: Transaction,
+            inputs: List<Transaction>,
+            scriptFlags: Int
+        ): Unit = correctlySpends(tx, inputs, scriptFlags, null)
+
+        @ExperimentalUnsignedTypes
+        @JvmStatic
+        fun correctlySpends(
+            tx: Transaction,
             parent: Transaction,
             scriptFlags: Int,
-            callback: RunnerCallback? = null
-        ): Unit= correctlySpends(tx, listOf(parent), scriptFlags, callback)
+            callback: RunnerCallback?
+        ): Unit = correctlySpends(tx, listOf(parent), scriptFlags, callback)
+
+        @ExperimentalUnsignedTypes
+        @JvmStatic
+        fun correctlySpends(
+            tx: Transaction,
+            parent: Transaction,
+            scriptFlags: Int
+        ): Unit = correctlySpends(tx, listOf(parent), scriptFlags, null)
     }
 
     override fun serializer(): BtcSerializer<Transaction> = Transaction

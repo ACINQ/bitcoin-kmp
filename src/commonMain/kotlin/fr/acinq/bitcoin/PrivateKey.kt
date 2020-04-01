@@ -13,6 +13,8 @@ data class PrivateKey(@JvmField val value: ByteVector32) {
         }
     )
 
+    constructor(data: ByteVector) : this(data.toByteArray())
+
     operator fun plus(that: PrivateKey): PrivateKey =
         PrivateKey(
             Secp256k1.privateKeyAdd(
@@ -50,6 +52,7 @@ data class PrivateKey(@JvmField val value: ByteVector32) {
     fun toBase58(prefix: Byte) = Base58Check.encode(prefix, value.toByteArray() + 1.toByte())
 
     companion object {
+        @JvmStatic
         fun isCompressed(data: ByteArray): Boolean {
             return when {
                 data.size == 32 -> false
@@ -74,5 +77,8 @@ data class PrivateKey(@JvmField val value: ByteVector32) {
                 isCompressed(data)
             )
         }
+
+        @JvmStatic
+        fun fromHex(hex: String) = PrivateKey(Hex.decode(hex))
     }
 }

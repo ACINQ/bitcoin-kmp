@@ -34,6 +34,18 @@ data class BlockHeader(
     @JvmField
     val blockId: ByteVector32 = hash.reversed()
 
+    fun setVersion(input: Long) = this.copy(version = input)
+
+    fun setHashPreviousBlock(input: ByteVector32) = this.copy(hashPreviousBlock = input)
+
+    fun setHashMerkleRoot(input: ByteVector32) = this.copy(hashMerkleRoot = input)
+
+    fun setTime(input: Long) = this.copy(time = input)
+
+    fun setBits(input: Long) = this.copy(bits = input)
+
+    fun setNonce(input: Long) = this.copy(nonce = input)
+
     @ExperimentalUnsignedTypes
     @ExperimentalStdlibApi
     @InternalSerializationApi

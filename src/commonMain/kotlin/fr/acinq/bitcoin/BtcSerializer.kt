@@ -131,10 +131,16 @@ abstract class BtcSerializer<T> {
         fun uint64(input: ByteArray): Long = Pack.uint64LE(input, 0)
 
         @JvmStatic
+        fun uint64BE(input: ByteArray): Long = Pack.uint64BE(input, 0)
+
+        @JvmStatic
         fun writeUInt64(input: Long, out: OutputStream): Unit = out.write(Pack.writeUint64LE(input))
 
         @JvmStatic
         fun writeUInt64(input: Long): ByteArray = Pack.writeUint64LE(input)
+
+        @JvmStatic
+        fun writeUInt64BE(input: Long): ByteArray = Pack.writeUint64BE(input)
 
         @JvmStatic
         fun varint(blob: ByteArray): Long = varint(ByteArrayInputStream(blob))

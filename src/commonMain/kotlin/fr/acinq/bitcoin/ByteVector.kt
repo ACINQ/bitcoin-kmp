@@ -66,6 +66,16 @@ open class ByteVector(private var bytes: ByteArray, private var offset: Int, pri
 
     open fun reversed() = ByteVector(toByteArray().reversedArray())
 
+    fun contentEquals(input: ByteArray, inputOffset: Int, inputSize: Int): Boolean {
+        if (size != inputSize) return false
+        for (i in 0 until size) {
+            if (bytes[offset + i] != input[inputOffset + i]) return false
+        }
+        return true
+    }
+
+    fun contentEquals(input: ByteArray) = contentEquals(input, 0, input.size)
+
     fun toByteArray() = bytes.copyOfRange(offset, offset + size)
 
     fun toHex() = Hex.encode(bytes, offset, size)
@@ -75,15 +85,7 @@ open class ByteVector(private var bytes: ByteArray, private var offset: Int, pri
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is ByteVector) return false
-        if (size != other.size) return false
-
-        var us = offset
-        var them = other.offset
-        for (i in 1..size) {
-            if (bytes[us++] != other.bytes[them++]) return false
-        }
-
-        return true
+        return contentEquals(other.bytes, other.offset, other.size)
     }
 
     override fun hashCode(): Int {

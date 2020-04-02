@@ -328,6 +328,10 @@ data class Transaction(
 
     fun weight(): Int = Transaction.weight(this)
 
+    override fun toString(): String {
+        return Hex.encode(Transaction.write(this))
+    }
+
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     companion object : BtcSerializer<Transaction>() {
         const val SERIALIZE_TRANSACTION_NO_WITNESS = 0x40000000L

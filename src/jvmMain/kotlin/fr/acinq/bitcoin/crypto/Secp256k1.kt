@@ -69,10 +69,11 @@ actual object Secp256k1 {
     actual fun compact2der(input: ByteArray): ByteArray {
         val r = BigInteger(1, input.take(32).toByteArray())
         val s = BigInteger(1, input.takeLast(32).toByteArray())
+        val s1 = if (s >= N2) N.minus(s) else s
         val bos = ByteArrayOutputStream(73)
         val seq = DERSequenceGenerator(bos)
         seq.addObject(ASN1Integer(r))
-        seq.addObject(ASN1Integer(s))
+        seq.addObject(ASN1Integer(s1))
         seq.close()
         return bos.toByteArray()
     }

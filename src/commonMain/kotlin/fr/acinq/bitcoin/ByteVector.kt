@@ -44,10 +44,9 @@ open class ByteVector(private var bytes: ByteArray, private var offset: Int, pri
     }
 
     open fun update(i: Int, b: Byte): ByteVector {
-        bytes = toByteArray()
-        offset = 0
-        bytes[offset + i] = b
-        return this
+        val newbytes = toByteArray()
+        newbytes[i] = b
+        return ByteVector(newbytes)
     }
 
     fun takeRight(n: Int) = drop(size - n)
@@ -75,6 +74,10 @@ open class ByteVector(private var bytes: ByteArray, private var offset: Int, pri
     }
 
     fun contentEquals(input: ByteArray) = contentEquals(input, 0, input.size)
+
+    fun sha256() : ByteVector32 {
+        return ByteVector32(Crypto.sha256(bytes, offset, size))
+    }
 
     fun toByteArray() = bytes.copyOfRange(offset, offset + size)
 
@@ -108,8 +111,9 @@ class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 32
     constructor(input: String) : this(Hex.decode(input), 0)
 
     override fun update(i: Int, b: Byte): ByteVector32 {
-        super.update(i, b)
-        return this
+        val newbytes = toByteArray()
+        newbytes[i] = b
+        return ByteVector32(newbytes)
     }
 
     override fun reversed() = ByteVector32(super.toByteArray().reversedArray())

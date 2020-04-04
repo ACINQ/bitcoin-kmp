@@ -79,6 +79,10 @@ open class ByteVector(private var bytes: ByteArray, private var offset: Int, pri
         return ByteVector32(Crypto.sha256(bytes, offset, size))
     }
 
+    fun ripemd160() : ByteVector {
+        return ByteVector(Crypto.ripemd160(bytes, offset, size))
+    }
+
     fun toByteArray() = bytes.copyOfRange(offset, offset + size)
 
     fun toHex() = Hex.encode(bytes, offset, size)

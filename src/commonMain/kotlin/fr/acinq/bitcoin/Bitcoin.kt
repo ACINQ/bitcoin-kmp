@@ -1,8 +1,13 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Crypto
-import fr.acinq.bitcoin.crypto.PublicKey
 import kotlinx.serialization.InternalSerializationApi
+import kotlin.jvm.JvmField
+
+@JvmField
+val MaxScriptElementSize = 520
+
+@JvmField
+val MaxBlockSize = 1000000
 
 fun fixSize(data: ByteArray, size: Int): ByteArray = when {
     data.size == size -> data

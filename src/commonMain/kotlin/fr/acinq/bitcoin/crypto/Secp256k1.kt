@@ -1,5 +1,8 @@
 package fr.acinq.bitcoin.crypto
 
+import fr.acinq.bitcoin.ByteVector64
+import fr.acinq.bitcoin.PublicKey
+
 expect object Secp256k1 {
     fun computePublicKey(priv: ByteArray): ByteArray
 
@@ -28,4 +31,6 @@ expect object Secp256k1 {
     fun der2compact(input: ByteArray): ByteArray
 
     fun signatureNormalize(input: ByteArray): Pair<ByteArray, Boolean>
+
+    fun recoverPublicKey(sig: ByteArray, message: ByteArray, recid: Int): ByteArray
 }

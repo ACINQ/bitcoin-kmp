@@ -1,7 +1,7 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Crypto
 import fr.acinq.bitcoin.crypto.Pack
+import kotlin.jvm.JvmStatic
 
 object Base58 {
     object Prefix {
@@ -39,6 +39,7 @@ object Base58 {
     )
     //@formatter:on
 
+    @JvmStatic
     fun encode(input: ByteArray): String {
         // Skip & count leading zeroes.
         var zeroes = 0
@@ -84,6 +85,7 @@ object Base58 {
         return str.toString()
     }
 
+    @JvmStatic
     fun decode(input: String): ByteArray {
         // Skip leading spaces.
         var psz = 0
@@ -153,6 +155,7 @@ object Base58 {
 object Base58Check {
     fun checksum(data: ByteArray): ByteArray = Crypto.hash256(data).copyOf(4)
 
+    @JvmStatic
     fun encode(prefix: Int, data: ByteArray): String = encode(Pack.writeUint32BE(prefix), data)
 
     /**
@@ -163,8 +166,10 @@ object Base58Check {
      * @param data   date to be encoded
      * @return a Base58 string
      */
+    @JvmStatic
     fun encode(prefix: Byte, data: ByteArray): String = encode(arrayOf(prefix).toByteArray(), data)
 
+    @JvmStatic
     fun encode(prefix: Byte, data: ByteVector): String = encode(arrayOf(prefix).toByteArray(), data.toByteArray())
 
     /**
@@ -173,6 +178,7 @@ object Base58Check {
      * @param data   data to be encoded
      * @return a Base58 String
      */
+    @JvmStatic
     fun encode(prefix: ByteArray, data: ByteArray): String {
         val prefixAndData = prefix + data
         return Base58.encode(prefixAndData + checksum(prefixAndData))
@@ -185,6 +191,7 @@ object Base58Check {
      * @return a (prefix, data) tuple
      * @throws RuntimeException if the checksum that is part of the encoded data cannot be verified
      */
+    @JvmStatic
     fun decode(encoded: String): Pair<Byte, ByteArray> {
         val raw = Base58.decode(encoded)
         val versionAndHash = raw.dropLast(4).toByteArray()
@@ -201,6 +208,7 @@ object Base58Check {
      * @param encoded encoded data
      * @return a (prefix, data) tuple
      */
+    @JvmStatic
     fun decodeWithIntPrefix(encoded: String): Pair<Int, ByteArray> {
         val (prefix, data) = decodeWithPrefixLen(encoded, 4)
         return Pair(Pack.uint32BE(prefix), data)
@@ -214,6 +222,7 @@ object Base58Check {
      * @param encoded encoded data
      * @return a (prefix, data) tuple
      */
+    @JvmStatic
     fun decodeWithPrefixLen(encoded: String, prefixLen: Int): Pair<ByteArray, ByteArray> {
         val raw = Base58.decode(encoded)
         val versionAndHash = raw.dropLast(4).toByteArray()

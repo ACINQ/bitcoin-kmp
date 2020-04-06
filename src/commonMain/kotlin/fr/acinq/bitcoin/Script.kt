@@ -1,11 +1,12 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.*
 import kotlinx.io.ByteArrayInputStream
 import kotlinx.io.ByteArrayOutputStream
 import kotlinx.io.InputStream
 import kotlinx.io.OutputStream
 import kotlinx.serialization.InternalSerializationApi
+import kotlin.jvm.JvmField
+import kotlin.jvm.JvmStatic
 
 @ExperimentalStdlibApi
 @InternalSerializationApi
@@ -18,6 +19,8 @@ object Script {
     val True = ByteVector("01")
     val False = ByteVector.empty
 
+    @JvmField
+    val LockTimeThreshold = 500000000L
     /**
      * parse a script from a input stream of binary data
      *
@@ -51,13 +54,16 @@ object Script {
         }
     }
 
+    @JvmStatic
     fun parse(blob: ByteArray): List<ScriptElt> =
         if (blob.size > 10000) throw RuntimeException("script is too large") else parse(
             ByteArrayInputStream(blob)
         )
 
+    @JvmStatic
     fun parse(blob: ByteVector): List<ScriptElt> = parse(blob.toByteArray())
 
+    @JvmStatic
     fun parse(hex: String): List<ScriptElt> = parse(Hex.decode(hex))
 
     tailrec fun write(script: List<ScriptElt>, out: OutputStream): Unit {
@@ -95,39 +101,46 @@ object Script {
         }
     }
 
+    @JvmStatic
     fun write(script: List<ScriptElt>): ByteArray {
         val out = ByteArrayOutputStream()
         write(script, out)
         return out.toByteArray()
     }
 
+    @JvmStatic
     fun isUpgradableNop(op: ScriptElt) = when (op) {
         OP_NOP1, OP_NOP4, OP_NOP5, OP_NOP6, OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10 -> true
         else -> false
     }
 
+    @JvmStatic
     fun isSimpleValue(op: ScriptElt) = when (op) {
         OP_1NEGATE, OP_0, OP_1, OP_2, OP_3, OP_4, OP_5, OP_6, OP_7, OP_8, OP_9, OP_10, OP_11, OP_12, OP_13, OP_14, OP_15, OP_16 -> true
         else -> false
     }
 
+    @JvmStatic
     fun simpleValue(op: ScriptElt): Byte {
         require(isSimpleValue(op)) {}
         val value = if (op == OP_0) 0 else (ScriptEltMapping.elt2code.getValue(op) - 0x50)
         return value.toByte()
     }
 
+    @JvmStatic
     fun fromSimpleValue(value: Byte): ScriptElt = when (value.toInt()) {
         0 -> OP_0
         in -1..16 -> ScriptEltMapping.code2elt.getValue(value + 0x50)
         else -> throw IllegalArgumentException("cannot convert $value to a simple value operator")
     }
 
+    @JvmStatic
     fun isDisabled(op: ScriptElt) = when (op) {
         OP_CAT, OP_SUBSTR, OP_LEFT, OP_RIGHT, OP_INVERT, OP_AND, OP_OR, OP_XOR, OP_2MUL, OP_2DIV, OP_MUL, OP_MUL, OP_DIV, OP_MOD, OP_LSHIFT, OP_RSHIFT -> true
         else -> false
     }
 
+    @JvmStatic
     fun cost(op: ScriptElt): Int = when {
         isSimpleValue(op) -> 0
         op is OP_PUSHDATA -> 0
@@ -135,6 +148,7 @@ object Script {
         else -> 1
     }
 
+    @JvmStatic
     fun encodeNumber(value: Long): ByteVector {
         if (value == 0L) return ByteVector.empty
         else {
@@ -166,8 +180,10 @@ object Script {
         }
     }
 
+    @JvmStatic
     fun encodeNumber(value: Int) = encodeNumber(value.toLong())
 
+    @JvmStatic
     fun decodeNumber(input: ByteArray, checkMinimalEncoding: Boolean, maximumSize: Int = 4): Long {
         if (input.isEmpty()) return 0
         else if (input.size > maximumSize) throw RuntimeException("number cannot be encoded on more than $maximumSize bytes")
@@ -204,6 +220,7 @@ object Script {
         }
     }
 
+    @JvmStatic
     fun decodeNumber(input: ByteVector, checkMinimalEncoding: Boolean, maximumSize: Int = 4): Long =
         decodeNumber(input.toByteArray(), checkMinimalEncoding, maximumSize)
 
@@ -223,6 +240,7 @@ object Script {
 
     fun castToBoolean(input: ByteVector): Boolean = castToBoolean(input.toByteArray())
 
+    @JvmStatic
     fun isPushOnly(script: List<ScriptElt>): Boolean = !script.any {
         when {
             isSimpleValue(it) -> false
@@ -231,6 +249,7 @@ object Script {
         }
     }
 
+    @JvmStatic
     fun isPayToScript(script: ByteArray): Boolean =
         script.size == 23 && script[0] == ScriptEltMapping.elt2code.getValue(OP_HASH160)
             .toByte() && script[1] == 0x14.toByte() && script[22] == ScriptEltMapping.elt2code.getValue(OP_EQUAL)
@@ -244,6 +263,7 @@ object Script {
      *                as required signatures)
      * @return a multisig redeem script
      */
+    @JvmStatic
     fun createMultiSigMofN(m: Int, pubkeys: List<PublicKey>): List<ScriptElt> {
         require(m in 1..16) { "number of required signatures is $m, should be between 1 and 16" }
         require(pubkeys.count() in 1..16) { "number of public keys is ${pubkeys.size}, should be between 1 and 16" }
@@ -259,16 +279,62 @@ object Script {
      * @param pubKeyHash public key hash
      * @return a pay-to-public-key-hash script
      */
+    @JvmStatic
     fun pay2pkh(pubKeyHash: ByteArray): List<ScriptElt> {
         require(pubKeyHash.size == 20) { "pubkey hash length must be 20 bytes" }
         return listOf(OP_DUP, OP_HASH160, OP_PUSHDATA(pubKeyHash), OP_EQUALVERIFY, OP_CHECKSIG)
     }
+
+    @JvmStatic
+    fun isPay2pkh(script: List<ScriptElt>): Boolean {
+        return when {
+            script.size == 5 && script[0] == OP_DUP && script[1] == OP_HASH160 && script[2].isPush(20) && script[3] == OP_EQUALVERIFY && script[4] == OP_CHECKSIG -> true
+            else -> false
+        }
+    }
+
+    @JvmStatic
+    fun isPay2pkh(script: ByteArray): Boolean = isPay2pkh(Script.parse(script))
+
+    @JvmStatic
+    fun isPay2sh(script: List<ScriptElt>): Boolean {
+        return when {
+            script.size == 3 && script[0] == OP_HASH160 && script[1].isPush(20) && script[2] == OP_EQUAL -> true
+            else -> false
+        }
+    }
+
+    @JvmStatic
+    fun isPay2sh(script: ByteArray): Boolean = isPay2sh(Script.parse(script))
+
+    @JvmStatic
+    fun isPay2wpkh(script: List<ScriptElt>): Boolean {
+        return when {
+            script.size == 2 && script[0] == OP_0 && script[1].isPush(20) -> true
+            else -> false
+        }
+    }
+
+    @JvmStatic
+    fun isPay2wpkh(script: ByteArray): Boolean = isPay2wpkh(Script.parse(script))
+
+    @JvmStatic
+    fun isPay2wsh(script: List<ScriptElt>): Boolean {
+        return when {
+            script.size == 2 && script[0] == OP_0 && script[1].isPush(32) -> true
+            else -> false
+        }
+    }
+
+    @JvmStatic
+    fun isPay2wsh(script: ByteArray): Boolean = isPay2wsh(Script.parse(script))
 
     /**
      *
      * @param pubKey public key
      * @return a pay-to-public-key-hash script
      */
+    @JvmStatic
     fun pay2pkh(pubKey: PublicKey): List<ScriptElt> = pay2pkh(pubKey.hash160())
 
     /**
@@ -276,6 +342,7 @@ object Script {
      * @param script bitcoin script
      * @return a pay-to-script script
      */
+    @JvmStatic
     fun pay2sh(script: List<ScriptElt>): List<ScriptElt> = pay2sh(Script.write(script))
 
     /**
@@ -283,6 +350,7 @@ object Script {
      * @param script bitcoin script
      * @return a pay-to-script script
      */
+    @JvmStatic
     fun pay2sh(script: ByteArray): List<ScriptElt> = listOf(OP_HASH160, OP_PUSHDATA(Crypto.hash160(script)), OP_EQUAL)
 
     /**
@@ -290,6 +358,7 @@ object Script {
      * @param script bitcoin script
      * @return a pay-to-witness-script script
      */
+    @JvmStatic
     fun pay2wsh(script: List<ScriptElt>): List<ScriptElt> = pay2wsh(Script.write(script))
 
     /**
@@ -297,13 +366,22 @@ object Script {
      * @param script bitcoin script
      * @return a pay-to-witness-script script
      */
+    @JvmStatic
     fun pay2wsh(script: ByteArray): List<ScriptElt> = listOf(OP_0, OP_PUSHDATA(Crypto.sha256(script)))
 
+    /**
+     *
+     * @param script bitcoin script
+     * @return a pay-to-witness-script script
+     */
+    @JvmStatic
+    fun pay2wsh(script: ByteVector): List<ScriptElt> = pay2wsh(script.toByteArray())
     /**
      *
      * @param pubKeyHash public key hash
      * @return a pay-to-witness-public-key-hash script
      */
+    @JvmStatic
     fun pay2wpkh(pubKeyHash: ByteArray): List<ScriptElt> {
         require(pubKeyHash.size == 20) { "pubkey hash length must be 20 bytes" }
         return listOf(OP_0, OP_PUSHDATA(pubKeyHash))
@@ -314,6 +392,7 @@ object Script {
      * @param pubKey public key
      * @return a pay-to-witness-public-key-hash script
      */
+    @JvmStatic
     fun pay2wpkh(pubKey: PublicKey): List<ScriptElt> = pay2wpkh(pubKey.hash160())
 
     fun removeSignature(script: List<ScriptElt>, signature: ByteVector): List<ScriptElt> {
@@ -423,7 +502,7 @@ object Script {
      * @param tx         transaction that is being verified
      * @param inputIndex 0-based index of the tx input that is being processed
      */
-    data class Context(val tx: Transaction, val inputIndex: Int, val amount: Satoshi) {
+    data class Context(val tx: Transaction, val inputIndex: Int, val amount: Long) {
         init {
             require(inputIndex >= 0 && inputIndex < tx.txIn.count()) { "invalid input index" }
         }
@@ -480,7 +559,9 @@ object Script {
                         context.amount,
                         signatureVersion
                     )
-                    val result = Crypto.verifySignature(hash, Crypto.der2compact(sigBytes), PublicKey(pubKey))
+                    val result = Crypto.verifySignature(hash, Crypto.der2compact(sigBytes),
+                        PublicKey(pubKey)
+                    )
                     result
                 }
             }

@@ -16,9 +16,10 @@
 
 package fr.acinq.bitcoin
 
-import kotlinx.io.ByteArrayOutputStream
+import kotlin.jvm.JvmField
+import kotlin.jvm.JvmStatic
 
-open class ByteVector(private val bytes: ByteArray, private val offset: Int, private val size: Int) {
+open class ByteVector(private var bytes: ByteArray, private var offset: Int, private val size: Int) {
     constructor(bytes: ByteArray) : this(bytes, 0, bytes.size)
     constructor(input: String) : this(Hex.decode(input))
 
@@ -42,30 +43,56 @@ open class ByteVector(private val bytes: ByteArray, private val offset: Int, pri
         return ByteVector(bytes, offset + n, size - n)
     }
 
-    fun takeLast(n: Int) = drop(size - n)
+    open fun update(i: Int, b: Byte): ByteVector {
+        val newbytes = toByteArray()
+        newbytes[i] = b
+        return ByteVector(newbytes)
+    }
 
-    fun dropLast(n: Int) = take(size - n)
+    fun takeRight(n: Int) = drop(size - n)
+
+    fun dropRight(n: Int) = take(size - n)
+
+    fun append(value: Byte): ByteVector {
+        return ByteVector(toByteArray() + value)
+    }
+
+    fun append(other: ByteArray): ByteVector {
+        return ByteVector(toByteArray() + other)
+    }
+
+    fun append(other: ByteVector): ByteVector = append(other.toByteArray())
 
     open fun reversed() = ByteVector(toByteArray().reversedArray())
 
+    fun contentEquals(input: ByteArray, inputOffset: Int, inputSize: Int): Boolean {
+        if (size != inputSize) return false
+        for (i in 0 until size) {
+            if (bytes[offset + i] != input[inputOffset + i]) return false
+        }
+        return true
+    }
+
+    fun contentEquals(input: ByteArray) = contentEquals(input, 0, input.size)
+
+    fun sha256() : ByteVector32 {
+        return ByteVector32(Crypto.sha256(bytes, offset, size))
+    }
+
+    fun ripemd160() : ByteVector {
+        return ByteVector(Crypto.ripemd160(bytes, offset, size))
+    }
+
     fun toByteArray() = bytes.copyOfRange(offset, offset + size)
 
-    override fun toString(): String {
-        return Hex.encode(bytes, offset, size)
-    }
+    fun toHex() = Hex.encode(bytes, offset, size)
+
+    override fun toString(): String = toHex()
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is ByteVector) return false
-        if (size != other.size) return false
-
-        var us = offset
-        var them = other.offset
-        for (i in 1..size) {
-            if (bytes[us++] != other.bytes[them++]) return false
-        }
-
-        return true
+        return contentEquals(other.bytes, other.offset, other.size)
     }
 
     override fun hashCode(): Int {
@@ -77,6 +104,7 @@ open class ByteVector(private val bytes: ByteArray, private val offset: Int, pri
     }
 
     companion object {
+        @JvmField
         val empty = ByteVector(ByteArray(0))
     }
 }
@@ -86,11 +114,23 @@ class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 32
     constructor(bytes: ByteArray) : this(bytes, 0)
     constructor(input: String) : this(Hex.decode(input), 0)
 
+    override fun update(i: Int, b: Byte): ByteVector32 {
+        val newbytes = toByteArray()
+        newbytes[i] = b
+        return ByteVector32(newbytes)
+    }
+
     override fun reversed() = ByteVector32(super.toByteArray().reversedArray())
 
     companion object {
+        @JvmField
         val Zeroes = ByteVector32("0000000000000000000000000000000000000000000000000000000000000000")
+
+        @JvmField
         val One = ByteVector32("0100000000000000000000000000000000000000000000000000000000000000")
+
+        @JvmStatic
+        fun fromValidHex(input: String) = ByteVector32(input)
     }
 }
 
@@ -101,6 +141,14 @@ class ByteVector64(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 64
     init {
         require(offset >= 0 && offset < bytes.size)
         require(bytes.size - offset == 64) { "ByteVector64 must contain 64 bytes, not ${bytes.size - offset}" }
+    }
+
+    companion object {
+        @JvmField
+        val Zeroes = ByteVector64("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+
+        @JvmStatic
+        fun fromValidHex(input: String) = ByteVector64(input)
     }
 }
 

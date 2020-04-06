@@ -33,7 +33,7 @@ class TransactionTestsJvm {
 
         fun processSingle(it: List<JsonNode>, valid: Boolean, comment: String? = null): Unit {
             val prevoutMap = mutableMapOf<OutPoint, ByteVector>()
-            val prevamountMap = mutableMapOf<OutPoint, Satoshi>()
+            val prevamountMap = mutableMapOf<OutPoint, Long>()
 
             when {
                 it[0].isArray && it[1].isTextual && it[2].isTextual -> {
@@ -62,7 +62,7 @@ class TransactionTestsJvm {
                                     prevoutScript.byteVector()
                                 )
                                 val amount = it[3].longValue()
-                                prevamountMap.put(OutPoint(ByteVector32(hash).reversed(), index), Satoshi(amount))
+                                prevamountMap.put(OutPoint(ByteVector32(hash).reversed(), index), amount)
                             }
                             else -> {
                                 println("unexpected test data $it $comment")
@@ -75,7 +75,7 @@ class TransactionTestsJvm {
                         for (i in 0..tx.txIn.lastIndex) {
                             if (tx.txIn[i].outPoint.isCoinbase) continue
                             val prevOutputScript = prevoutMap.getValue(tx.txIn[i].outPoint)
-                            val amount = prevamountMap.get(tx.txIn[i].outPoint) ?: Satoshi(0)
+                            val amount = prevamountMap.get(tx.txIn[i].outPoint) ?: 0
                             val ctx = Script.Context(tx, i, amount)
                             val runner = Script.Runner(ctx, ScriptTestsJvm.parseScriptFlags(verifyFlags))
                             if (!runner.verifyScripts(

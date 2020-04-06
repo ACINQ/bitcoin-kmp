@@ -1,9 +1,10 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Crypto
 import kotlinx.io.InputStream
 import kotlinx.io.OutputStream
 import kotlinx.serialization.InternalSerializationApi
+import kotlin.jvm.JvmField
+import kotlin.jvm.JvmStatic
 
 /**
  *
@@ -18,24 +19,38 @@ import kotlinx.serialization.InternalSerializationApi
 @ExperimentalStdlibApi
 @InternalSerializationApi
 data class BlockHeader(
-    val version: Long,
-    val hashPreviousBlock: ByteVector32,
-    val hashMerkleRoot: ByteVector32,
-    val time: Long,
-    val bits: Long,
-    val nonce: Long
+    @JvmField val version: Long,
+    @JvmField val hashPreviousBlock: ByteVector32,
+    @JvmField val hashMerkleRoot: ByteVector32,
+    @JvmField val time: Long,
+    @JvmField val bits: Long,
+    @JvmField val nonce: Long
 ) {
     @ExperimentalUnsignedTypes
-    val hash: ByteVector32 by lazy { ByteVector32(Crypto.hash256(BlockHeader.write(this))) }
+    @JvmField
+    val hash: ByteVector32 = ByteVector32(Crypto.hash256(BlockHeader.write(this)))
 
     @ExperimentalUnsignedTypes
-    val blockId: ByteVector32 by lazy { hash.reversed() }
+    @JvmField
+    val blockId: ByteVector32 = hash.reversed()
+
+    fun setVersion(input: Long) = this.copy(version = input)
+
+    fun setHashPreviousBlock(input: ByteVector32) = this.copy(hashPreviousBlock = input)
+
+    fun setHashMerkleRoot(input: ByteVector32) = this.copy(hashMerkleRoot = input)
+
+    fun setTime(input: Long) = this.copy(time = input)
+
+    fun setBits(input: Long) = this.copy(bits = input)
+
+    fun setNonce(input: Long) = this.copy(nonce = input)
 
     @ExperimentalUnsignedTypes
     @ExperimentalStdlibApi
     @InternalSerializationApi
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
-    companion object : BtcSerializer<BlockHeader> {
+    companion object : BtcSerializer<BlockHeader>() {
         override fun read(input: InputStream, protocolVersion: Long): BlockHeader {
             val version = BtcSerializer.uint32(input)
             val hashPreviousBlock = BtcSerializer.hash(input)
@@ -53,6 +68,16 @@ data class BlockHeader(
             )
         }
 
+        @JvmStatic
+        override fun read(input: String): BlockHeader {
+            return super.read(input)
+        }
+
+        @JvmStatic
+        override fun read(input: ByteArray): BlockHeader {
+            return super.read(input)
+        }
+
         override fun write(message: BlockHeader, output: OutputStream, protocolVersion: Long) {
             BtcSerializer.writeUInt32(message.version, output)
             BtcSerializer.writeBytes(message.hashPreviousBlock, output)
@@ -62,7 +87,13 @@ data class BlockHeader(
             BtcSerializer.writeUInt32(message.nonce, output)
         }
 
+        @JvmStatic
+        override fun write(message: BlockHeader): ByteArray {
+            return super.write(message)
+        }
+
         @ExperimentalUnsignedTypes
+        @JvmStatic
         fun getDifficulty(header: BlockHeader): UInt256 {
             val (diff, neg, _) = UInt256.decodeCompact(header.bits)
             return if (neg) -diff else diff
@@ -74,6 +105,7 @@ data class BlockHeader(
          * @return the amount of work represented by this difficulty target, as displayed
          *         by bitcoin core
          */
+        @JvmStatic
         fun blockProof(bits: Long): UInt256 {
             val (target, negative, overflow) = UInt256.decodeCompact(bits)
             return if (target == UInt256.Zero || negative || overflow) UInt256.Zero else {
@@ -84,6 +116,7 @@ data class BlockHeader(
             }
         }
 
+        @JvmStatic
         fun blockProof(header: BlockHeader): UInt256 = blockProof(header.bits)
 
         /**
@@ -92,12 +125,14 @@ data class BlockHeader(
          * @param header block header
          * @return true if the input block header validates its expected proof of work
          */
+        @JvmStatic
         fun checkProofOfWork(header: BlockHeader): Boolean {
             val (target, _, _) = UInt256.decodeCompact(header.bits)
             val hash = UInt256(header.blockId.toByteArray())
             return hash <= target
         }
 
+        @JvmStatic
         fun calculateNextWorkRequired(lastHeader: BlockHeader, lastRetargetTime: Long): Long {
             var actualTimespan = lastHeader.time - lastRetargetTime
             val targetTimespan = 14 * 24 * 60 * 60L // two weeks
@@ -140,17 +175,25 @@ object MerkleTree {
 @ExperimentalUnsignedTypes
 @InternalSerializationApi
 @ExperimentalStdlibApi
-data class Block(val header: BlockHeader, val tx: List<Transaction>) {
-    val hash: ByteVector32 by lazy { header.hash }
-    val blockId: ByteVector32 by lazy { hash.reversed() }
+data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Transaction>) {
+    @JvmField
+    val hash: ByteVector32 = header.hash
+
+    @JvmField
+    val blockId: ByteVector32 = hash.reversed()
 
     @InternalSerializationApi
     @ExperimentalStdlibApi
-    companion object : BtcSerializer<Block> {
+    companion object : BtcSerializer<Block>() {
         override fun write(message: Block, out: OutputStream, protocolVersion: Long) {
             BlockHeader.write(message.header, out)
             BtcSerializer.writeCollection(message.tx, out, Transaction, protocolVersion)
 
+        }
+
+        @JvmStatic
+        override fun write(message: Block): ByteArray {
+            return super.write(message)
         }
 
         override fun read(input: InputStream, protocolVersion: Long): Block {
@@ -159,6 +202,17 @@ data class Block(val header: BlockHeader, val tx: List<Transaction>) {
             return Block(header, BtcSerializer.readCollection(input, Transaction, protocolVersion))
         }
 
+        @JvmStatic
+        override fun read(input: String): Block {
+            return super.read(input)
+        }
+
+        @JvmStatic
+        override fun read(input: ByteArray): Block {
+            return super.read(input)
+        }
+
+        @JvmStatic
         override fun validate(message: Block) {
             BlockHeader.validate(message.header)
             require(message.header.hashMerkleRoot == MerkleTree.computeRoot(message.tx.map { it -> it.hash })) { "invalid block:  merkle root mismatch" }
@@ -176,6 +230,7 @@ data class Block(val header: BlockHeader, val tx: List<Transaction>) {
         fun checkProofOfWork(block: Block): Boolean = BlockHeader.checkProofOfWork(block.header)
 
         // genesis blocks
+        @JvmField
         val LivenetGenesisBlock = {
             val script = listOf(
                 OP_PUSHDATA(BtcSerializer.writeUInt32(486604799L)),
@@ -199,16 +254,18 @@ data class Block(val header: BlockHeader, val tx: List<Transaction>) {
                     Transaction(
                         version = 1,
                         txIn = listOf(TxIn.coinbase(script)),
-                        txOut = listOf(TxOut(amount = Satoshi(5000000000), publicKeyScript = scriptPubKey)),
+                        txOut = listOf(TxOut(amount = 5000000000, publicKeyScript = scriptPubKey)),
                         lockTime = 0
                     )
                 )
             )
         }.invoke()
 
+        @JvmField
         val TestnetGenesisBlock =
             LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458))
 
+        @JvmField
         val RegtestGenesisBlock = LivenetGenesisBlock.copy(
             header = LivenetGenesisBlock.header.copy(
                 bits = 0x207fffffL,
@@ -217,6 +274,7 @@ data class Block(val header: BlockHeader, val tx: List<Transaction>) {
             )
         )
 
+        @JvmField
         val SegnetGenesisBlock = LivenetGenesisBlock.copy(
             header = LivenetGenesisBlock.header.copy(
                 bits = 503447551,

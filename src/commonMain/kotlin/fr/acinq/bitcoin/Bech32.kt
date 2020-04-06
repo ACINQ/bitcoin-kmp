@@ -16,6 +16,8 @@
 
 package fr.acinq.bitcoin
 
+import kotlin.jvm.JvmStatic
+
 /**
  * See https://github.com/sipa/bech32/blob/master/bip-witaddr.mediawiki
  */
@@ -72,6 +74,7 @@ object Bech32 {
      * @param bech32 bech32 string
      * @return a (hrp, data) tuple
      */
+    @JvmStatic
     fun decode(bech32: String): Pair<String, Array<Int5>> {
         require(bech32.toLowerCase() == bech32 || bech32.toUpperCase() == bech32) { "mixed case strings are not valid bech32" }
         bech32.forEach { require(it.toInt() in 33..126) { "invalid character " } }
@@ -106,7 +109,8 @@ object Bech32 {
      * @param input a sequence of 8 bits integers
      * @return a sequence of 5 bits integers
      */
-    private fun eight2five(input: Array<Byte>): Array<Int5> {
+    @JvmStatic
+    fun eight2five(input: Array<Byte>): Array<Int5> {
         var buffer = 0L
         val output = ArrayList<Int5>()
         var count = 0
@@ -127,7 +131,8 @@ object Bech32 {
      * @param input a sequence of 5 bits integers
      * @return a sequence of 8 bits integers
      */
-    private fun five2eight(input: Array<Int5>, offset: Int): Array<Byte> {
+    @JvmStatic
+    fun five2eight(input: Array<Int5>, offset: Int): Array<Byte> {
         var buffer = 0L
         val output = ArrayList<Byte>()
         var count = 0
@@ -152,6 +157,7 @@ object Bech32 {
      * @param data witness program: if version is 0, either 20 bytes (P2WPKH) or 32 bytes (P2WSH)
      * @return a bech32 encoded witness address
      */
+    @JvmStatic
     fun encodeWitnessAddress(hrp: String, witnessVersion: Byte, data: ByteArray): String {
         // prepend witness version: 0
         val data1 = arrayOf(witnessVersion) + eight2five(data.toTypedArray())
@@ -168,6 +174,7 @@ object Bech32 {
      * @return a (version, program) tuple where version is the witness version and program the decoded witness program.
      *         If version is 0, it will be either 20 bytes (P2WPKH) or 32 bytes (P2WSH)
      */
+    @JvmStatic
     fun decodeWitnessAddress(address: String): Triple<String, Byte, ByteArray> {
         val (hrp, data) = decode(address)
         require(hrp == "bc" || hrp == "tb" || hrp == "bcrt") { "invalid HRP $hrp" }
@@ -177,5 +184,18 @@ object Bech32 {
         require(bin.size in 2..40) { "invalid witness program length ${bin.size}" }
         if (version == 0.toByte()) require(bin.size == 20 || bin.size == 32) { "invalid witness program length ${bin.size}" }
         return Triple(hrp, version, bin.toByteArray())
+    }
+
+    /**
+     *
+     * @param hrp   human readable prefix
+     * @param int5s 5-bit data
+     * @return hrp + data encoded as a Bech32 string
+     */
+    @JvmStatic
+    fun encode(hrp: String, int5s: ByteArray): String {
+        require(hrp.toLowerCase() == hrp || hrp.toUpperCase() == hrp){ "mixed case strings are not valid bech32 prefixes" }
+        val checksum = Bech32.checksum(hrp, int5s.toTypedArray())
+        return hrp + "1" + String((int5s.toTypedArray() + checksum).map { i -> alphabet[i.toInt()] }.toCharArray())
     }
 }

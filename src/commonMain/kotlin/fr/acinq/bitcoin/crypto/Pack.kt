@@ -19,9 +19,20 @@ object Pack {
         return bs
     }
 
+    fun writeUint16BE(n: Int): ByteArray {
+        val bs = ByteArray(2)
+        writeUint16BE(n, bs, 0)
+        return bs
+    }
+
     fun writeUint16LE(n: Int, bs: ByteArray, off: Int) {
         bs[off] = n.toByte()
         bs[off + 1] = (n.toInt() ushr 8).toByte()
+    }
+
+    fun writeUint16BE(n: Int, bs: ByteArray, off: Int) {
+        bs[off] = (n.toInt() ushr 8).toByte()
+        bs[off + 1] = n.toByte()
     }
 
     fun uint32BE(bs: ByteArray, off: Int): Int {

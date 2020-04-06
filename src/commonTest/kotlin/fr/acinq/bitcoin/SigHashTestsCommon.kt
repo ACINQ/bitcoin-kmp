@@ -2,7 +2,6 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.SigHash.SIGHASH_ALL
 import fr.acinq.bitcoin.SigHash.SIGHASH_ANYONECANPAY
-import fr.acinq.bitcoin.crypto.PrivateKey
 import kotlinx.serialization.InternalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertFails
@@ -11,7 +10,7 @@ import kotlin.test.assertFails
 @ExperimentalStdlibApi
 @InternalSerializationApi
 class SighashSpec {
-    fun MilliBtc(value: Long) = Satoshi(value * 100000)
+    fun MilliBtc(value: Long) = value * 100000
 
     @Test
     fun `"SIGHASH_ANYONECANPAY lets you add inputs`() {

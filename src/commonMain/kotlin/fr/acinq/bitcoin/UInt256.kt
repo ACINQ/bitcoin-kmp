@@ -1,6 +1,8 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Pack
+import kotlin.jvm.JvmField
+import kotlin.jvm.JvmStatic
 
 
 @ExperimentalUnsignedTypes
@@ -201,8 +203,10 @@ class UInt256() : Comparable<UInt256> {
     companion object {
         private const val WIDTH = 8
 
+        @JvmField
         val Zero = UInt256()
 
+        @JvmStatic
         fun decodeCompact(nCompact: Long): Triple<UInt256, Boolean, Boolean> {
             val nSize = (nCompact ushr 24).toInt();
             var nWord = nCompact and 0x007fffff;

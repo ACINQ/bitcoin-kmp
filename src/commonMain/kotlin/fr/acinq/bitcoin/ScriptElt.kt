@@ -6,7 +6,17 @@ import kotlin.jvm.JvmStatic
 sealed class ScriptElt {
     fun isPush(size: Int): Boolean = ScriptElt.isPush(this, size)
 
+    fun isPush(): Boolean = ScriptElt.isPush(this)
+
     companion object {
+        @JvmStatic
+        fun isPush(op: ScriptElt) : Boolean {
+            return when {
+                op is OP_PUSHDATA -> true
+                else -> false
+            }
+        }
+
         @JvmStatic
         fun isPush(op: ScriptElt, size: Int) : Boolean {
             return when {

@@ -33,7 +33,7 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation(kotlin("stdlib-jdk8"))
+                implementation(kotlin("stdlib-jdk7"))
                 implementation("org.bouncycastle:bcprov-jdk15on:1.64")
                 implementation("fr.acinq.bitcoin:secp256k1-jni:1.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime:0.20.0")

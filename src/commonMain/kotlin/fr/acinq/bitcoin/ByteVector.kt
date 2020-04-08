@@ -19,7 +19,7 @@ package fr.acinq.bitcoin
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
-open class ByteVector(private var bytes: ByteArray, private var offset: Int, private val size: Int) {
+open class ByteVector(internal val bytes: ByteArray, internal val offset: Int, protected val size: Int) {
     constructor(bytes: ByteArray) : this(bytes, 0, bytes.size)
     constructor(input: String) : this(Hex.decode(input))
 
@@ -42,6 +42,8 @@ open class ByteVector(private var bytes: ByteArray, private var offset: Int, pri
     fun drop(n: Int): ByteVector {
         return ByteVector(bytes, offset + n, size - n)
     }
+
+    fun slice(from: Int, to: Int) = drop(from).take(to - from)
 
     open fun update(i: Int, b: Byte): ByteVector {
         val newbytes = toByteArray()
@@ -113,6 +115,7 @@ open class ByteVector(private var bytes: ByteArray, private var offset: Int, pri
 class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 32) {
     constructor(bytes: ByteArray) : this(bytes, 0)
     constructor(input: String) : this(Hex.decode(input), 0)
+    constructor(input: ByteVector) : this(input.bytes, input.offset)
 
     override fun update(i: Int, b: Byte): ByteVector32 {
         val newbytes = toByteArray()

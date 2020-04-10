@@ -177,6 +177,16 @@ class UInt256() : Comparable<UInt256> {
 
     }
 
+    fun toDouble(): Double  {
+        var ret: Double = 0.0
+        var fact: Double = 1.0
+        for (i in 0 until WIDTH) {
+            ret += fact * pn[i].toDouble()
+            fact *= 4294967296.0
+        }
+        return ret;
+    }
+
     override fun toString(): String {
         val bytes = ByteArray(32)
         for (i in 0 until WIDTH) {

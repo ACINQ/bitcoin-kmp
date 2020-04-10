@@ -1,5 +1,22 @@
+/*
+ * Copyright 2020 ACINQ SAS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.DeterministicWallet.hardened
 import kotlinx.io.ByteArrayInputStream
 import kotlinx.io.ByteArrayOutputStream
 import kotlinx.serialization.InternalSerializationApi
@@ -20,8 +37,6 @@ object DeterministicWallet {
     @JvmStatic
     fun isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
-
-
     data class ExtendedPrivateKey(
         @JvmField val secretkeybytes: ByteVector32,
         @JvmField val chaincode: ByteVector32,
@@ -30,8 +45,7 @@ object DeterministicWallet {
         @JvmField val parent: Long
     ) {
         @JvmField
-        val privateKey: PrivateKey =
-            PrivateKey(secretkeybytes)
+        val privateKey: PrivateKey = PrivateKey(secretkeybytes)
 
         @JvmField
         val publicKey: PublicKey = privateKey.publicKey()
@@ -49,8 +63,7 @@ object DeterministicWallet {
         }
 
         @JvmField
-        val publicKey: PublicKey =
-            PublicKey(publickeybytes)
+        val publicKey: PublicKey = PublicKey(publickeybytes)
     }
 
     @JvmStatic
@@ -291,8 +304,7 @@ data class KeyPath(@JvmField val path: List<Long>) {
 
         @JvmStatic
         fun computePath(path: String): List<Long> {
-            fun toNumber(value: String): Long =
-                if (value.last() == '\'') DeterministicWallet.hardened(value.dropLast(1).toLong()) else value.toLong()
+            fun toNumber(value: String): Long = if (value.last() == '\'') hardened(value.dropLast(1).toLong()) else value.toLong()
 
             val path1 = path.removePrefix("m").removePrefix("/")
             return if (path1.isEmpty())

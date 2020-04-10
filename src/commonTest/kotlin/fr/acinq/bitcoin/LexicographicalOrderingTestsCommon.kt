@@ -1,3 +1,19 @@
+/*
+ * Copyright 2020 ACINQ SAS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package fr.acinq.bitcoin
 
 import kotlinx.serialization.InternalSerializationApi
@@ -34,7 +50,7 @@ class LexicographicalOrderingTestsCommon {
             ByteVector32("f0a130a84912d03c1d284974f563c5949ac13f8342b8112edff52971599e6a45"),
             ByteVector32("f320832a9d2e2452af63154bc687493484a0e7745ebd3aaf9ca19eb80834ad60")
         )
-        assertEquals(tx1.txIn.map { it.outPoint.txid}, expected)
+        assertEquals(tx1.txIn.map { it.outPoint.txid }, expected)
     }
 
     @Test
@@ -47,7 +63,7 @@ class LexicographicalOrderingTestsCommon {
             OutPoint(ByteVector32("35288d269cee1941eaebb2ea85e32b42cdb2b04284a56d8b14dcc3f5c65d6055").reversed(), 0),
             OutPoint(ByteVector32("35288d269cee1941eaebb2ea85e32b42cdb2b04284a56d8b14dcc3f5c65d6055").reversed(), 1)
         ))
-        assertEquals(tx1.txOut , listOf(
+        assertEquals(tx1.txOut, listOf(
             TxOut(100000000, ByteVector("41046a0765b5865641ce08dd39690aade26dfbf5511430ca428a3089261361cef170e3929a68aee3d8d4848b0c5111b0a37b82b86ad559fd2a745b44d8e8d9dfdc0cac")),
             TxOut(2400000000L, ByteVector("41044a656f065871a353f216ca26cef8dde2f03e8c16202d2e8ad769f02032cb86a5eb5e56842e92e19141d60a01928f8dd2c875a390f67c1f6c94cfc617c0ea45afac"))
         ))

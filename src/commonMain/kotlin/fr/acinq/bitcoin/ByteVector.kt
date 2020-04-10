@@ -77,11 +77,11 @@ open class ByteVector(internal val bytes: ByteArray, internal val offset: Int, p
 
     fun contentEquals(input: ByteArray) = contentEquals(input, 0, input.size)
 
-    fun sha256() : ByteVector32 {
+    fun sha256(): ByteVector32 {
         return ByteVector32(Crypto.sha256(bytes, offset, size))
     }
 
-    fun ripemd160() : ByteVector {
+    fun ripemd160(): ByteVector {
         return ByteVector(Crypto.ripemd160(bytes, offset, size))
     }
 

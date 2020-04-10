@@ -1,3 +1,19 @@
+/*
+ * Copyright 2020 ACINQ SAS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package fr.acinq.bitcoin
 
 object ScriptFlags {
@@ -101,19 +117,19 @@ object ScriptFlags {
      * blocks and we must accept those blocks.
      */
     const val STANDARD_SCRIPT_VERIFY_FLAGS = MANDATORY_SCRIPT_VERIFY_FLAGS or
-            SCRIPT_VERIFY_DERSIG or
-            SCRIPT_VERIFY_STRICTENC or
-            SCRIPT_VERIFY_MINIMALDATA or
-            SCRIPT_VERIFY_NULLDUMMY or
-            SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS or
-            SCRIPT_VERIFY_CLEANSTACK or
-            SCRIPT_VERIFY_MINIMALIF or
-            SCRIPT_VERIFY_NULLFAIL or
-            SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY or
-            SCRIPT_VERIFY_CHECKSEQUENCEVERIFY or
-            SCRIPT_VERIFY_LOW_S or
-            SCRIPT_VERIFY_WITNESS or
-            SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM
+        SCRIPT_VERIFY_DERSIG or
+        SCRIPT_VERIFY_STRICTENC or
+        SCRIPT_VERIFY_MINIMALDATA or
+        SCRIPT_VERIFY_NULLDUMMY or
+        SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS or
+        SCRIPT_VERIFY_CLEANSTACK or
+        SCRIPT_VERIFY_MINIMALIF or
+        SCRIPT_VERIFY_NULLFAIL or
+        SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY or
+        SCRIPT_VERIFY_CHECKSEQUENCEVERIFY or
+        SCRIPT_VERIFY_LOW_S or
+        SCRIPT_VERIFY_WITNESS or
+        SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM
 
     /** For convenience, standard but not mandatory verify flags. */
     const val STANDARD_NOT_MANDATORY_VERIFY_FLAGS = STANDARD_SCRIPT_VERIFY_FLAGS and MANDATORY_SCRIPT_VERIFY_FLAGS.inv()

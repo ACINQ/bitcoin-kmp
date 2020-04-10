@@ -1,3 +1,19 @@
+/*
+ * Copyright 2020 ACINQ SAS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_DERSIG
@@ -37,13 +53,7 @@ object Crypto {
 
     @JvmStatic
     fun hash256(input: ByteArray, offset: Int, len: Int) =
-        Sha256.hash(
-            Sha256.hash(
-                input,
-                offset,
-                len
-            )
-        )
+        Sha256.hash(Sha256.hash(input, offset, len))
 
     @JvmStatic
     fun hash256(input: ByteArray) = hash256(input, 0, input.size)
@@ -55,11 +65,7 @@ object Crypto {
     @JvmStatic
     fun hash160(input: ByteArray, offset: Int, len: Int) =
         Ripemd160.hash(
-            Sha256.hash(
-                input,
-                offset,
-                len
-            )
+            Sha256.hash(input, offset, len)
         )
 
     @JvmStatic
@@ -71,12 +77,7 @@ object Crypto {
 
     @JvmStatic
     fun hmac512(key: ByteArray, data: ByteArray): ByteArray {
-        return HMac.hmac(
-            key,
-            data,
-            Sha512(),
-            128
-        )
+        return HMac.hmac(key, data, Sha512(), 128)
     }
 
     /**
@@ -148,19 +149,11 @@ object Crypto {
         verifySignature(data.toByteArray(), signature, publicKey)
 
     @JvmStatic
-    fun compact2der(signature: ByteVector64): ByteVector = ByteVector(
-        Secp256k1.compact2der(
-            signature.toByteArray()
-        )
-    )
+    fun compact2der(signature: ByteVector64): ByteVector = ByteVector(Secp256k1.compact2der(signature.toByteArray()))
 
     @InternalSerializationApi
     @JvmStatic
-    fun der2compact(signature: ByteArray): ByteVector64 = ByteVector64(
-        Secp256k1.der2compact(
-            signature
-        )
-    )
+    fun der2compact(signature: ByteArray): ByteVector64 = ByteVector64(Secp256k1.der2compact(signature))
 
     @JvmStatic
     fun isDERSignature(sig: ByteArray): Boolean {
@@ -230,9 +223,7 @@ object Crypto {
 
     @InternalSerializationApi
     @JvmStatic
-    fun isLowDERSignature(sig: ByteArray): Boolean = !Secp256k1.signatureNormalize(
-        sig
-    ).second
+    fun isLowDERSignature(sig: ByteArray): Boolean = !Secp256k1.signatureNormalize(sig).second
 
     @JvmStatic
     fun isDefinedHashtypeSignature(sig: ByteArray): Boolean = if (sig.isEmpty()) false else {
@@ -246,18 +237,9 @@ object Crypto {
         // Empty signature. Not strictly DER encoded, but allowed to provide a
         // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
         return if (sig.isEmpty()) true
-        else if ((flags and (SCRIPT_VERIFY_DERSIG or SCRIPT_VERIFY_LOW_S or SCRIPT_VERIFY_STRICTENC)) != 0 && !isDERSignature(
-                sig
-            )
-        ) false
-        else if ((flags and SCRIPT_VERIFY_LOW_S) != 0 && !isLowDERSignature(
-                sig
-            )
-        ) false
-        else if ((flags and SCRIPT_VERIFY_STRICTENC) != 0 && !isDefinedHashtypeSignature(
-                sig
-            )
-        ) false
+        else if ((flags and (SCRIPT_VERIFY_DERSIG or SCRIPT_VERIFY_LOW_S or SCRIPT_VERIFY_STRICTENC)) != 0 && !isDERSignature(sig)) false
+        else if ((flags and SCRIPT_VERIFY_LOW_S) != 0 && !isLowDERSignature(sig)) false
+        else if ((flags and SCRIPT_VERIFY_STRICTENC) != 0 && !isDefinedHashtypeSignature(sig)) false
         else true
     }
 

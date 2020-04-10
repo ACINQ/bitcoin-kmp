@@ -1,3 +1,19 @@
+/*
+ * Copyright 2020 ACINQ SAS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package fr.acinq.bitcoin.crypto
 
 class Sha512 : Digest {
@@ -117,13 +133,13 @@ class Sha512 : Digest {
 
     private fun processWord(`in`: ByteArray, inOff: Int) {
         W[wOff++] = ((`in`[inOff].toInt() and 0xff).toLong() shl 56
-                or ((`in`[inOff + 1].toInt() and 0xff).toLong() shl 48)
-                or ((`in`[inOff + 2].toInt() and 0xff).toLong() shl 40)
-                or ((`in`[inOff + 3].toInt() and 0xff).toLong() shl 32)
-                or ((`in`[inOff + 4].toInt() and 0xff).toLong() shl 24)
-                or ((`in`[inOff + 5].toInt() and 0xff).toLong() shl 16)
-                or ((`in`[inOff + 6].toInt() and 0xff).toLong() shl 8)
-                or (`in`[inOff + 7].toInt() and 0xff).toLong())
+            or ((`in`[inOff + 1].toInt() and 0xff).toLong() shl 48)
+            or ((`in`[inOff + 2].toInt() and 0xff).toLong() shl 40)
+            or ((`in`[inOff + 3].toInt() and 0xff).toLong() shl 32)
+            or ((`in`[inOff + 4].toInt() and 0xff).toLong() shl 24)
+            or ((`in`[inOff + 5].toInt() and 0xff).toLong() shl 16)
+            or ((`in`[inOff + 6].toInt() and 0xff).toLong() shl 8)
+            or (`in`[inOff + 7].toInt() and 0xff).toLong())
         if (wOff == 16) processBlock()
     }
 

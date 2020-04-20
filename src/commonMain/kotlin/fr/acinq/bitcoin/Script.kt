@@ -16,6 +16,7 @@
 
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.crypto.Secp256k1
 import kotlinx.io.ByteArrayInputStream
 import kotlinx.io.ByteArrayOutputStream
 import kotlinx.io.InputStream
@@ -548,6 +549,13 @@ object Script {
             )
         }
 
+        /**
+         * @param pubKey public key
+         * @param sigBytes signature, in Bitcoin format (DER encoded + 1 trailing sighash bytes)
+         * @param scriptCode current script code
+         * @param signatureVersion version (legacy or segwit)
+         * @return true if the signature is valid
+         */
         fun checkSignature(
             pubKey: ByteArray,
             sigBytes: ByteArray,
@@ -555,18 +563,17 @@ object Script {
             signatureVersion: Int
         ): Boolean {
             val check = if (sigBytes.isEmpty()) false
-            else if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag)) throw RuntimeException("invalid signature")
-            else if (!Crypto.checkPubKeyEncoding(
-                    pubKey,
-                    scriptFlag,
-                    signatureVersion
-                )
-            ) throw RuntimeException("invalid public key")
-            else if (!Crypto.isPubKeyValid(pubKey)) false // see how this is different from above ?
+            else if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag)) {
+                throw RuntimeException("invalid signature encoding")
+            } else if (!Crypto.checkPubKeyEncoding(pubKey, scriptFlag, signatureVersion)) {
+                throw RuntimeException("invalid public key encoding")
+            } else if (!Crypto.isPubKeyValid(pubKey)) {
+                false
+            } // see how this is different from above ?
             else {
                 val sigHashFlags = sigBytes.last().toInt() and 0xff
                 // sig hash is the last byte
-                val sigBytes1 = sigBytes.dropLast(1) // drop sig hash
+                val sigBytes1 = sigBytes.dropLast(1).toByteArray() // drop sig hash
                 if (sigBytes1.isEmpty()) false
                 else {
                     val hash = Transaction.hashForSigning(
@@ -577,9 +584,10 @@ object Script {
                         context.amount,
                         signatureVersion
                     )
-                    val result = Crypto.verifySignature(hash, Crypto.der2compact(sigBytes),
-                        PublicKey(pubKey)
-                    )
+                    // signature is normalized here, but high-S correctness has already been checked
+                    val normalized = ByteVector64(Secp256k1.signatureNormalize(sigBytes1).first)
+                    val pub = PublicKey(pubKey)
+                    val result = Crypto.verifySignature(hash, normalized, pub)
                     result
                 }
             }
@@ -1460,9 +1468,13 @@ object Script {
         @ExperimentalUnsignedTypes
         fun verifyScripts(scriptSig: ByteArray, scriptPubKey: ByteArray, witness: ScriptWitness): Boolean {
             fun checkStack(stack: List<ByteVector>): Boolean {
-                return if (stack.isEmpty()) false
-                else if (!castToBoolean(stack.first())) false
-                else if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CLEANSTACK) != 0) {
+                return if (stack.isEmpty()) {
+                    println("empty stask")
+                    false
+                } else if (!castToBoolean(stack.first())) {
+                    println("cast failed")
+                    false
+                } else if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CLEANSTACK) != 0) {
                     if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) == 0) throw RuntimeException("illegal script flag")
                     stack.size == 1
                 } else true

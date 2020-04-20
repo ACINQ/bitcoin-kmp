@@ -107,11 +107,9 @@ class CryptoTestsCommon {
         )
         dataset.forEach { it ->
             val (k, m, s) = it
-            val sig = Crypto.compact2der(
-                Crypto.sign(
-                    Crypto.sha256(m.encodeToByteArray()),
-                    PrivateKey(Hex.decode(k))
-                ))
+            val compact = Crypto.sign(Crypto.sha256(m.encodeToByteArray()), PrivateKey(Hex.decode(k)))
+            val sig = Crypto.compact2der(compact)
+
             assertEquals(Hex.encode(sig.toByteArray()), s)
         }
     }

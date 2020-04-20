@@ -221,16 +221,29 @@ object Crypto {
         return true
     }
 
+    /**
+     * @param sig signature (DER encoded, without a trailing sighash byte)
+     * @return true if the input is a "low S" signature
+     */
     @InternalSerializationApi
     @JvmStatic
     fun isLowDERSignature(sig: ByteArray): Boolean = !Secp256k1.signatureNormalize(sig).second
 
+    /**
+     * @param sig signature (DER encoded + a trailing sighash byte)
+     * @return true if the trailing sighash byte is valid
+     */
     @JvmStatic
     fun isDefinedHashtypeSignature(sig: ByteArray): Boolean = if (sig.isEmpty()) false else {
         val hashType = (sig.last().toInt() and 0xff) and (SigHash.SIGHASH_ANYONECANPAY.inv())
         !((hashType < SigHash.SIGHASH_ALL || hashType > SigHash.SIGHASH_SINGLE))
     }
 
+    /**
+     * @param sig signature in Bitcoin format (DER encoded + 1 trailing sighash byte)
+     * @param flags script flags
+     * @return true if the signature is properly encoded
+     */
     @InternalSerializationApi
     @JvmStatic
     fun checkSignatureEncoding(sig: ByteArray, flags: Int): Boolean {
@@ -238,11 +251,17 @@ object Crypto {
         // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
         return if (sig.isEmpty()) true
         else if ((flags and (SCRIPT_VERIFY_DERSIG or SCRIPT_VERIFY_LOW_S or SCRIPT_VERIFY_STRICTENC)) != 0 && !isDERSignature(sig)) false
-        else if ((flags and SCRIPT_VERIFY_LOW_S) != 0 && !isLowDERSignature(sig)) false
+        else if ((flags and SCRIPT_VERIFY_LOW_S) != 0 && !isLowDERSignature(sig.dropLast(1).toByteArray())) false // drop the sighash byte
         else if ((flags and SCRIPT_VERIFY_STRICTENC) != 0 && !isDefinedHashtypeSignature(sig)) false
         else true
     }
 
+    /**
+     * @param key public key
+     * @param flags script flags
+     * @param sigVersion signature version (legacy or segwit)
+     * @return true if the pubkey is properly encoded
+     */
     @JvmStatic
     fun checkPubKeyEncoding(key: ByteArray, flags: Int, sigVersion: Int): Boolean {
         if ((flags and SCRIPT_VERIFY_STRICTENC) != 0) {

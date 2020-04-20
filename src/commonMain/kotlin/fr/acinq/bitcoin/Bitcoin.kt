@@ -39,10 +39,6 @@ fun <T> List<T>.updated(i: Int, t: T): List<T> = when (i) {
     else -> this.take(i) + t + this.take(this.size - i - 1)
 }
 
-fun <T> `???`(): T {
-    throw RuntimeException("not implemented")
-}
-
 @ExperimentalUnsignedTypes
 @ExperimentalStdlibApi
 @InternalSerializationApi

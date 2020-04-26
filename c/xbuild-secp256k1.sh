@@ -9,7 +9,7 @@ fi;
 
 rm -rf secp256k1/build
 mkdir secp256k1/build
-CONFIGURE_OPTS="--enable-experimental --enable-module_ecdh --enable-benchmark=no --enable-shared=no --enable-exhaustive-tests=no --enable-tests=no"
+CONFIGURE_OPTS="--enable-experimental --enable-module_ecdh --enable-module_recovery --enable-benchmark=no --enable-shared=no --enable-exhaustive-tests=no --enable-tests=no"
 if [[ $HOST == "linux" ]];
 then
   echo "We can't cross build for ios targets using a linux host !";

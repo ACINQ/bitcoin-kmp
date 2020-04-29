@@ -33,6 +33,8 @@ kotlin {
 
     jvm()
     linuxX64("linux")
+    ios()
+
     targets.configureEach {
         (compilations["main"] as? org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeCompilation)?.apply {
             cinterops {
@@ -74,6 +76,13 @@ kotlin {
         }
         val linuxMain by getting {
             dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime-native:0.20.0")
+            }
+        }
+
+        val iosMain by getting {
+            dependencies {
+                implementation(kotlin("stdlib"))
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime-native:0.20.0")
             }
         }

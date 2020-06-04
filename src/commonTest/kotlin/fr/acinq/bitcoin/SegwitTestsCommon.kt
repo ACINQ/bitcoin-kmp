@@ -59,7 +59,7 @@ class SegwitTestsCommon {
             1,
             Hex.decode("76a9141d0f172a0ecb48aee1be1f2687d2963ae33f71a188ac"),
             SIGHASH_ALL,
-            600000000,
+            600000000L.toSatoshi(),
             1
         )
         assertTrue(Hex.encode(hash) == "c37af31116d1b27caf68aae9e3ac82f1477929014d5b917657d0eb49478cb670")
@@ -89,7 +89,7 @@ class SegwitTestsCommon {
             PrivateKey(Hex.decode("619c335025c7f4012e556c2a58b2506e30b8511b53ade95ea316fd8c3286feb901"))
         val pub = priv.publicKey()
         val pubKeyScript = Script.write(Script.pay2wpkh(pub)).byteVector()
-        val runner = Script.Runner(Script.Context(tx, 1, 600000000), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        val runner = Script.Runner(Script.Context(tx, 1, 600000000L.toSatoshi()), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         assertTrue(runner.verifyScripts(tx.txIn[1].signatureScript, pubKeyScript, tx.txIn[1].witness))
     }
 
@@ -142,7 +142,7 @@ class SegwitTestsCommon {
             val tmp = Transaction(
                 version = 1,
                 txIn = listOf(TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL)),
-                txOut = listOf(TxOut(39000000, Script.pay2wpkh(pub1))),
+                txOut = listOf(TxOut(39000000L.toSatoshi(), Script.pay2wpkh(pub1))),
                 lockTime = 0
             )
             val sig = Transaction.signInput(
@@ -168,7 +168,7 @@ class SegwitTestsCommon {
                 txIn = listOf(TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL)),
                 txOut = listOf(
                     TxOut(
-                        38000000,
+                        38000000L.toSatoshi(),
                         Script.pay2wpkh(pub1)
                     )
                 ), // we reuse the same output script but if could be anything else
@@ -231,7 +231,7 @@ class SegwitTestsCommon {
             val tmp = Transaction(
                 version = 1,
                 txIn = listOf(TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL)),
-                txOut = listOf(TxOut(49000000, Script.pay2wsh(redeemScript))),
+                txOut = listOf(TxOut(49000000L.toSatoshi(), Script.pay2wsh(redeemScript))),
                 lockTime = 0
             )
             val sig = Transaction.signInput(
@@ -254,7 +254,7 @@ class SegwitTestsCommon {
             val tmp: Transaction = Transaction(
                 version = 1,
                 txIn = listOf(TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL)),
-                txOut = listOf(TxOut(48000000, Script.pay2wpkh(pub1))),
+                txOut = listOf(TxOut(48000000L.toSatoshi(), Script.pay2wpkh(pub1))),
                 lockTime = 0
             )
             val pubKeyScript = Script.write(Script.createMultiSigMofN(2, listOf(pub2, pub3)))
@@ -313,7 +313,7 @@ class SegwitTestsCommon {
             val tmp: Transaction = Transaction(
                 version = 1,
                 txIn = listOf(TxIn(OutPoint(tx.hash, 1), sequence = 0xffffffffL)),
-                txOut = listOf(TxOut(49000000, listOf(OP_0, OP_PUSHDATA(pub1.hash160())))),
+                txOut = listOf(TxOut(49000000L.toSatoshi(), listOf(OP_0, OP_PUSHDATA(pub1.hash160())))),
                 lockTime = 0
             )
             val pubKeyScript = Script.pay2pkh(pub1)

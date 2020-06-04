@@ -156,7 +156,7 @@ class ScriptTestsJvm {
             }
         }
 
-        fun creditTx(scriptPubKey: ByteArray, amount: Long) = Transaction(
+        fun creditTx(scriptPubKey: ByteArray, amount: Satoshi) = Transaction(
             version = 1,
             txIn = listOf(TxIn(OutPoint(ByteArray(32), -1), listOf(OP_0, OP_0), 0xffffffff)),
             txOut = listOf(TxOut(amount, scriptPubKey)),
@@ -179,11 +179,11 @@ class ScriptTestsJvm {
             comments: String?,
             expectedText: String
         ): Unit =
-            runTest(witnessText, 0, scriptSigText, scriptPubKeyText, flags, comments, expectedText)
+            runTest(witnessText, 0L.toSatoshi(), scriptSigText, scriptPubKeyText, flags, comments, expectedText)
 
         fun runTest(
             witnessText: List<String>,
-            amount: Long,
+            amount: Satoshi,
             scriptSigText: String,
             scriptPubKeyText: String,
             flags: String,
@@ -228,7 +228,7 @@ class ScriptTestsJvm {
                 it.size == 5 && it[0].isArray -> {
                     val elements = it[0].elements().asSequence().toList()
                     val strings = elements.dropLast(1).map { it.textValue() }
-                    val amount = (elements.last().doubleValue() * 100_000_000).toLong()
+                    val amount = (elements.last().doubleValue() * 100_000_000).toLong().toSatoshi()
                     val scriptSig = it[1].textValue()
                     val scriptPubKey = it[2].textValue()
                     val flags = it[3].textValue()
@@ -239,7 +239,7 @@ class ScriptTestsJvm {
                 it.size == 6 && it[0].isArray -> {
                     val elements = it[0].elements().asSequence().toList()
                     val strings = elements.dropLast(1).map { it.textValue() }
-                    val amount = (elements.last().doubleValue() * 100_000_000).toLong()
+                    val amount = (elements.last().doubleValue() * 100_000_000).toLong().toSatoshi()
                     val scriptSig = it[1].textValue()
                     val scriptPubKey = it[2].textValue()
                     val flags = it[3].textValue()

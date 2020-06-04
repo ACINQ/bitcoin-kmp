@@ -270,7 +270,7 @@ data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Trans
                     Transaction(
                         version = 1,
                         txIn = listOf(TxIn.coinbase(script)),
-                        txOut = listOf(TxOut(amount = 5000000000, publicKeyScript = scriptPubKey)),
+                        txOut = listOf(TxOut(amount = 5000000000.toSatoshi(), publicKeyScript = scriptPubKey)),
                         lockTime = 0
                     )
                 )

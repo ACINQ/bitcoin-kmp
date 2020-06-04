@@ -55,7 +55,7 @@ class CheckLockTimeVerifyTestsCommon {
             val tmpTx = Transaction(
                 version = 1L,
                 txIn = listOf(TxIn(OutPoint(previousTx.hash, 0), sequence = 0L)),
-                txOut = listOf(TxOut(amount = 100, publicKeyScript = scriptPubKey)),
+                txOut = listOf(TxOut(amount = 100L.toSatoshi(), publicKeyScript = scriptPubKey)),
                 lockTime = 100L
             )
             val sig = Transaction.signInput(tmpTx, 0, previousTx.txOut[0].publicKeyScript, SigHash.SIGHASH_ALL, previousTx.txOut[0].amount, SigVersion.SIGVERSION_BASE, key)
@@ -73,7 +73,7 @@ class CheckLockTimeVerifyTestsCommon {
             val tmpTx = Transaction(
                 version = 1L,
                 txIn = listOf(TxIn(OutPoint(tx.hash, 0), sequence = 0L)),
-                txOut = listOf(TxOut(amount = 100, publicKeyScript = Script.pay2pkh(Base58Check.decode(to).second))),
+                txOut = listOf(TxOut(amount = 100L.toSatoshi(), publicKeyScript = Script.pay2pkh(Base58Check.decode(to).second))),
                 lockTime = 100L
             )
 
@@ -90,7 +90,7 @@ class CheckLockTimeVerifyTestsCommon {
             val tmpTx = Transaction(
                 version = 1L,
                 txIn = listOf(TxIn(OutPoint(tx.hash, 0), sequence = 0L)),
-                txOut = listOf(TxOut(100, publicKeyScript = Script.pay2pkh(Base58Check.decode(to).second))),
+                txOut = listOf(TxOut(100L.toSatoshi(), publicKeyScript = Script.pay2pkh(Base58Check.decode(to).second))),
                 lockTime = 99L
             )
 
@@ -109,7 +109,7 @@ class CheckLockTimeVerifyTestsCommon {
             val tmpTx = Transaction(
                 version = 1L,
                 txIn = listOf(TxIn(OutPoint(tx.hash, 0), sequence = 0L)),
-                txOut = listOf(TxOut(100, publicKeyScript = Script.pay2pkh(Base58Check.decode(to).second))),
+                txOut = listOf(TxOut(100L.toSatoshi(), publicKeyScript = Script.pay2pkh(Base58Check.decode(to).second))),
                 lockTime = 0L
             )
 

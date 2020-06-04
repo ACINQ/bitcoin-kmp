@@ -26,7 +26,7 @@ import kotlin.test.assertFails
 @ExperimentalStdlibApi
 @InternalSerializationApi
 class SighashSpec {
-    fun MilliBtc(value: Long) = value * 100000
+    fun MilliBtc(value: Long) = Satoshi(value * 100000)
 
     @Test
     fun `"SIGHASH_ANYONECANPAY lets you add inputs`() {

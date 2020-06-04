@@ -521,7 +521,7 @@ object Script {
      * @param tx         transaction that is being verified
      * @param inputIndex 0-based index of the tx input that is being processed
      */
-    data class Context(val tx: Transaction, val inputIndex: Int, val amount: Long) {
+    data class Context(val tx: Transaction, val inputIndex: Int, val amount: Satoshi) {
         init {
             require(inputIndex >= 0 && inputIndex < tx.txIn.count()) { "invalid input index" }
         }

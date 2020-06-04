@@ -55,15 +55,19 @@ open class ByteVector(internal val bytes: ByteArray, internal val offset: Int, p
 
     fun dropRight(n: Int) = take(size - n)
 
-    fun append(value: Byte): ByteVector {
+    fun concat(value: Byte): ByteVector {
         return ByteVector(toByteArray() + value)
     }
 
-    fun append(other: ByteArray): ByteVector {
+    operator fun plus(other: ByteVector) = concat(other)
+
+    operator fun plus(other: ByteArray) = concat(other)
+
+    fun concat(other: ByteArray): ByteVector {
         return ByteVector(toByteArray() + other)
     }
 
-    fun append(other: ByteVector): ByteVector = append(other.toByteArray())
+    fun concat(other: ByteVector): ByteVector = concat(other.toByteArray())
 
     open fun reversed() = ByteVector(toByteArray().reversedArray())
 

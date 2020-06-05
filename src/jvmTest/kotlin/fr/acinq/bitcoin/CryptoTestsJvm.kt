@@ -129,4 +129,11 @@ class CryptoTestsJvm {
         }
     }
 
+    @Test
+    fun `ECDH shared secrets`() {
+        val privateKey = PrivateKey(Hex.decode("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55"))
+        val publicKey = privateKey.publicKey()
+        val shared = Crypto.ecdh(privateKey, publicKey)
+        assertEquals("56bc84cffc7db1ca04046fc04ec8f84232c340be789bc4779d221fe8b978af06", Hex.encode(shared))
+    }
 }

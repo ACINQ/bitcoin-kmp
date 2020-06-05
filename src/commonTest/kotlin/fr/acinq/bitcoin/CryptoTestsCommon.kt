@@ -17,6 +17,7 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Secp256k1
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -119,4 +120,33 @@ class CryptoTestsCommon {
         val check = Secp256k1.computePublicKey(Hex.decode("0000000000000000000000000000000000000000000000000000000000000001"))
         assertEquals(PublicKey.Generator, PublicKey(check))
     }
+
+    @Test
+    fun `recover public keys from signatures (random tests)`() {
+        val random = Random
+        val privbytes = ByteArray(32)
+        val message = ByteArray(32)
+        for (i in 1..100) {
+            random.nextBytes(privbytes)
+            random.nextBytes(message)
+
+            val priv = PrivateKey(privbytes)
+            val pub = priv.publicKey()
+            val sig = Crypto.sign(message, priv)
+            val (pub1, pub2) = Crypto.recoverPublicKey(sig, message)
+
+            assertTrue(Crypto.verifySignature(message, sig, pub1))
+            assertTrue(Crypto.verifySignature(message, sig, pub2))
+            assertTrue(pub == pub1 || pub == pub2)
+        }
+    }
+
+    @Test
+    fun `ECDH shared secrets`() {
+        val privateKey = PrivateKey(Hex.decode("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55"))
+        val publicKey = privateKey.publicKey()
+        val shared = Crypto.ecdh(privateKey, publicKey)
+        assertEquals("56bc84cffc7db1ca04046fc04ec8f84232c340be789bc4779d221fe8b978af06", Hex.encode(shared))
+    }
+
 }

@@ -22,7 +22,8 @@ object Hex {
     private val hexCode = arrayOf('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
 
     @JvmStatic
-    fun decode(input: String): ByteArray {
+    fun decode(hex: String): ByteArray {
+        val input = hex.filterNot { it.isWhitespace() }
         val offset = when {
             input.length >= 2 && input[0] == '0' && input[1] == 'x' -> 2
             input.length >= 2 && input[0] == '0' && input[1] == 'X' -> 2

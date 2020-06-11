@@ -16,6 +16,7 @@
 
 package fr.acinq.bitcoin
 
+import kotlin.experimental.or
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -24,9 +25,9 @@ open class ByteVector(internal val bytes: ByteArray, internal val offset: Int, p
     constructor(input: String) : this(Hex.decode(input))
 
     init {
-        require(offset >= 0)
-        require(size >= 0)
-        require(offset + size <= bytes.size)
+        require(offset >= 0){ "offset muts be > 0"}
+        require(size >= 0){"size must be > 0"}
+        require(offset + size <= bytes.size){"offset + size must be <= buffer size"}
     }
 
     fun size() = size
@@ -62,6 +63,27 @@ open class ByteVector(internal val bytes: ByteArray, internal val offset: Int, p
     operator fun plus(other: ByteVector) = concat(other)
 
     operator fun plus(other: ByteArray) = concat(other)
+
+    fun or(other: ByteVector): ByteVector {
+        require(size() == other.size){ "cannot call or() on byte vectors of different sizes"}
+        val data = toByteArray()
+        for(i in data.indices) {
+            data[i] = data[i] or other[i]
+        }
+        return ByteVector(data)
+    }
+
+    fun padLeft(length: Int): ByteVector {
+        require(size <= length){"byte vector larger than padding target"}
+        if (length == size) return this
+        return ByteVector(ByteArray(length - size) + toByteArray())
+    }
+
+    fun padRight(length: Int): ByteVector {
+        require(size <= length){"byte vector larger than padding target"}
+        if (length == size) return this
+        return ByteVector(toByteArray() + ByteArray(length - size))
+    }
 
     fun concat(other: ByteArray): ByteVector {
         return ByteVector(toByteArray() + other)

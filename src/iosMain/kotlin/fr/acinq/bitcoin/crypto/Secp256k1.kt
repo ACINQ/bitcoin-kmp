@@ -203,6 +203,7 @@ public actual object Secp256k1 {
             val sig = nativeHeap.alloc<secp256k1_ecdsa_signature>()
             var result = secp256k1_ecdsa_signature_parse_compact(ctx, sig.ptr, inputBytes)
             require(result == 1)
+            secp256k1_ecdsa_signature_normalize(ctx, sig.ptr, sig.ptr)
             val len = alloc<size_tVar>()
             len.value = 73UL
             val output = nativeHeap.allocArray<UByteVar>(73)
@@ -215,11 +216,14 @@ public actual object Secp256k1 {
     public actual fun der2compact(input: ByteArray): ByteArray {
         require(ctx != null)
         require(input.size >= 70 && input.size <= 73) { "signature size is not compatible with DER format" }
+        val (r, s) = Crypto.decodeSignatureLax(ByteArrayInput(input))
+        val lax = dropZeroAndFixSize(r, 32) + dropZeroAndFixSize(s, 32)
         memScoped {
-            val inputBytes = toNat(input)
+            val inputBytes = toNat(lax)
             val sig = nativeHeap.alloc<secp256k1_ecdsa_signature>()
-            var result = secp256k1_ecdsa_signature_parse_der(ctx, sig.ptr, inputBytes, input.size.toULong())
-            assert(result == 1) { "cannot parse DER signature" }
+            var result = secp256k1_ecdsa_signature_parse_compact(ctx, sig.ptr, inputBytes)
+            secp256k1_ecdsa_signature_normalize(ctx, sig.ptr, sig.ptr)
+            assert(result == 1) { "cannot parse signature" }
             val output = nativeHeap.allocArray<UByteVar>(64)
             result = secp256k1_ecdsa_signature_serialize_compact(ctx, output, sig.ptr)
             require(result == 1)

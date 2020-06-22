@@ -20,12 +20,8 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import fr.acinq.bitcoin.*
-import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 
-@ExperimentalUnsignedTypes
-@ExperimentalStdlibApi
-@InternalSerializationApi
 class KeyEncodingTestsJvm {
     val mapper = jacksonObjectMapper()
 

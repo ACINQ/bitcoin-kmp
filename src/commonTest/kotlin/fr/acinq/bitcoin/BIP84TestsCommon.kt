@@ -16,13 +16,9 @@
 
 package fr.acinq.bitcoin
 
-import kotlinx.serialization.InternalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-@ExperimentalUnsignedTypes
-@InternalSerializationApi
-@ExperimentalStdlibApi
 class BIP84TestsCommon {
     /**
      * BIP 84 (Derivation scheme for P2WPKH based accounts) reference tests

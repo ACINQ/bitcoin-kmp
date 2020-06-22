@@ -16,13 +16,9 @@
 
 package fr.acinq.bitcoin
 
-import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 import kotlin.test.assertEquals
 
-@ExperimentalUnsignedTypes
-@InternalSerializationApi
-@ExperimentalStdlibApi
 class TransactionTestsJvm {
     @Test
     fun `error #1`() {

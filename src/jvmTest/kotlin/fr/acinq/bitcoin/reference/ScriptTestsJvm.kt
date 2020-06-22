@@ -38,12 +38,8 @@ import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_SIGPUSHONLY
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_STRICTENC
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_WITNESS
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_WITNESS_PUBKEYTYPE
-import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 
-@ExperimentalUnsignedTypes
-@InternalSerializationApi
-@ExperimentalStdlibApi
 class ScriptTestsJvm {
     val mapper = jacksonObjectMapper()
 
@@ -68,8 +64,6 @@ class ScriptTestsJvm {
     }
 
 
-    @ExperimentalStdlibApi
-    @InternalSerializationApi
     companion object {
         val mapFlagNames = mapOf(
             "NONE" to SCRIPT_VERIFY_NONE,

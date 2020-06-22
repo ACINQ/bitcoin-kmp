@@ -21,11 +21,8 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import fr.acinq.bitcoin.Hex
 import fr.acinq.bitcoin.Transaction
-import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 
-@InternalSerializationApi
-@ExperimentalStdlibApi
 class SigHashTestsJvm {
     val mapper = jacksonObjectMapper()
 

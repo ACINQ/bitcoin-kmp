@@ -16,7 +16,7 @@
 
 package fr.acinq.bitcoin.crypto
 
-class Sha512 : Digest {
+public class Sha512 : Digest {
 
     private val DIGEST_LENGTH = 64
 
@@ -242,9 +242,9 @@ class Sha512 : Digest {
         return rotateRight(x, 19) xor rotateRight(x, 61) xor (x ushr 6)
     }
 
-    companion object {
+    public companion object {
 
-        fun hash(input: ByteArray, offset: Int, len: Int): ByteArray {
+        public fun hash(input: ByteArray, offset: Int, len: Int): ByteArray {
             val sha512 = Sha512()
             sha512.update(input, offset, len)
             val output = ByteArray(64)
@@ -252,9 +252,9 @@ class Sha512 : Digest {
             return output
         }
 
-        fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
+        public fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
 
-        val K = longArrayOf(
+        public val K: LongArray = longArrayOf(
             0x428a2f98d728ae22L, 0x7137449123ef65cdL, -0x4a3f043013b2c4d1L, -0x164a245a7e762444L,
             0x3956c25bf348b538L, 0x59f111f1b605d019L, -0x6dc07d5b50e6b065L, -0x54e3a12a25927ee8L,
             -0x27f855675cfcfdbeL, 0x12835b0145706fbeL, 0x243185be4ee4b28cL, 0x550c7dc3d5ffb4e2L,

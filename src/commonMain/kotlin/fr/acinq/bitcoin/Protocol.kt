@@ -16,6 +16,6 @@
 
 package fr.acinq.bitcoin
 
-object Protocol {
-    const val PROTOCOL_VERSION = 70015L
+public object Protocol {
+    public const val PROTOCOL_VERSION: Long = 70015L
 }

@@ -17,24 +17,19 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Pack
-import kotlinx.io.ByteArrayInputStream
-import kotlinx.io.ByteArrayOutputStream
-import kotlinx.io.InputStream
-import kotlinx.io.OutputStream
-import kotlinx.serialization.InternalSerializationApi
+import fr.acinq.bitcoin.io.*
 import kotlin.jvm.JvmStatic
 
-@InternalSerializationApi
-abstract class BtcSerializer<T> {
+public abstract class BtcSerializer<T> {
     /**
      * write a message to a stream
      *
      * @param message   message
      * @param out output stream
      */
-    abstract fun write(message: T, out: OutputStream, protocolVersion: Long)
+    public abstract fun write(message: T, out: Output, protocolVersion: Long)
 
-    fun write(message: T, out: OutputStream): Unit = write(message, out, Protocol.PROTOCOL_VERSION)
+    public fun write(message: T, out: Output): Unit = write(message, out, Protocol.PROTOCOL_VERSION)
 
     /**
      * write a message to a byte array
@@ -42,23 +37,23 @@ abstract class BtcSerializer<T> {
      * @param message message
      * @return a serialized message
      */
-    fun write(message: T, protocolVersion: Long): ByteArray {
-        val out = ByteArrayOutputStream()
+    public fun write(message: T, protocolVersion: Long): ByteArray {
+        val out = ByteArrayOutput()
         write(message, out, protocolVersion)
         return out.toByteArray()
     }
 
-    open fun write(message: T): ByteArray = write(message, Protocol.PROTOCOL_VERSION)
+    public open fun write(message: T): ByteArray = write(message, Protocol.PROTOCOL_VERSION)
 
     /**
      * read a message from a stream
      *
-     * @param in input stream
+     * @param input input stream
      * @return a deserialized message
      */
-    abstract fun read(input: InputStream, protocolVersion: Long): T
+    public abstract fun read(input: Input, protocolVersion: Long): T
 
-    fun read(input: InputStream): T = read(input, Protocol.PROTOCOL_VERSION)
+    public fun read(input: Input): T = read(input, Protocol.PROTOCOL_VERSION)
 
     /**
      * read a message from a byte array
@@ -66,116 +61,115 @@ abstract class BtcSerializer<T> {
      * @param input serialized message
      * @return a deserialized message
      */
-    fun read(input: ByteArray, protocolVersion: Long): T = read(ByteArrayInputStream(input), protocolVersion)
+    public fun read(input: ByteArray, protocolVersion: Long): T = read(ByteArrayInput(input), protocolVersion)
 
-    open fun read(input: ByteArray): T = read(input, Protocol.PROTOCOL_VERSION)
+    public open fun read(input: ByteArray): T = read(input, Protocol.PROTOCOL_VERSION)
 
     /**
      * read a message from a hex string
      *
-     * @param in message binary data in hex format
+     * @param input message binary data in hex format
      * @return a deserialized message of type T
      */
-    fun read(input: String, protocolVersion: Long): T = read(Hex.decode(input), protocolVersion)
+    public fun read(input: String, protocolVersion: Long): T = read(Hex.decode(input), protocolVersion)
 
-    open fun read(input: String): T = read(input, Protocol.PROTOCOL_VERSION)
+    public open fun read(input: String): T = read(input, Protocol.PROTOCOL_VERSION)
 
-    open fun validate(message: T) {}
+    public open fun validate(message: T) {}
 
-    @ExperimentalStdlibApi
-    companion object {
+    public companion object {
         @JvmStatic
-        fun uint8(input: InputStream): Int = input.read()
-
-        @JvmStatic
-        fun writeUInt8(input: Int, out: OutputStream): Unit = out.write(input and 0xff)
+        public fun uint8(input: Input): Int = input.read()
 
         @JvmStatic
-        fun uint16(input: InputStream): Int {
+        public fun writeUInt8(input: Int, out: Output): Unit = out.write(input and 0xff)
+
+        @JvmStatic
+        public fun uint16(input: Input): Int {
             val bin = ByteArray(2)
-            input.read(bin)
+            input.read(bin, 0, 2)
             return Pack.uint16LE(bin, 0)
         }
 
         @JvmStatic
-        fun uint16(input: ByteArray): Int = Pack.uint16LE(input, 0)
+        public fun uint16(input: ByteArray): Int = Pack.uint16LE(input, 0)
 
         @JvmStatic
-        fun uint16BE(input: ByteArray): Int = Pack.uint16BE(input, 0)
+        public fun uint16BE(input: ByteArray): Int = Pack.uint16BE(input, 0)
 
         @JvmStatic
-        fun writeUInt16(input: Int, out: OutputStream): Unit = out.write(Pack.writeUint16LE(input))
+        public fun writeUInt16(input: Int, out: Output): Unit = out.write(Pack.writeUint16LE(input))
 
         @JvmStatic
-        fun writeUInt16(input: Int): ByteArray = Pack.writeUint16LE(input)
+        public fun writeUInt16(input: Int): ByteArray = Pack.writeUint16LE(input)
 
         @JvmStatic
-        fun writeUInt16BE(input: Int): ByteArray = Pack.writeUint16BE(input)
+        public fun writeUInt16BE(input: Int): ByteArray = Pack.writeUint16BE(input)
 
         @JvmStatic
-        fun uint32(input: InputStream): Long {
+        public fun uint32(input: Input): Long {
             val bin = ByteArray(4)
-            input.read(bin)
+            input.read(bin, 0, 4)
             return Pack.uint32LE(bin, 0).toLong() and 0xffffffffL
         }
 
         @JvmStatic
-        fun uint32(input: ByteArray): Int {
+        public fun uint32(input: ByteArray): Int {
             return Pack.uint32LE(input, 0)
         }
 
         @JvmStatic
-        fun uint32BE(input: ByteArray): Int {
+        public fun uint32BE(input: ByteArray): Int {
             return Pack.uint32BE(input, 0)
         }
 
         @JvmStatic
-        fun writeUInt32(input: Long, out: OutputStream): Unit = out.write(Pack.writeUint32LE(input.toInt()))
+        public fun writeUInt32(input: Long, out: Output): Unit = out.write(Pack.writeUint32LE(input.toInt()))
 
         @JvmStatic
-        fun writeUInt32(input: Long): ByteArray {
-            val out = ByteArrayOutputStream()
+        public fun writeUInt32(input: Long): ByteArray {
+            val out = ByteArrayOutput()
             writeUInt32(input, out)
             return out.toByteArray()
         }
 
         @JvmStatic
-        fun writeUInt32BE(input: Long, out: OutputStream): Unit = out.write(Pack.writeUint32BE(input.toInt()))
+        public fun writeUInt32BE(input: Long, out: Output): Unit = out.write(Pack.writeUint32BE(input.toInt()))
 
         @JvmStatic
-        fun writeUInt32BE(input: Long): ByteArray {
-            val out = ByteArrayOutputStream()
+        public fun writeUInt32BE(input: Long): ByteArray {
+            val out = ByteArrayOutput()
             writeUInt32BE(input, out)
             return out.toByteArray()
         }
 
         @JvmStatic
-        fun uint64(input: InputStream): Long {
+        public fun uint64(input: Input): Long {
             val bin = ByteArray(8)
-            input.read(bin)
+            input.read(bin, 0, 8)
             return Pack.uint64LE(bin, 0)
         }
 
         @JvmStatic
-        fun uint64(input: ByteArray): Long = Pack.uint64LE(input, 0)
+        public fun uint64(input: ByteArray): Long = Pack.uint64LE(input, 0)
 
         @JvmStatic
-        fun uint64BE(input: ByteArray): Long = Pack.uint64BE(input, 0)
+        public fun uint64BE(input: ByteArray): Long = Pack.uint64BE(input, 0)
 
         @JvmStatic
-        fun writeUInt64(input: Long, out: OutputStream): Unit = out.write(Pack.writeUint64LE(input))
+        public fun writeUInt64(input: Long, out: Output): Unit = out.write(Pack.writeUint64LE(input))
 
         @JvmStatic
-        fun writeUInt64(input: Long): ByteArray = Pack.writeUint64LE(input)
+        public fun writeUInt64(input: Long): ByteArray = Pack.writeUint64LE(input)
 
         @JvmStatic
-        fun writeUInt64BE(input: Long): ByteArray = Pack.writeUint64BE(input)
+        public fun writeUInt64BE(input: Long): ByteArray = Pack.writeUint64BE(input)
 
         @JvmStatic
-        fun varint(blob: ByteArray): Long = varint(ByteArrayInputStream(blob))
+        public fun varint(blob: ByteArray): Long = varint(ByteArrayInput(blob))
 
         @JvmStatic
-        fun varint(input: InputStream): Long {
+        public fun varint(input: Input): Long {
             val first = input.read()
             return when {
                 first < 0xfd -> first.toLong()
@@ -189,10 +183,10 @@ abstract class BtcSerializer<T> {
         }
 
         @JvmStatic
-        fun writeVarint(input: Int, out: OutputStream): Unit = writeVarint(input.toLong(), out)
+        public fun writeVarint(input: Int, out: Output): Unit = writeVarint(input.toLong(), out)
 
         @JvmStatic
-        fun writeVarint(input: Long, out: OutputStream) {
+        public fun writeVarint(input: Long, out: Output) {
             when {
                 input < 0xfdL -> writeUInt8(input.toInt(), out)
                 input < 65535L -> {
@@ -211,29 +205,29 @@ abstract class BtcSerializer<T> {
         }
 
         @JvmStatic
-        fun bytes(input: InputStream, size: Long): ByteArray = bytes(input, size.toInt())
+        public fun bytes(input: Input, size: Long): ByteArray = bytes(input, size.toInt())
 
         @JvmStatic
-        fun bytes(input: InputStream, size: Int): ByteArray {
+        public fun bytes(input: Input, size: Int): ByteArray {
             val blob = ByteArray(size)
             if (size > 0) {
-                val count = input.read(blob)
+                val count = input.read(blob, 0, size)
                 require(count >= size)
             }
             return blob
         }
 
         @JvmStatic
-        fun writeBytes(input: ByteArray, out: OutputStream): Unit = out.write(input)
+        public fun writeBytes(input: ByteArray, out: Output): Unit = out.write(input)
 
         @JvmStatic
-        fun writeBytes(input: ByteVector, out: OutputStream): Unit = writeBytes(input.toByteArray(), out)
+        public fun writeBytes(input: ByteVector, out: Output): Unit = writeBytes(input.toByteArray(), out)
 
         @JvmStatic
-        fun writeBytes(input: ByteVector32, out: OutputStream): Unit = writeBytes(input.toByteArray(), out)
+        public fun writeBytes(input: ByteVector32, out: Output): Unit = writeBytes(input.toByteArray(), out)
 
         @JvmStatic
-        fun varstring(input: InputStream): String {
+        public fun varstring(input: Input): String {
             val length = varint(input)
             val bytes = bytes(input, length)
             val chars = bytes.map { it.toChar() }.toCharArray()
@@ -241,39 +235,40 @@ abstract class BtcSerializer<T> {
         }
 
         @JvmStatic
-        fun writeVarstring(input: String, out: OutputStream): Unit {
+        @OptIn(ExperimentalStdlibApi::class)
+        public fun writeVarstring(input: String, out: Output) {
             writeVarint(input.length, out)
             writeBytes(input.encodeToByteArray(), out)
         }
 
         @JvmStatic
-        fun hash(input: InputStream): ByteArray = bytes(input, 32) // a hash is always 256 bits
+        public fun hash(input: Input): ByteArray = bytes(input, 32) // a hash is always 256 bits
 
         @JvmStatic
-        fun script(input: InputStream): ByteArray {
+        public fun script(input: Input): ByteArray {
             val length = varint(input) // read size
             return bytes(input, length) // read bytes
         }
 
         @JvmStatic
-        fun writeScript(input: ByteArray, out: OutputStream) {
+        public fun writeScript(input: ByteArray, out: Output) {
             writeVarint(input.size, out)
             writeBytes(input, out)
         }
 
         @JvmStatic
-        fun writeScript(input: ByteVector, out: OutputStream) = writeScript(input.toByteArray(), out)
+        public fun writeScript(input: ByteVector, out: Output) { writeScript(input.toByteArray(), out) }
 
-        fun <T> readCollection(
-            input: InputStream,
+        public fun <T> readCollection(
+            input: Input,
             reader: BtcSerializer<T>,
             maxElement: Int?,
             protocolVersion: Long
         ): List<T> = readCollection(input, reader::read, maxElement, protocolVersion)
 
-        fun <T> readCollection(
-            input: InputStream,
-            reader: (InputStream, Long) -> T,
+        public fun <T> readCollection(
+            input: Input,
+            reader: (Input, Long) -> T,
             maxElement: Int?,
             protocolVersion: Long
         ): List<T> {
@@ -286,29 +281,28 @@ abstract class BtcSerializer<T> {
             return items.toList()
         }
 
-        fun <T> readCollection(input: InputStream, reader: BtcSerializer<T>, protocolVersion: Long): List<T> =
+        public fun <T> readCollection(input: Input, reader: BtcSerializer<T>, protocolVersion: Long): List<T> =
             readCollection(input, reader, null, protocolVersion)
 
-        fun <T> writeCollection(
+        public fun <T> writeCollection(
             seq: List<T>,
-            output: OutputStream,
+            output: Output,
             writer: BtcSerializer<T>,
             protocolVersion: Long
         ): Unit = writeCollection(seq, output, writer::write, protocolVersion)
 
-        fun <T> writeCollection(
+        public fun <T> writeCollection(
             seq: List<T>,
-            output: OutputStream,
-            writer: (T, OutputStream, Long) -> Unit,
+            output: Output,
+            writer: (T, Output, Long) -> Unit,
             protocolVersion: Long
-        ): Unit {
+        ) {
             writeVarint(seq.size, output)
             seq.forEach { writer.invoke(it, output, protocolVersion) }
         }
     }
 }
 
-@InternalSerializationApi
-interface BtcSerializable<T> {
-    fun serializer(): BtcSerializer<T>
+public interface BtcSerializable<T> {
+    public fun serializer(): BtcSerializer<T>
 }

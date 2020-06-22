@@ -16,8 +16,7 @@
 
 package fr.acinq.bitcoin.crypto
 
-@ExperimentalUnsignedTypes
-class Sha1 : Digest {
+public class Sha1 : Digest {
     private var H1 = 0
     private var H2 = 0
     private var H3 = 0
@@ -124,7 +123,7 @@ class Sha1 : Digest {
         return DIGEST_LENGTH
     }
 
-    fun finish() {
+    public fun finish() {
         val bitLength: Long = byteCount shl 3
 
         //
@@ -265,10 +264,10 @@ class Sha1 : Digest {
         }
     }
 
-    companion object {
+    public companion object {
         private val DIGEST_LENGTH = 20
 
-        fun hash(input: ByteArray, offset: Int, len: Int): ByteArray {
+        public fun hash(input: ByteArray, offset: Int, len: Int): ByteArray {
             val sha1 = Sha1()
             sha1.update(input, offset, len)
             val output = ByteArray(DIGEST_LENGTH)
@@ -276,7 +275,7 @@ class Sha1 : Digest {
             return output
         }
 
-        fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
+        public fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
 
         //
         // Additive constants

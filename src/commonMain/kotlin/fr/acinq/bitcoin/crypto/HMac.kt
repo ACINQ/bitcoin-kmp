@@ -18,8 +18,8 @@ package fr.acinq.bitcoin.crypto
 
 import kotlin.experimental.xor
 
-object HMac {
-    fun hmac(key: ByteArray, data: ByteArray, digest: Digest, blockSize: Int): ByteArray {
+public object HMac {
+    public fun hmac(key: ByteArray, data: ByteArray, digest: Digest, blockSize: Int): ByteArray {
         val key1 = if (key.size > blockSize) digest.hash(key) else key
         val key2 = if (key1.size < blockSize) key1 + ByteArray(blockSize - key1.size) else key1
 

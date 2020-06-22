@@ -16,7 +16,7 @@
 
 package fr.acinq.bitcoin.crypto
 
-class Sha256 : Digest {
+public class Sha256 : Digest {
     private val xBuf = ByteArray(4)
     private var xBufOff = 0
 
@@ -260,10 +260,10 @@ class Sha256 : Digest {
     }
 
 
-    companion object {
+    public companion object {
         private val DIGEST_LENGTH = 32
 
-        fun hash(input: ByteArray, offset: Int, len: Int): ByteArray {
+        public fun hash(input: ByteArray, offset: Int, len: Int): ByteArray {
             val sha256 = Sha256()
             sha256.update(input, offset, len)
             val output = ByteArray(32)
@@ -271,7 +271,7 @@ class Sha256 : Digest {
             return output
         }
 
-        fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
+        public fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
 
         /* SHA-256 functions */
         private fun Ch(x: Int, y: Int, z: Int): Int {
@@ -304,7 +304,7 @@ class Sha256 : Digest {
          * (represent the first 32 bits of the fractional parts of the
          * cube roots of the first sixty-four prime numbers)
          */
-        val K = intArrayOf(
+        public val K: IntArray = intArrayOf(
             0x428a2f98, 0x71374491, -0x4a3f0431, -0x164a245b, 0x3956c25b, 0x59f111f1, -0x6dc07d5c, -0x54e3a12b,
             -0x27f85568, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, -0x7f214e02, -0x6423f959, -0x3e640e8c,
             -0x1b64963f, -0x1041b87a, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,

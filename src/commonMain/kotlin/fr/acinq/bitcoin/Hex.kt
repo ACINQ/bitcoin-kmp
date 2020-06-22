@@ -18,11 +18,11 @@ package fr.acinq.bitcoin
 
 import kotlin.jvm.JvmStatic
 
-object Hex {
+public object Hex {
     private val hexCode = arrayOf('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
 
     @JvmStatic
-    fun decode(hex: String): ByteArray {
+    public fun decode(hex: String): ByteArray {
         val input = hex.filterNot { it.isWhitespace() }
         val offset = when {
             input.length >= 2 && input[0] == '0' && input[1] == 'x' -> 2
@@ -48,7 +48,7 @@ object Hex {
     }
 
     @JvmStatic
-    fun encode(input: ByteArray, offset: Int, len: Int): String {
+    public fun encode(input: ByteArray, offset: Int, len: Int): String {
         val r = StringBuilder(len * 2)
         for (i in 0 until len) {
             val b = input[offset + i]
@@ -59,5 +59,5 @@ object Hex {
     }
 
     @JvmStatic
-    fun encode(input: ByteArray) = encode(input, 0, input.size)
+    public fun encode(input: ByteArray): String = encode(input, 0, input.size)
 }

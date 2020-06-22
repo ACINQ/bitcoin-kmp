@@ -16,11 +16,9 @@
 
 package fr.acinq.bitcoin
 
-import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 import kotlin.test.assertEquals
 
-@ExperimentalUnsignedTypes
 @ExperimentalStdlibApi
 class CryptoTestsJvm {
     @Test
@@ -69,7 +67,6 @@ class CryptoTestsJvm {
         assert(Crypto.verifySignature(data, encoded, publicKey))
     }
 
-    @InternalSerializationApi
     @Test
     fun `der2compact`() {
         assertEquals(

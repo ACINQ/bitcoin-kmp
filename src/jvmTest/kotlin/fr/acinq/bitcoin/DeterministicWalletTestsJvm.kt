@@ -21,14 +21,10 @@ import fr.acinq.bitcoin.DeterministicWallet.encode
 import fr.acinq.bitcoin.DeterministicWallet.fingerprint
 import fr.acinq.bitcoin.DeterministicWallet.generate
 import fr.acinq.bitcoin.DeterministicWallet.publicKey
-import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 
-@ExperimentalUnsignedTypes
-@InternalSerializationApi
-@ExperimentalStdlibApi
 class DeterministicWalletTestsJvm {
     @Test
     fun `generate and derive keys (test vector #1)`() {

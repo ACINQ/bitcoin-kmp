@@ -19,7 +19,6 @@ package fr.acinq.bitcoin
 import org.junit.Test
 import kotlin.test.assertEquals
 
-@ExperimentalUnsignedTypes
 class UInt256TestsJvm {
     @Test
     fun `init`() {

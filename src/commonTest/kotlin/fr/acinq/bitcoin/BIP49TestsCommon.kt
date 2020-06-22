@@ -16,13 +16,9 @@
 
 package fr.acinq.bitcoin
 
-import kotlinx.serialization.InternalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-@ExperimentalUnsignedTypes
-@InternalSerializationApi
-@ExperimentalStdlibApi
 class BIP49TestsCommon {
     @Test
     fun `BIP49 reference tests`() {

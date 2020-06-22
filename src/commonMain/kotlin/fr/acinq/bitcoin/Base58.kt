@@ -19,17 +19,17 @@ package fr.acinq.bitcoin
 import fr.acinq.bitcoin.crypto.Pack
 import kotlin.jvm.JvmStatic
 
-object Base58 {
-    object Prefix {
-        const val PubkeyAddress = 0.toByte()
-        const val ScriptAddress = 5.toByte()
-        const val SecretKey = 128.toByte()
-        const val PubkeyAddressTestnet = 111.toByte()
-        const val ScriptAddressTestnet = 196.toByte()
-        const val SecretKeyTestnet = 239.toByte()
-        const val PubkeyAddressSegnet = 30.toByte()
-        const val ScriptAddressSegnet = 50.toByte()
-        const val SecretKeySegnet = 158.toByte()
+public object Base58 {
+    public object Prefix {
+        public const val PubkeyAddress: Byte = 0.toByte()
+        public const val ScriptAddress: Byte = 5.toByte()
+        public const val SecretKey: Byte = 128.toByte()
+        public const val PubkeyAddressTestnet: Byte = 111.toByte()
+        public const val ScriptAddressTestnet: Byte = 196.toByte()
+        public const val SecretKeyTestnet: Byte = 239.toByte()
+        public const val PubkeyAddressSegnet: Byte = 30.toByte()
+        public const val ScriptAddressSegnet: Byte = 50.toByte()
+        public const val SecretKeySegnet: Byte = 158.toByte()
     }
 
     private const val pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -56,12 +56,12 @@ object Base58 {
     //@formatter:on
 
     @JvmStatic
-    fun encode(input: ByteArray): String {
+    public fun encode(input: ByteArray): String {
         // Skip & count leading zeroes.
         var zeroes = 0
         var length = 0
         var begin = 0
-        var end = input.size
+        val end = input.size
         while (begin != end && input[begin] == 0.toByte()) {
             begin++
             zeroes++
@@ -102,7 +102,7 @@ object Base58 {
     }
 
     @JvmStatic
-    fun decode(input: String): ByteArray {
+    public fun decode(input: String): ByteArray {
         // Skip leading spaces.
         var psz = 0
         while (psz < input.length && input[psz].isWhitespace()) {
@@ -117,7 +117,7 @@ object Base58 {
         }
         // Allocate enough space in big-endian base256 representation.
         val size = (input.length - psz) * 733 / 1000 + 1 // log(58) / log(256), rounded up.
-        val b256 = ByteArray(size);
+        val b256 = ByteArray(size)
         // Process the characters.
         while (psz < input.length && !input[psz].isWhitespace()) {
             // Decode base58 character
@@ -168,11 +168,11 @@ object Base58 {
  * }}}
  *
  */
-object Base58Check {
-    fun checksum(data: ByteArray): ByteArray = Crypto.hash256(data).copyOf(4)
+public object Base58Check {
+    public fun checksum(data: ByteArray): ByteArray = Crypto.hash256(data).copyOf(4)
 
     @JvmStatic
-    fun encode(prefix: Int, data: ByteArray): String = encode(Pack.writeUint32BE(prefix), data)
+    public fun encode(prefix: Int, data: ByteArray): String = encode(Pack.writeUint32BE(prefix), data)
 
     /**
      * Encode data in Base58Check format.
@@ -183,10 +183,10 @@ object Base58Check {
      * @return a Base58 string
      */
     @JvmStatic
-    fun encode(prefix: Byte, data: ByteArray): String = encode(arrayOf(prefix).toByteArray(), data)
+    public fun encode(prefix: Byte, data: ByteArray): String = encode(arrayOf(prefix).toByteArray(), data)
 
     @JvmStatic
-    fun encode(prefix: Byte, data: ByteVector): String = encode(arrayOf(prefix).toByteArray(), data.toByteArray())
+    public fun encode(prefix: Byte, data: ByteVector): String = encode(arrayOf(prefix).toByteArray(), data.toByteArray())
 
     /**
      *
@@ -195,7 +195,7 @@ object Base58Check {
      * @return a Base58 String
      */
     @JvmStatic
-    fun encode(prefix: ByteArray, data: ByteArray): String {
+    public fun encode(prefix: ByteArray, data: ByteArray): String {
         val prefixAndData = prefix + data
         return Base58.encode(prefixAndData + checksum(prefixAndData))
     }
@@ -208,11 +208,11 @@ object Base58Check {
      * @throws RuntimeException if the checksum that is part of the encoded data cannot be verified
      */
     @JvmStatic
-    fun decode(encoded: String): Pair<Byte, ByteArray> {
+    public fun decode(encoded: String): Pair<Byte, ByteArray> {
         val raw = Base58.decode(encoded)
         val versionAndHash = raw.dropLast(4).toByteArray()
         val checksum = raw.takeLast(4).toByteArray()
-        require(checksum.contentEquals(Base58Check.checksum(versionAndHash))) { "invalid Base58Check data $encoded" }
+        require(checksum.contentEquals(checksum(versionAndHash))) { "invalid Base58Check data $encoded" }
         return Pair(versionAndHash[0], versionAndHash.drop(1).toByteArray())
     }
 
@@ -225,7 +225,7 @@ object Base58Check {
      * @return a (prefix, data) tuple
      */
     @JvmStatic
-    fun decodeWithIntPrefix(encoded: String): Pair<Int, ByteArray> {
+    public fun decodeWithIntPrefix(encoded: String): Pair<Int, ByteArray> {
         val (prefix, data) = decodeWithPrefixLen(encoded, 4)
         return Pair(Pack.uint32BE(prefix), data)
     }
@@ -239,11 +239,11 @@ object Base58Check {
      * @return a (prefix, data) tuple
      */
     @JvmStatic
-    fun decodeWithPrefixLen(encoded: String, prefixLen: Int): Pair<ByteArray, ByteArray> {
+    public fun decodeWithPrefixLen(encoded: String, prefixLen: Int): Pair<ByteArray, ByteArray> {
         val raw = Base58.decode(encoded)
         val versionAndHash = raw.dropLast(4).toByteArray()
         val checksum = raw.takeLast(4).toByteArray()
-        require(checksum.contentEquals(Base58Check.checksum(versionAndHash))) { "invalid Base58Check data $encoded" }
+        require(checksum.contentEquals(checksum(versionAndHash))) { "invalid Base58Check data $encoded" }
         return Pair(versionAndHash.take(prefixLen).toByteArray(), versionAndHash.drop(prefixLen).toByteArray())
     }
 }

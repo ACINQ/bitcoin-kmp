@@ -20,63 +20,62 @@ import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_DERSIG
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_LOW_S
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_STRICTENC
 import fr.acinq.bitcoin.crypto.*
-import kotlinx.io.ByteArrayInputStream
-import kotlinx.serialization.InternalSerializationApi
+import fr.acinq.bitcoin.io.ByteArrayInput
 import kotlin.jvm.JvmStatic
 
-object Crypto {
-    @ExperimentalUnsignedTypes
-    fun sha1(input: ByteVector): ByteArray =
+public object Crypto {
+    public fun sha1(input: ByteVector): ByteArray =
         Sha1.hash(input.toByteArray())
 
     @JvmStatic
-    fun sha256(input: ByteArray, offset: Int, len: Int) =
+    public fun sha256(input: ByteArray, offset: Int, len: Int): ByteArray =
         Sha256.hash(input, offset, len)
 
     @JvmStatic
-    fun sha256(input: ByteArray) = sha256(input, 0, input.size)
+    public fun sha256(input: ByteArray): ByteArray =
+        sha256(input, 0, input.size)
 
     @JvmStatic
-    fun sha256(input: ByteVector) =
+    public fun sha256(input: ByteVector): ByteArray =
         sha256(input.toByteArray(), 0, input.size())
 
     @JvmStatic
-    fun ripemd160(input: ByteArray, offset: Int, len: Int) =
+    public fun ripemd160(input: ByteArray, offset: Int, len: Int): ByteArray =
         Ripemd160.hash(input, offset, len)
 
     @JvmStatic
-    fun ripemd160(input: ByteArray) = ripemd160(input, 0, input.size)
+    public fun ripemd160(input: ByteArray): ByteArray =
+        ripemd160(input, 0, input.size)
 
     @JvmStatic
-    fun ripemd160(input: ByteVector) =
+    public fun ripemd160(input: ByteVector): ByteArray =
         ripemd160(input.toByteArray(), 0, input.size())
 
     @JvmStatic
-    fun hash256(input: ByteArray, offset: Int, len: Int) =
+    public fun hash256(input: ByteArray, offset: Int, len: Int): ByteArray =
         Sha256.hash(Sha256.hash(input, offset, len))
 
     @JvmStatic
-    fun hash256(input: ByteArray) = hash256(input, 0, input.size)
+    public fun hash256(input: ByteArray): ByteArray =
+        hash256(input, 0, input.size)
 
     @JvmStatic
-    fun hash256(input: ByteVector) =
+    public fun hash256(input: ByteVector): ByteArray =
         hash256(input.toByteArray(), 0, input.size())
 
     @JvmStatic
-    fun hash160(input: ByteArray, offset: Int, len: Int) =
-        Ripemd160.hash(
-            Sha256.hash(input, offset, len)
-        )
+    public fun hash160(input: ByteArray, offset: Int, len: Int): ByteArray =
+        Ripemd160.hash(Sha256.hash(input, offset, len))
 
     @JvmStatic
-    fun hash160(input: ByteArray) = hash160(input, 0, input.size)
+    public fun hash160(input: ByteArray): ByteArray = hash160(input, 0, input.size)
 
     @JvmStatic
-    fun hash160(input: ByteVector) =
+    public fun hash160(input: ByteVector): ByteArray =
         hash160(input.toByteArray(), 0, input.size())
 
     @JvmStatic
-    fun hmac512(key: ByteArray, data: ByteArray): ByteArray {
+    public fun hmac512(key: ByteArray, data: ByteArray): ByteArray {
         return HMac.hmac(key, data, Sha512(), 128)
     }
 
@@ -88,26 +87,26 @@ object Crypto {
      * @return ecdh(priv, pub) as computed by libsecp256k1
      */
     @JvmStatic
-    fun ecdh(priv: PrivateKey, pub: PublicKey): ByteArray {
+    public fun ecdh(priv: PrivateKey, pub: PublicKey): ByteArray {
         return Secp256k1.ecdh(priv.value.toByteArray(), pub.value.toByteArray())
     }
 
     @JvmStatic
-    fun isPubKeyValid(key: ByteArray): Boolean = when {
+    public fun isPubKeyValid(key: ByteArray): Boolean = when {
         key.size == 65 && (key[0] == 4.toByte() || key[0] == 6.toByte() || key[0] == 7.toByte()) -> true
         key.size == 33 && (key[0] == 2.toByte() || key[0] == 3.toByte()) -> true
         else -> false
     }
 
     @JvmStatic
-    fun isPubKeyCompressedOrUncompressed(key: ByteArray): Boolean = when {
+    public fun isPubKeyCompressedOrUncompressed(key: ByteArray): Boolean = when {
         key.size == 65 && key[0] == 4.toByte() -> true
         key.size == 33 && (key[0] == 2.toByte() || key[0] == 3.toByte()) -> true
         else -> false
     }
 
     @JvmStatic
-    fun isPubKeyCompressed(key: ByteArray): Boolean = when {
+    public fun isPubKeyCompressed(key: ByteArray): Boolean = when {
         key.size == 33 && (key[0] == 2.toByte() || key[0] == 3.toByte()) -> true
         else -> false
     }
@@ -121,13 +120,13 @@ object Crypto {
      * @return a (r, s) ECDSA signature pair
      */
     @JvmStatic
-    fun sign(data: ByteArray, privateKey: PrivateKey): ByteVector64 {
+    public fun sign(data: ByteArray, privateKey: PrivateKey): ByteVector64 {
         val bin = Secp256k1.sign(data, privateKey.value.toByteArray())
         return ByteVector64(bin)
     }
 
     @JvmStatic
-    fun sign(data: ByteVector32, privateKey: PrivateKey): ByteVector64 =
+    public fun sign(data: ByteVector32, privateKey: PrivateKey): ByteVector64 =
         sign(data.toByteArray(), privateKey)
 
     /**
@@ -137,7 +136,7 @@ object Crypto {
      * @return true is signature is valid for this data with this public key
      */
     @JvmStatic
-    fun verifySignature(data: ByteArray, signature: ByteVector64, publicKey: PublicKey): Boolean {
+    public fun verifySignature(data: ByteArray, signature: ByteVector64, publicKey: PublicKey): Boolean {
         return Secp256k1.verify(
             data,
             signature.toByteArray(),
@@ -145,18 +144,17 @@ object Crypto {
         )
     }
 
-    fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean =
+    public fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean =
         verifySignature(data.toByteArray(), signature, publicKey)
 
     @JvmStatic
-    fun compact2der(signature: ByteVector64): ByteVector = ByteVector(Secp256k1.compact2der(signature.toByteArray()))
-
-    @InternalSerializationApi
-    @JvmStatic
-    fun der2compact(signature: ByteArray): ByteVector64 = ByteVector64(Secp256k1.der2compact(signature))
+    public fun compact2der(signature: ByteVector64): ByteVector = ByteVector(Secp256k1.compact2der(signature.toByteArray()))
 
     @JvmStatic
-    fun isDERSignature(sig: ByteArray): Boolean {
+    public fun der2compact(signature: ByteArray): ByteVector64 = ByteVector64(Secp256k1.der2compact(signature))
+
+    @JvmStatic
+    public fun isDERSignature(sig: ByteArray): Boolean {
         // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S] [sighash]
         // * total-length: 1-byte length descriptor of everything that follows,
         //   excluding the sighash byte.
@@ -225,16 +223,15 @@ object Crypto {
      * @param sig signature (DER encoded, without a trailing sighash byte)
      * @return true if the input is a "low S" signature
      */
-    @InternalSerializationApi
     @JvmStatic
-    fun isLowDERSignature(sig: ByteArray): Boolean = !Secp256k1.signatureNormalize(sig).second
+    public fun isLowDERSignature(sig: ByteArray): Boolean = !Secp256k1.signatureNormalize(sig).second
 
     /**
      * @param sig signature (DER encoded + a trailing sighash byte)
      * @return true if the trailing sighash byte is valid
      */
     @JvmStatic
-    fun isDefinedHashtypeSignature(sig: ByteArray): Boolean = if (sig.isEmpty()) false else {
+    public fun isDefinedHashtypeSignature(sig: ByteArray): Boolean = if (sig.isEmpty()) false else {
         val hashType = (sig.last().toInt() and 0xff) and (SigHash.SIGHASH_ANYONECANPAY.inv())
         !((hashType < SigHash.SIGHASH_ALL || hashType > SigHash.SIGHASH_SINGLE))
     }
@@ -244,9 +241,8 @@ object Crypto {
      * @param flags script flags
      * @return true if the signature is properly encoded
      */
-    @InternalSerializationApi
     @JvmStatic
-    fun checkSignatureEncoding(sig: ByteArray, flags: Int): Boolean {
+    public fun checkSignatureEncoding(sig: ByteArray, flags: Int): Boolean {
         // Empty signature. Not strictly DER encoded, but allowed to provide a
         // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
         return if (sig.isEmpty()) true
@@ -263,7 +259,7 @@ object Crypto {
      * @return true if the pubkey is properly encoded
      */
     @JvmStatic
-    fun checkPubKeyEncoding(key: ByteArray, flags: Int, sigVersion: Int): Boolean {
+    public fun checkPubKeyEncoding(key: ByteArray, flags: Int, sigVersion: Int): Boolean {
         if ((flags and SCRIPT_VERIFY_STRICTENC) != 0) {
             require(isPubKeyCompressedOrUncompressed(key)) { "invalid public key" }
         }
@@ -274,9 +270,8 @@ object Crypto {
         return true
     }
 
-    @InternalSerializationApi
     @JvmStatic
-    fun decodeSignatureLax(input: ByteArrayInputStream): Pair<ByteArray, ByteArray> {
+    public fun decodeSignatureLax(input: ByteArrayInput): Pair<ByteArray, ByteArray> {
         require(input.read() == 0x30)
 
         fun readLength(): Int {
@@ -298,11 +293,11 @@ object Crypto {
         require(input.read() == 0x02)
         val lenR = readLength()
         val r = ByteArray(lenR)
-        input.read(r)
+        input.read(r, 0, lenR)
         require(input.read() == 0x02)
         val lenS = readLength()
         val s = ByteArray(lenS)
-        input.read(s)
+        input.read(s, 0, lenS)
         return Pair(r, s)
     }
 
@@ -315,7 +310,7 @@ object Crypto {
      *         pub1 if the recovery id is even and pub2 if it is odd
      */
     @JvmStatic
-    fun recoverPublicKey(sig: ByteVector64, message: ByteArray): Pair<PublicKey, PublicKey> {
+    public fun recoverPublicKey(sig: ByteVector64, message: ByteArray): Pair<PublicKey, PublicKey> {
         val p0 = recoverPublicKey(sig, message, 0)
         val p1 = recoverPublicKey(sig, message, 1)
         return Pair(p0, p1)
@@ -330,7 +325,7 @@ object Crypto {
      * @return the recovered public key
      */
     @JvmStatic
-    fun recoverPublicKey(sig: ByteVector64, message: ByteArray, recid: Int): PublicKey {
+    public fun recoverPublicKey(sig: ByteVector64, message: ByteArray, recid: Int): PublicKey {
         return PublicKey(PublicKey.compress(Secp256k1.recoverPublicKey(sig.toByteArray(), message, recid)))
     }
 }

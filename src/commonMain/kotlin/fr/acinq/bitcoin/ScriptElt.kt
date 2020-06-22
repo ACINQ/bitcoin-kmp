@@ -19,14 +19,14 @@ package fr.acinq.bitcoin
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
-sealed class ScriptElt {
-    fun isPush(size: Int): Boolean = ScriptElt.isPush(this, size)
+public sealed class ScriptElt {
+    public fun isPush(size: Int): Boolean = isPush(this, size)
 
-    fun isPush(): Boolean = ScriptElt.isPush(this)
+    public fun isPush(): Boolean = isPush(this)
 
-    companion object {
+    public companion object {
         @JvmStatic
-        fun isPush(op: ScriptElt): Boolean {
+        public fun isPush(op: ScriptElt): Boolean {
             return when {
                 op is OP_PUSHDATA -> true
                 else -> false
@@ -34,7 +34,7 @@ sealed class ScriptElt {
         }
 
         @JvmStatic
-        fun isPush(op: ScriptElt, size: Int): Boolean {
+        public fun isPush(op: ScriptElt, size: Int): Boolean {
             return when {
                 op is OP_PUSHDATA && op.data.size() == size -> true
                 else -> false
@@ -44,144 +44,144 @@ sealed class ScriptElt {
 }
 
 // @formatter:off
-object OP_0 : ScriptElt()
-object OP_PUSHDATA1 : ScriptElt()
-object OP_PUSHDATA2 : ScriptElt()
-object OP_PUSHDATA4 : ScriptElt()
-object OP_1NEGATE : ScriptElt()
-object OP_RESERVED : ScriptElt()
-object OP_1 : ScriptElt()
-object OP_2 : ScriptElt()
-object OP_3 : ScriptElt()
-object OP_4 : ScriptElt()
-object OP_5 : ScriptElt()
-object OP_6 : ScriptElt()
-object OP_7 : ScriptElt()
-object OP_8 : ScriptElt()
-object OP_9 : ScriptElt()
-object OP_10 : ScriptElt()
-object OP_11 : ScriptElt()
-object OP_12 : ScriptElt()
-object OP_13 : ScriptElt()
-object OP_14 : ScriptElt()
-object OP_15 : ScriptElt()
-object OP_16 : ScriptElt()
-object OP_NOP : ScriptElt()
-object OP_VER : ScriptElt()
-object OP_IF : ScriptElt()
-object OP_NOTIF : ScriptElt()
-object OP_VERIF : ScriptElt()
-object OP_VERNOTIF : ScriptElt()
-object OP_ELSE : ScriptElt()
-object OP_ENDIF : ScriptElt()
-object OP_VERIFY : ScriptElt()
-object OP_RETURN : ScriptElt()
-object OP_TOALTSTACK : ScriptElt()
-object OP_FROMALTSTACK : ScriptElt()
-object OP_2DROP : ScriptElt()
-object OP_2DUP : ScriptElt()
-object OP_3DUP : ScriptElt()
-object OP_2OVER : ScriptElt()
-object OP_2ROT : ScriptElt()
-object OP_2SWAP : ScriptElt()
-object OP_IFDUP : ScriptElt()
-object OP_DEPTH : ScriptElt()
-object OP_DROP : ScriptElt()
-object OP_DUP : ScriptElt()
-object OP_NIP : ScriptElt()
-object OP_OVER : ScriptElt()
-object OP_PICK : ScriptElt()
-object OP_ROLL : ScriptElt()
-object OP_ROT : ScriptElt()
-object OP_SWAP : ScriptElt()
-object OP_TUCK : ScriptElt()
-object OP_CAT : ScriptElt()
-object OP_SUBSTR : ScriptElt()
-object OP_LEFT : ScriptElt()
-object OP_RIGHT : ScriptElt()
-object OP_SIZE : ScriptElt()
-object OP_INVERT : ScriptElt()
-object OP_AND : ScriptElt()
-object OP_OR : ScriptElt()
-object OP_XOR : ScriptElt()
-object OP_EQUAL : ScriptElt()
-object OP_EQUALVERIFY : ScriptElt()
-object OP_RESERVED1 : ScriptElt()
-object OP_RESERVED2 : ScriptElt()
-object OP_1ADD : ScriptElt()
-object OP_1SUB : ScriptElt()
-object OP_2MUL : ScriptElt()
-object OP_2DIV : ScriptElt()
-object OP_NEGATE : ScriptElt()
-object OP_ABS : ScriptElt()
-object OP_NOT : ScriptElt()
-object OP_0NOTEQUAL : ScriptElt()
-object OP_ADD : ScriptElt()
-object OP_SUB : ScriptElt()
-object OP_MUL : ScriptElt()
-object OP_DIV : ScriptElt()
-object OP_MOD : ScriptElt()
-object OP_LSHIFT : ScriptElt()
-object OP_RSHIFT : ScriptElt()
-object OP_BOOLAND : ScriptElt()
-object OP_BOOLOR : ScriptElt()
-object OP_NUMEQUAL : ScriptElt()
-object OP_NUMEQUALVERIFY : ScriptElt()
-object OP_NUMNOTEQUAL : ScriptElt()
-object OP_LESSTHAN : ScriptElt()
-object OP_GREATERTHAN : ScriptElt()
-object OP_LESSTHANOREQUAL : ScriptElt()
-object OP_GREATERTHANOREQUAL : ScriptElt()
-object OP_MIN : ScriptElt()
-object OP_MAX : ScriptElt()
-object OP_WITHIN : ScriptElt()
-object OP_RIPEMD160 : ScriptElt()
-object OP_SHA1 : ScriptElt()
-object OP_SHA256 : ScriptElt()
-object OP_HASH160 : ScriptElt()
-object OP_HASH256 : ScriptElt()
-object OP_CODESEPARATOR : ScriptElt()
-object OP_CHECKSIG : ScriptElt()
-object OP_CHECKSIGVERIFY : ScriptElt()
-object OP_CHECKMULTISIG : ScriptElt()
-object OP_CHECKMULTISIGVERIFY : ScriptElt()
-object OP_NOP1 : ScriptElt()
-object OP_CHECKLOCKTIMEVERIFY : ScriptElt()
-object OP_CHECKSEQUENCEVERIFY : ScriptElt()
-object OP_NOP4 : ScriptElt()
-object OP_NOP5 : ScriptElt()
-object OP_NOP6 : ScriptElt()
-object OP_NOP7 : ScriptElt()
-object OP_NOP8 : ScriptElt()
-object OP_NOP9 : ScriptElt()
-object OP_NOP10 : ScriptElt()
-object OP_SMALLINTEGER : ScriptElt()
-object OP_INVALIDOPCODE : ScriptElt()
+public object OP_0 : ScriptElt()
+public object OP_PUSHDATA1 : ScriptElt()
+public object OP_PUSHDATA2 : ScriptElt()
+public object OP_PUSHDATA4 : ScriptElt()
+public object OP_1NEGATE : ScriptElt()
+public object OP_RESERVED : ScriptElt()
+public object OP_1 : ScriptElt()
+public object OP_2 : ScriptElt()
+public object OP_3 : ScriptElt()
+public object OP_4 : ScriptElt()
+public object OP_5 : ScriptElt()
+public object OP_6 : ScriptElt()
+public object OP_7 : ScriptElt()
+public object OP_8 : ScriptElt()
+public object OP_9 : ScriptElt()
+public object OP_10 : ScriptElt()
+public object OP_11 : ScriptElt()
+public object OP_12 : ScriptElt()
+public object OP_13 : ScriptElt()
+public object OP_14 : ScriptElt()
+public object OP_15 : ScriptElt()
+public object OP_16 : ScriptElt()
+public object OP_NOP : ScriptElt()
+public object OP_VER : ScriptElt()
+public object OP_IF : ScriptElt()
+public object OP_NOTIF : ScriptElt()
+public object OP_VERIF : ScriptElt()
+public object OP_VERNOTIF : ScriptElt()
+public object OP_ELSE : ScriptElt()
+public object OP_ENDIF : ScriptElt()
+public object OP_VERIFY : ScriptElt()
+public object OP_RETURN : ScriptElt()
+public object OP_TOALTSTACK : ScriptElt()
+public object OP_FROMALTSTACK : ScriptElt()
+public object OP_2DROP : ScriptElt()
+public object OP_2DUP : ScriptElt()
+public object OP_3DUP : ScriptElt()
+public object OP_2OVER : ScriptElt()
+public object OP_2ROT : ScriptElt()
+public object OP_2SWAP : ScriptElt()
+public object OP_IFDUP : ScriptElt()
+public object OP_DEPTH : ScriptElt()
+public object OP_DROP : ScriptElt()
+public object OP_DUP : ScriptElt()
+public object OP_NIP : ScriptElt()
+public object OP_OVER : ScriptElt()
+public object OP_PICK : ScriptElt()
+public object OP_ROLL : ScriptElt()
+public object OP_ROT : ScriptElt()
+public object OP_SWAP : ScriptElt()
+public object OP_TUCK : ScriptElt()
+public object OP_CAT : ScriptElt()
+public object OP_SUBSTR : ScriptElt()
+public object OP_LEFT : ScriptElt()
+public object OP_RIGHT : ScriptElt()
+public object OP_SIZE : ScriptElt()
+public object OP_INVERT : ScriptElt()
+public object OP_AND : ScriptElt()
+public object OP_OR : ScriptElt()
+public object OP_XOR : ScriptElt()
+public object OP_EQUAL : ScriptElt()
+public object OP_EQUALVERIFY : ScriptElt()
+public object OP_RESERVED1 : ScriptElt()
+public object OP_RESERVED2 : ScriptElt()
+public object OP_1ADD : ScriptElt()
+public object OP_1SUB : ScriptElt()
+public object OP_2MUL : ScriptElt()
+public object OP_2DIV : ScriptElt()
+public object OP_NEGATE : ScriptElt()
+public object OP_ABS : ScriptElt()
+public object OP_NOT : ScriptElt()
+public object OP_0NOTEQUAL : ScriptElt()
+public object OP_ADD : ScriptElt()
+public object OP_SUB : ScriptElt()
+public object OP_MUL : ScriptElt()
+public object OP_DIV : ScriptElt()
+public object OP_MOD : ScriptElt()
+public object OP_LSHIFT : ScriptElt()
+public object OP_RSHIFT : ScriptElt()
+public object OP_BOOLAND : ScriptElt()
+public object OP_BOOLOR : ScriptElt()
+public object OP_NUMEQUAL : ScriptElt()
+public object OP_NUMEQUALVERIFY : ScriptElt()
+public object OP_NUMNOTEQUAL : ScriptElt()
+public object OP_LESSTHAN : ScriptElt()
+public object OP_GREATERTHAN : ScriptElt()
+public object OP_LESSTHANOREQUAL : ScriptElt()
+public object OP_GREATERTHANOREQUAL : ScriptElt()
+public object OP_MIN : ScriptElt()
+public object OP_MAX : ScriptElt()
+public object OP_WITHIN : ScriptElt()
+public object OP_RIPEMD160 : ScriptElt()
+public object OP_SHA1 : ScriptElt()
+public object OP_SHA256 : ScriptElt()
+public object OP_HASH160 : ScriptElt()
+public object OP_HASH256 : ScriptElt()
+public object OP_CODESEPARATOR : ScriptElt()
+public object OP_CHECKSIG : ScriptElt()
+public object OP_CHECKSIGVERIFY : ScriptElt()
+public object OP_CHECKMULTISIG : ScriptElt()
+public object OP_CHECKMULTISIGVERIFY : ScriptElt()
+public object OP_NOP1 : ScriptElt()
+public object OP_CHECKLOCKTIMEVERIFY : ScriptElt()
+public object OP_CHECKSEQUENCEVERIFY : ScriptElt()
+public object OP_NOP4 : ScriptElt()
+public object OP_NOP5 : ScriptElt()
+public object OP_NOP6 : ScriptElt()
+public object OP_NOP7 : ScriptElt()
+public object OP_NOP8 : ScriptElt()
+public object OP_NOP9 : ScriptElt()
+public object OP_NOP10 : ScriptElt()
+public object OP_SMALLINTEGER : ScriptElt()
+public object OP_INVALIDOPCODE : ScriptElt()
 // @formatter:on
 
-data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val code: Int) : ScriptElt() {
-    constructor(data: ByteArray, code: Int) : this(data.byteVector(), code)
+public data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val code: Int) : ScriptElt() {
+    public constructor(data: ByteArray, code: Int) : this(data.byteVector(), code)
 
-    constructor(data: ByteArray) : this(
+    public constructor(data: ByteArray) : this(
         data,
         codeFromDataLength(data.count())
     )
 
-    constructor(data: ByteVector) : this(
+    public constructor(data: ByteVector) : this(
         data,
         codeFromDataLength(data.size())
     )
 
-    constructor(data: ByteVector32) : this(
+    public constructor(data: ByteVector32) : this(
         data,
         codeFromDataLength(data.size())
     )
 
-    constructor(publicKey: PublicKey) : this(publicKey.value)
+    public constructor(publicKey: PublicKey) : this(publicKey.value)
 
-    companion object {
+    public companion object {
         @JvmStatic
-        fun codeFromDataLength(length: Int): Int {
+        public fun codeFromDataLength(length: Int): Int {
             val code = when {
                 length < 0x4c -> length
                 length < 0xff -> 0x4c
@@ -195,7 +195,7 @@ data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val code: Int) 
         }
 
         @JvmStatic
-        fun isMinimal(data: ByteArray, code: Int): Boolean {
+        public fun isMinimal(data: ByteArray, code: Int): Boolean {
             return when {
                 data.size == 0 -> code == ScriptEltMapping.elt2code[OP_0]
                 data.size == 1 && data[0] >= 1 && data[0] <= 16 -> code == (ScriptEltMapping.elt2code[OP_1])?.plus(data[0] - 1)
@@ -211,12 +211,12 @@ data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val code: Int) 
     }
 }
 
-data class OP_INVALID(val code: Int) : ScriptElt()
+public data class OP_INVALID(val code: Int) : ScriptElt()
 
-object ScriptEltMapping {
+public object ScriptEltMapping {
     // code -> ScriptElt
     @JvmField
-    val code2elt = hashMapOf(
+    public val code2elt: HashMap<Int, ScriptElt> = hashMapOf(
         0x00 to OP_0,
         0x4c to OP_PUSHDATA1,
         0x4d to OP_PUSHDATA2,
@@ -333,15 +333,15 @@ object ScriptEltMapping {
     )
 
     @JvmField
-    val elt2code = code2elt.map { it -> it.value to it.key }.toMap()
+    public val elt2code: Map<ScriptElt, Int> = code2elt.map { it.value to it.key }.toMap()
 
-    fun name(elt: ScriptElt): String {
+    public fun name(elt: ScriptElt): String {
         val name = elt.toString().removePrefix("fr.acinq.bitcoin.OP_")
         val name1 = name.take(name.lastIndexOf('@'))
         return name1
     }
 
-    val name2code = elt2code.map { it ->
+    public val name2code: Map<String, Int> = elt2code.map { it ->
         name(
             it.key
         ) to it.value

@@ -20,12 +20,11 @@ import fr.acinq.bitcoin.Crypto
 import fr.acinq.bitcoin.Hex
 import fr.acinq.bitcoin.fixSize
 import kotlinx.cinterop.*
-import kotlinx.io.ByteArrayInputStream
-import kotlinx.serialization.InternalSerializationApi
+import fr.acinq.bitcoin.io.ByteArrayInput
 import platform.posix.size_tVar
 import secp256k1.*
 
-actual object Secp256k1 {
+public actual object Secp256k1 {
     private const val SIG_FORMAT_UNKNOWN = 0
     private const val SIG_FORMAT_COMPACT = 1
     private const val SIG_FORMAT_DER = 2
@@ -34,7 +33,7 @@ actual object Secp256k1 {
         secp256k1_context_create((SECP256K1_FLAGS_TYPE_CONTEXT or SECP256K1_FLAGS_BIT_CONTEXT_SIGN or SECP256K1_FLAGS_BIT_CONTEXT_VERIFY).toUInt())
     }
 
-    actual fun computePublicKey(priv: ByteArray): ByteArray {
+    public actual fun computePublicKey(priv: ByteArray): ByteArray {
         require(ctx != null)
         require(priv.size == 32)
         memScoped {
@@ -46,7 +45,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun parsePublicKey(pub: ByteArray): ByteArray {
+    public actual fun parsePublicKey(pub: ByteArray): ByteArray {
         require(ctx != null)
         require(pub.size == 33 || pub.size == 65)
         memScoped {
@@ -62,7 +61,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun ecdh(priv: ByteArray, pub: ByteArray): ByteArray {
+    public actual fun ecdh(priv: ByteArray, pub: ByteArray): ByteArray {
         require(ctx != null)
         require(priv.size == 32)
         require(pub.size == 33)
@@ -80,7 +79,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun privateKeyAdd(priv1: ByteArray, priv2: ByteArray): ByteArray {
+    public actual fun privateKeyAdd(priv1: ByteArray, priv2: ByteArray): ByteArray {
         require(ctx != null)
         require(priv1.size == 32)
         require(priv2.size == 32)
@@ -94,7 +93,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun privateKeyNegate(priv: ByteArray): ByteArray {
+    public actual fun privateKeyNegate(priv: ByteArray): ByteArray {
         require(ctx != null)
         require(priv.size == 32)
         memScoped {
@@ -106,7 +105,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun privateKeyMul(priv: ByteArray, tweak: ByteArray): ByteArray {
+    public actual fun privateKeyMul(priv: ByteArray, tweak: ByteArray): ByteArray {
         require(ctx != null)
         require(priv.size == 32)
         require(tweak.size == 32)
@@ -120,7 +119,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun publicKeyAdd(pub1: ByteArray, pub2: ByteArray): ByteArray {
+    public actual fun publicKeyAdd(pub1: ByteArray, pub2: ByteArray): ByteArray {
         require(ctx != null)
         memScoped {
             val pubkey1 = convertPublicKey(pub1)
@@ -133,7 +132,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun publicKeyNegate(pub: ByteArray): ByteArray {
+    public actual fun publicKeyNegate(pub: ByteArray): ByteArray {
         require(ctx != null)
         memScoped {
             val pubkey = convertPublicKey(pub)
@@ -143,7 +142,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun publicKeyMul(pub: ByteArray, tweak: ByteArray): ByteArray {
+    public actual fun publicKeyMul(pub: ByteArray, tweak: ByteArray): ByteArray {
         require(ctx != null)
         memScoped {
             val pubkey = convertPublicKey(pub)
@@ -154,7 +153,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun sign(data: ByteArray, priv: ByteArray): ByteArray {
+    public actual fun sign(data: ByteArray, priv: ByteArray): ByteArray {
         require(ctx != null)
         require(priv.size == 32)
         require(data.size == 32)
@@ -180,7 +179,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun verify(data: ByteArray, sig: ByteArray, pub: ByteArray): Boolean {
+    public actual fun verify(data: ByteArray, sig: ByteArray, pub: ByteArray): Boolean {
         require(ctx != null)
         require(data.size == 32)
         require(pub.size == 33 || pub.size == 65)
@@ -196,7 +195,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun compact2der(input: ByteArray): ByteArray {
+    public actual fun compact2der(input: ByteArray): ByteArray {
         require(ctx != null)
         require(input.size == 64)
         memScoped {
@@ -204,6 +203,7 @@ actual object Secp256k1 {
             val sig = nativeHeap.alloc<secp256k1_ecdsa_signature>()
             var result = secp256k1_ecdsa_signature_parse_compact(ctx, sig.ptr, inputBytes)
             require(result == 1)
+            secp256k1_ecdsa_signature_normalize(ctx, sig.ptr, sig.ptr)
             val len = alloc<size_tVar>()
             len.value = 73UL
             val output = nativeHeap.allocArray<UByteVar>(73)
@@ -213,14 +213,17 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun der2compact(input: ByteArray): ByteArray {
+    public actual fun der2compact(input: ByteArray): ByteArray {
         require(ctx != null)
         require(input.size >= 70 && input.size <= 73) { "signature size is not compatible with DER format" }
+        val (r, s) = Crypto.decodeSignatureLax(ByteArrayInput(input))
+        val lax = dropZeroAndFixSize(r, 32) + dropZeroAndFixSize(s, 32)
         memScoped {
-            val inputBytes = toNat(input)
+            val inputBytes = toNat(lax)
             val sig = nativeHeap.alloc<secp256k1_ecdsa_signature>()
-            var result = secp256k1_ecdsa_signature_parse_der(ctx, sig.ptr, inputBytes, input.size.toULong())
-            assert(result == 1) { "cannot parse DER signature" }
+            var result = secp256k1_ecdsa_signature_parse_compact(ctx, sig.ptr, inputBytes)
+            secp256k1_ecdsa_signature_normalize(ctx, sig.ptr, sig.ptr)
+            assert(result == 1) { "cannot parse signature" }
             val output = nativeHeap.allocArray<UByteVar>(64)
             result = secp256k1_ecdsa_signature_serialize_compact(ctx, output, sig.ptr)
             require(result == 1)
@@ -230,10 +233,9 @@ actual object Secp256k1 {
 
     private fun dropZeroAndFixSize(input: ByteArray, size: Int) = fixSize(input.dropWhile { it == 0.toByte() }.toByteArray(), size)
 
-    @InternalSerializationApi
-    actual fun signatureNormalize(input: ByteArray): Pair<ByteArray, Boolean> {
+    public actual fun signatureNormalize(input: ByteArray): Pair<ByteArray, Boolean> {
         require(ctx != null)
-        val (r, s) = Crypto.decodeSignatureLax(ByteArrayInputStream(input))
+        val (r, s) = Crypto.decodeSignatureLax(ByteArrayInput(input))
         val compact = dropZeroAndFixSize(r, 32) + dropZeroAndFixSize(s, 32)
         memScoped {
             val sig = convertSignature(compact)
@@ -246,7 +248,7 @@ actual object Secp256k1 {
         }
     }
 
-    actual fun recoverPublicKey(sig: ByteArray, message: ByteArray, recid: Int): ByteArray {
+    public actual fun recoverPublicKey(sig: ByteArray, message: ByteArray, recid: Int): ByteArray {
         require(ctx != null)
         memScoped {
             val nativeSig = convertRecoverableSignature(sig, recid)

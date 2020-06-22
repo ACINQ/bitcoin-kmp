@@ -17,14 +17,10 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.SigHash.SIGHASH_ALL
-import kotlinx.serialization.InternalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-@ExperimentalUnsignedTypes
-@InternalSerializationApi
-@ExperimentalStdlibApi
 class SegwitTestsCommon {
     val pversion = Protocol.PROTOCOL_VERSION
 
@@ -204,7 +200,7 @@ class SegwitTestsCommon {
         val pub1 = priv1.publicKey()
         val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, pub1.hash160())
 
-        assert(address1 == "D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap")
+        assertEquals("D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap", address1)
 
         val (priv2, _) = PrivateKey.fromBase58(
             "QUpr3G5ia7K7txSq5k7QpgTfNy33iTQWb1nAUgb77xFesn89xsoJ",

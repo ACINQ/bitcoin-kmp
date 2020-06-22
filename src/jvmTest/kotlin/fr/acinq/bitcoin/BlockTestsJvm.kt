@@ -17,18 +17,15 @@
 package fr.acinq.bitcoin
 
 import com.google.common.io.ByteStreams
-import kotlinx.serialization.InternalSerializationApi
+import fr.acinq.bitcoin.io.InputStreamInput
 import org.junit.Test
 import kotlin.test.assertEquals
 
-@ExperimentalUnsignedTypes
-@ExperimentalStdlibApi
-@InternalSerializationApi
 class BlockTestsJvm {
     @Test
     fun `read blocks`() {
         val stream = javaClass.getResourceAsStream("/block1.dat")
-        val block = Block.read(stream)
+        val block = Block.read(InputStreamInput(stream))
         // assert(Block.checkProofOfWork(block))
 
         assert(MerkleTree.computeRoot(block.tx.map { it.hash }) == block.header.hashMerkleRoot)

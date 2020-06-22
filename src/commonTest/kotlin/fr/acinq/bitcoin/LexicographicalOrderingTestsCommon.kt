@@ -16,13 +16,10 @@
 
 package fr.acinq.bitcoin
 
-import kotlinx.serialization.InternalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-@InternalSerializationApi
-@ExperimentalStdlibApi
 class LexicographicalOrderingTestsCommon {
     @Test
     fun `sort tx inputs and outputs in lexicographical order`() {

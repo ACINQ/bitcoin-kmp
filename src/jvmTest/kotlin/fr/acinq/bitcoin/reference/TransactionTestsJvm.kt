@@ -20,17 +20,11 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import fr.acinq.bitcoin.*
-import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 
-@ExperimentalUnsignedTypes
-@ExperimentalStdlibApi
-@InternalSerializationApi
 class TransactionTestsJvm {
     val mapper = jacksonObjectMapper()
 
-    @InternalSerializationApi
-    @ExperimentalStdlibApi
     companion object {
         fun process(tests: List<List<JsonNode>>, valid: Boolean): Int {
             var count = 0

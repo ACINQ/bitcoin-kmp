@@ -17,27 +17,24 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.DeterministicWallet.hardened
-import kotlinx.io.ByteArrayInputStream
-import kotlinx.io.ByteArrayOutputStream
-import kotlinx.serialization.InternalSerializationApi
+import fr.acinq.bitcoin.io.ByteArrayInput
+import fr.acinq.bitcoin.io.ByteArrayOutput
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 /**
  * see https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
  */
-@ExperimentalStdlibApi
-@InternalSerializationApi
-object DeterministicWallet {
-    const val hardenedKeyIndex = 0x80000000L
+public object DeterministicWallet {
+    public const val hardenedKeyIndex: Long = 0x80000000L
 
     @JvmStatic
-    fun hardened(index: Long): Long = hardenedKeyIndex + index
+    public fun hardened(index: Long): Long = hardenedKeyIndex + index
 
     @JvmStatic
-    fun isHardened(index: Long): Boolean = index >= hardenedKeyIndex
+    public fun isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
-    data class ExtendedPrivateKey(
+    public data class ExtendedPrivateKey(
         @JvmField val secretkeybytes: ByteVector32,
         @JvmField val chaincode: ByteVector32,
         @JvmField val depth: Int,
@@ -51,7 +48,7 @@ object DeterministicWallet {
         val publicKey: PublicKey = privateKey.publicKey()
     }
 
-    data class ExtendedPublicKey(
+    public data class ExtendedPublicKey(
         @JvmField val publickeybytes: ByteVector,
         @JvmField val chaincode: ByteVector32,
         @JvmField val depth: Int,
@@ -67,11 +64,11 @@ object DeterministicWallet {
     }
 
     @JvmStatic
-    fun encode(input: ExtendedPrivateKey, testnet: Boolean): String = encode(input, if (testnet) tprv else xprv)
+    public fun encode(input: ExtendedPrivateKey, testnet: Boolean): String = encode(input, if (testnet) tprv else xprv)
 
     @JvmStatic
-    fun encode(input: ExtendedPrivateKey, prefix: Int): String {
-        val out = ByteArrayOutputStream()
+    public fun encode(input: ExtendedPrivateKey, prefix: Int): String {
+        val out = ByteArrayOutput()
         BtcSerializer.writeUInt8(input.depth, out)
         BtcSerializer.writeUInt32BE(input.parent, out)
         BtcSerializer.writeUInt32BE(input.path.lastChildNumber, out)
@@ -83,11 +80,11 @@ object DeterministicWallet {
     }
 
     @JvmStatic
-    fun encode(input: ExtendedPublicKey, testnet: Boolean): String = encode(input, if (testnet) tpub else xpub)
+    public fun encode(input: ExtendedPublicKey, testnet: Boolean): String = encode(input, if (testnet) tpub else xpub)
 
     @JvmStatic
-    fun encode(input: ExtendedPublicKey, prefix: Int): String {
-        val out = ByteArrayOutputStream()
+    public fun encode(input: ExtendedPublicKey, prefix: Int): String {
+        val out = ByteArrayOutput()
         BtcSerializer.writeUInt8(input.depth, out)
         BtcSerializer.writeUInt32BE(input.parent, out)
         BtcSerializer.writeUInt32BE(input.path.lastChildNumber, out)
@@ -103,7 +100,8 @@ object DeterministicWallet {
      * @return a "master" private key
      */
     @JvmStatic
-    fun generate(seed: ByteArray): ExtendedPrivateKey {
+    @OptIn(ExperimentalStdlibApi::class)
+    public fun generate(seed: ByteArray): ExtendedPrivateKey {
         val I = Crypto.hmac512("Bitcoin seed".encodeToByteArray(), seed)
         val IL = I.take(32).toByteArray().byteVector32()
         val IR = I.takeLast(32).toByteArray().byteVector32()
@@ -116,7 +114,7 @@ object DeterministicWallet {
      * @return a "master" private key
      */
     @JvmStatic
-    fun generate(seed: ByteVector): ExtendedPrivateKey = generate(seed.toByteArray())
+    public fun generate(seed: ByteVector): ExtendedPrivateKey = generate(seed.toByteArray())
 
     /**
      *
@@ -124,7 +122,7 @@ object DeterministicWallet {
      * @return the public key for this private key
      */
     @JvmStatic
-    fun publicKey(input: ExtendedPrivateKey): ExtendedPublicKey {
+    public fun publicKey(input: ExtendedPrivateKey): ExtendedPublicKey {
         return ExtendedPublicKey(
             input.publicKey.value,
             input.chaincode,
@@ -140,8 +138,8 @@ object DeterministicWallet {
      * @return the fingerprint for this public key
      */
     @JvmStatic
-    fun fingerprint(input: ExtendedPublicKey): Long = BtcSerializer.uint32(
-        ByteArrayInputStream(
+    public fun fingerprint(input: ExtendedPublicKey): Long = BtcSerializer.uint32(
+        ByteArrayInput(
             Crypto.hash160(input.publickeybytes).take(4).reversed().toByteArray()
         )
     )
@@ -152,7 +150,7 @@ object DeterministicWallet {
      * @return the fingerprint for this private key (which is based on the corresponding public key)
      */
     @JvmStatic
-    fun fingerprint(input: ExtendedPrivateKey): Long = fingerprint(publicKey(input))
+    public fun fingerprint(input: ExtendedPrivateKey): Long = fingerprint(publicKey(input))
 
     /**
      *
@@ -161,7 +159,7 @@ object DeterministicWallet {
      * @return the derived private key at the specified index
      */
     @JvmStatic
-    fun derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey {
+    public fun derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey {
         val I = if (isHardened(index)) {
             val buffer = arrayOf(0.toByte()).toByteArray() + parent.secretkeybytes.toByteArray()
             Crypto.hmac512(parent.chaincode.toByteArray(), buffer + BtcSerializer.writeUInt32BE(index))
@@ -189,9 +187,8 @@ object DeterministicWallet {
      * @param index  index of the child key
      * @return the derived public key at the specified index
      */
-    @ExperimentalUnsignedTypes
     @JvmStatic
-    fun derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey {
+    public fun derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey {
         require(!isHardened(index)) { "Cannot derive public keys from public hardened keys" }
 
         val I = Crypto.hmac512(
@@ -222,88 +219,81 @@ object DeterministicWallet {
     }
 
     @JvmStatic
-    fun derivePrivateKey(parent: ExtendedPrivateKey, chain: List<Long>): ExtendedPrivateKey =
+    public fun derivePrivateKey(parent: ExtendedPrivateKey, chain: List<Long>): ExtendedPrivateKey =
         chain.fold(parent, DeterministicWallet::derivePrivateKey)
 
     @JvmStatic
-    fun derivePrivateKey(parent: ExtendedPrivateKey, keyPath: KeyPath): ExtendedPrivateKey =
+    public fun derivePrivateKey(parent: ExtendedPrivateKey, keyPath: KeyPath): ExtendedPrivateKey =
         derivePrivateKey(parent, keyPath.path)
 
     @JvmStatic
-    fun derivePrivateKey(parent: ExtendedPrivateKey, keyPath: String): ExtendedPrivateKey =
+    public fun derivePrivateKey(parent: ExtendedPrivateKey, keyPath: String): ExtendedPrivateKey =
         derivePrivateKey(parent, KeyPath.fromPath(keyPath))
 
-    @ExperimentalUnsignedTypes
     @JvmStatic
-    fun derivePublicKey(parent: ExtendedPublicKey, chain: List<Long>): ExtendedPublicKey =
+    public fun derivePublicKey(parent: ExtendedPublicKey, chain: List<Long>): ExtendedPublicKey =
         chain.fold(parent, DeterministicWallet::derivePublicKey)
 
-    @ExperimentalUnsignedTypes
     @JvmStatic
-    fun derivePublicKey(parent: ExtendedPublicKey, keyPath: KeyPath): ExtendedPublicKey =
+    public fun derivePublicKey(parent: ExtendedPublicKey, keyPath: KeyPath): ExtendedPublicKey =
         derivePublicKey(parent, keyPath.path)
 
-    @ExperimentalUnsignedTypes
     @JvmStatic
-    fun derivePublicKey(parent: ExtendedPublicKey, keyPath: String): ExtendedPublicKey =
+    public fun derivePublicKey(parent: ExtendedPublicKey, keyPath: String): ExtendedPublicKey =
         derivePublicKey(parent, KeyPath.fromPath(keyPath))
 
     // p2pkh mainnet
-    const val xprv = 0x0488ade4
-    const val xpub = 0x0488b21e
+    public const val xprv: Int = 0x0488ade4
+    public const val xpub: Int = 0x0488b21e
 
     // p2sh-of-p2wpkh mainnet
-    const val yprv = 0x049d7878
-    const val ypub = 0x049d7cb2
+    public const val yprv: Int = 0x049d7878
+    public const val ypub: Int = 0x049d7cb2
 
     // p2wpkh mainnet
-    const val zprv = 0x04b2430c
-    const val zpub = 0x04b24746
+    public const val zprv: Int = 0x04b2430c
+    public const val zpub: Int = 0x04b24746
 
     // p2pkh testnet
-    const val tprv = 0x04358394
-    const val tpub = 0x043587cf
+    public const val tprv: Int = 0x04358394
+    public const val tpub: Int = 0x043587cf
 
     // p2sh-of-p2wpkh testnet
-    const val uprv = 0x044a4e28
-    const val upub = 0x044a5262
+    public const val uprv: Int = 0x044a4e28
+    public const val upub: Int = 0x044a5262
 
     // p2wpkh testnet
-    const val vprv = 0x045f18bc
-    const val vpub = 0x045f1cf6
+    public const val vprv: Int = 0x045f18bc
+    public const val vpub: Int = 0x045f1cf6
 }
 
-@ExperimentalStdlibApi
-@InternalSerializationApi
-data class KeyPath(@JvmField val path: List<Long>) {
-    constructor(path: String) : this(computePath(path))
+public data class KeyPath(@JvmField val path: List<Long>) {
+    public constructor(path: String) : this(computePath(path))
 
     @JvmField
-    val lastChildNumber = if (path.isEmpty()) 0L else path.last()
+    public val lastChildNumber: Long = if (path.isEmpty()) 0L else path.last()
 
-    fun derive(number: Long) = KeyPath(path + listOf(number))
+    public fun derive(number: Long): KeyPath = KeyPath(path + listOf(number))
 
-    fun append(index: Long): KeyPath {
+    public fun append(index: Long): KeyPath {
         return KeyPath(path + listOf(index))
     }
 
-    fun append(indexes: List<Long>): KeyPath {
+    public fun append(indexes: List<Long>): KeyPath {
         return KeyPath(path + indexes)
     }
 
-    fun append(that: KeyPath): KeyPath {
+    public fun append(that: KeyPath): KeyPath {
         return KeyPath(path + that.path)
     }
 
-    override fun toString() = path.map { KeyPath.childNumberToString(it) }.fold("m") { a, b -> "$a/$b" }
+    override fun toString(): String = path.map { KeyPath.childNumberToString(it) }.fold("m") { a, b -> "$a/$b" }
 
-    @InternalSerializationApi
-    @ExperimentalStdlibApi
-    companion object {
-        val empty = KeyPath(listOf())
+    public companion object {
+        public val empty: KeyPath = KeyPath(listOf())
 
         @JvmStatic
-        fun computePath(path: String): List<Long> {
+        public fun computePath(path: String): List<Long> {
             fun toNumber(value: String): Long = if (value.last() == '\'') hardened(value.dropLast(1).toLong()) else value.toLong()
 
             val path1 = path.removePrefix("m").removePrefix("/")
@@ -314,9 +304,9 @@ data class KeyPath(@JvmField val path: List<Long>) {
         }
 
         @JvmStatic
-        fun fromPath(path: String): KeyPath = KeyPath(path)
+        public fun fromPath(path: String): KeyPath = KeyPath(path)
 
-        fun childNumberToString(childNumber: Long) =
+        public fun childNumberToString(childNumber: Long): String =
             if (DeterministicWallet.isHardened(childNumber)) ((childNumber - DeterministicWallet.hardenedKeyIndex).toString() + "'") else childNumber.toString()
     }
 }

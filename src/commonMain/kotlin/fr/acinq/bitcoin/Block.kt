@@ -16,9 +16,8 @@
 
 package fr.acinq.bitcoin
 
-import kotlinx.io.InputStream
-import kotlinx.io.OutputStream
-import kotlinx.serialization.InternalSerializationApi
+import fr.acinq.bitcoin.io.Input
+import fr.acinq.bitcoin.io.Output
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -32,9 +31,7 @@ import kotlin.jvm.JvmStatic
  * @param bits              The calculated difficulty target being used for this block
  * @param nonce             The nonce used to generate this block… to allow variations of the header and compute different hashes
  */
-@ExperimentalStdlibApi
-@InternalSerializationApi
-data class BlockHeader(
+public data class BlockHeader(
     @JvmField val version: Long,
     @JvmField val hashPreviousBlock: ByteVector32,
     @JvmField val hashMerkleRoot: ByteVector32,
@@ -42,38 +39,33 @@ data class BlockHeader(
     @JvmField val bits: Long,
     @JvmField val nonce: Long
 ) {
-    @ExperimentalUnsignedTypes
     @JvmField
-    val hash: ByteVector32 = ByteVector32(Crypto.hash256(BlockHeader.write(this)))
+    public val hash: ByteVector32 = ByteVector32(Crypto.hash256(write(this)))
 
-    @ExperimentalUnsignedTypes
     @JvmField
-    val blockId: ByteVector32 = hash.reversed()
+    public val blockId: ByteVector32 = hash.reversed()
 
-    fun setVersion(input: Long) = this.copy(version = input)
+    public fun setVersion(input: Long): BlockHeader = this.copy(version = input)
 
-    fun setHashPreviousBlock(input: ByteVector32) = this.copy(hashPreviousBlock = input)
+    public fun setHashPreviousBlock(input: ByteVector32): BlockHeader = this.copy(hashPreviousBlock = input)
 
-    fun setHashMerkleRoot(input: ByteVector32) = this.copy(hashMerkleRoot = input)
+    public fun setHashMerkleRoot(input: ByteVector32): BlockHeader = this.copy(hashMerkleRoot = input)
 
-    fun setTime(input: Long) = this.copy(time = input)
+    public fun setTime(input: Long): BlockHeader = this.copy(time = input)
 
-    fun setBits(input: Long) = this.copy(bits = input)
+    public fun setBits(input: Long): BlockHeader = this.copy(bits = input)
 
-    fun setNonce(input: Long) = this.copy(nonce = input)
+    public fun setNonce(input: Long): BlockHeader = this.copy(nonce = input)
 
-    @ExperimentalUnsignedTypes
-    @ExperimentalStdlibApi
-    @InternalSerializationApi
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
-    companion object : BtcSerializer<BlockHeader>() {
-        override fun read(input: InputStream, protocolVersion: Long): BlockHeader {
-            val version = BtcSerializer.uint32(input)
-            val hashPreviousBlock = BtcSerializer.hash(input)
-            val hashMerkleRoot = BtcSerializer.hash(input)
-            val time = BtcSerializer.uint32(input)
-            val bits = BtcSerializer.uint32(input)
-            val nonce = BtcSerializer.uint32(input)
+    public companion object : BtcSerializer<BlockHeader>() {
+        override fun read(input: Input, protocolVersion: Long): BlockHeader {
+            val version = uint32(input)
+            val hashPreviousBlock = hash(input)
+            val hashMerkleRoot = hash(input)
+            val time = uint32(input)
+            val bits = uint32(input)
+            val nonce = uint32(input)
             return BlockHeader(
                 version,
                 hashPreviousBlock.byteVector32(),
@@ -94,13 +86,13 @@ data class BlockHeader(
             return super.read(input)
         }
 
-        override fun write(message: BlockHeader, output: OutputStream, protocolVersion: Long) {
-            BtcSerializer.writeUInt32(message.version, output)
-            BtcSerializer.writeBytes(message.hashPreviousBlock, output)
-            BtcSerializer.writeBytes(message.hashMerkleRoot, output)
-            BtcSerializer.writeUInt32(message.time, output)
-            BtcSerializer.writeUInt32(message.bits, output)
-            BtcSerializer.writeUInt32(message.nonce, output)
+        override fun write(message: BlockHeader, output: Output, protocolVersion: Long) {
+            writeUInt32(message.version, output)
+            writeBytes(message.hashPreviousBlock, output)
+            writeBytes(message.hashMerkleRoot, output)
+            writeUInt32(message.time, output)
+            writeUInt32(message.bits, output)
+            writeUInt32(message.nonce, output)
         }
 
         @JvmStatic
@@ -108,9 +100,9 @@ data class BlockHeader(
             return super.write(message)
         }
 
-        @ExperimentalUnsignedTypes
         @JvmStatic
-        fun getDifficulty(header: BlockHeader): UInt256 {
+        @OptIn(ExperimentalUnsignedTypes::class)
+        public fun getDifficulty(header: BlockHeader): UInt256 {
             val (diff, neg, _) = UInt256.decodeCompact(header.bits)
             return if (neg) -diff else diff
         }
@@ -122,18 +114,19 @@ data class BlockHeader(
          *         by bitcoin core
          */
         @JvmStatic
-        fun blockProof(bits: Long): UInt256 {
+        @OptIn(ExperimentalUnsignedTypes::class)
+        public fun blockProof(bits: Long): UInt256 {
             val (target, negative, overflow) = UInt256.decodeCompact(bits)
             return if (target == UInt256.Zero || negative || overflow) UInt256.Zero else {
                 //  (~bnTarget / (bnTarget + 1)) + 1;
-                var work = target.inv()
+                val work = target.inv()
                 work /= target.inc()
                 work.inc()
             }
         }
 
         @JvmStatic
-        fun blockProof(header: BlockHeader): UInt256 = blockProof(header.bits)
+        public fun blockProof(header: BlockHeader): UInt256 = blockProof(header.bits)
 
         /**
          * Proof of work: hash(header) <= target difficulty
@@ -142,14 +135,14 @@ data class BlockHeader(
          * @return true if the input block header validates its expected proof of work
          */
         @JvmStatic
-        fun checkProofOfWork(header: BlockHeader): Boolean {
+        public fun checkProofOfWork(header: BlockHeader): Boolean {
             val (target, _, _) = UInt256.decodeCompact(header.bits)
             val hash = UInt256(header.blockId.toByteArray())
             return hash <= target
         }
 
         @JvmStatic
-        fun calculateNextWorkRequired(lastHeader: BlockHeader, lastRetargetTime: Long): Long {
+        public fun calculateNextWorkRequired(lastHeader: BlockHeader, lastRetargetTime: Long): Long {
             var actualTimespan = lastHeader.time - lastRetargetTime
             val targetTimespan = 14 * 24 * 60 * 60L // two weeks
             if (actualTimespan < targetTimespan / 4) actualTimespan = targetTimespan / 4
@@ -171,8 +164,8 @@ data class BlockHeader(
 /**
  * see https://en.bitcoin.it/wiki/Protocol_specification#Merkle_Trees
  */
-object MerkleTree {
-    tailrec fun computeRoot(tree: List<ByteVector32>): ByteVector32 {
+public object MerkleTree {
+    public tailrec fun computeRoot(tree: List<ByteVector32>): ByteVector32 {
         return when {
             tree.size == 1 -> tree[0]
             (tree.size % 2) != 0 -> computeRoot(tree + listOf(tree.last())) // append last element again
@@ -188,22 +181,17 @@ object MerkleTree {
     }
 }
 
-@ExperimentalUnsignedTypes
-@InternalSerializationApi
-@ExperimentalStdlibApi
-data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Transaction>) {
+public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Transaction>) {
     @JvmField
     val hash: ByteVector32 = header.hash
 
     @JvmField
     val blockId: ByteVector32 = hash.reversed()
 
-    @InternalSerializationApi
-    @ExperimentalStdlibApi
-    companion object : BtcSerializer<Block>() {
-        override fun write(message: Block, out: OutputStream, protocolVersion: Long) {
+    public companion object : BtcSerializer<Block>() {
+        override fun write(message: Block, out: Output, protocolVersion: Long) {
             BlockHeader.write(message.header, out)
-            BtcSerializer.writeCollection(message.tx, out, Transaction, protocolVersion)
+            writeCollection(message.tx, out, Transaction, protocolVersion)
 
         }
 
@@ -212,10 +200,10 @@ data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Trans
             return super.write(message)
         }
 
-        override fun read(input: InputStream, protocolVersion: Long): Block {
-            val raw = BtcSerializer.bytes(input, 80)
+        override fun read(input: Input, protocolVersion: Long): Block {
+            val raw = bytes(input, 80)
             val header = BlockHeader.read(raw)
-            return Block(header, BtcSerializer.readCollection(input, Transaction, protocolVersion))
+            return Block(header, readCollection(input, Transaction, protocolVersion))
         }
 
         @JvmStatic
@@ -243,13 +231,14 @@ data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Trans
          * @param block
          * @return true if the input block validates its expected proof of work
          */
-        fun checkProofOfWork(block: Block): Boolean = BlockHeader.checkProofOfWork(block.header)
+        public fun checkProofOfWork(block: Block): Boolean = BlockHeader.checkProofOfWork(block.header)
 
         // genesis blocks
         @JvmField
-        val LivenetGenesisBlock = {
+        @OptIn(ExperimentalStdlibApi::class)
+        public val LivenetGenesisBlock: Block = {
             val script = listOf(
-                OP_PUSHDATA(BtcSerializer.writeUInt32(486604799L)),
+                OP_PUSHDATA(writeUInt32(486604799L)),
                 OP_PUSHDATA(ByteVector("04")),
                 OP_PUSHDATA("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks".encodeToByteArray())
             )
@@ -278,11 +267,11 @@ data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Trans
         }.invoke()
 
         @JvmField
-        val TestnetGenesisBlock =
+        public val TestnetGenesisBlock: Block =
             LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458))
 
         @JvmField
-        val RegtestGenesisBlock = LivenetGenesisBlock.copy(
+        public val RegtestGenesisBlock: Block = LivenetGenesisBlock.copy(
             header = LivenetGenesisBlock.header.copy(
                 bits = 0x207fffffL,
                 nonce = 2,
@@ -291,7 +280,7 @@ data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Trans
         )
 
         @JvmField
-        val SegnetGenesisBlock = LivenetGenesisBlock.copy(
+        public val SegnetGenesisBlock: Block = LivenetGenesisBlock.copy(
             header = LivenetGenesisBlock.header.copy(
                 bits = 503447551,
                 time = 1452831101,

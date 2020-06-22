@@ -20,8 +20,8 @@ import fr.acinq.bitcoin.crypto.Secp256k1
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
-data class PrivateKey(@JvmField val value: ByteVector32) {
-    constructor(data: ByteArray) : this(
+public data class PrivateKey(@JvmField val value: ByteVector32) {
+    public constructor(data: ByteArray) : this(
         when {
             data.size == 32 -> ByteVector32(data.copyOf())
             data.size == 33 && data.last() == 1.toByte() -> ByteVector32(data.copyOf(32))
@@ -29,9 +29,9 @@ data class PrivateKey(@JvmField val value: ByteVector32) {
         }
     )
 
-    constructor(data: ByteVector) : this(data.toByteArray())
+    public constructor(data: ByteVector) : this(data.toByteArray())
 
-    operator fun plus(that: PrivateKey): PrivateKey =
+    public operator fun plus(that: PrivateKey): PrivateKey =
         PrivateKey(
             Secp256k1.privateKeyAdd(
                 value.toByteArray(),
@@ -39,7 +39,7 @@ data class PrivateKey(@JvmField val value: ByteVector32) {
             )
         )
 
-    operator fun minus(that: PrivateKey): PrivateKey =
+    public operator fun minus(that: PrivateKey): PrivateKey =
         plus(
             PrivateKey(
                 Secp256k1.privateKeyNegate(
@@ -48,7 +48,7 @@ data class PrivateKey(@JvmField val value: ByteVector32) {
             )
         )
 
-    operator fun times(that: PrivateKey): PrivateKey =
+    public operator fun times(that: PrivateKey): PrivateKey =
         PrivateKey(
             Secp256k1.privateKeyMul(
                 value.toByteArray(),
@@ -56,17 +56,17 @@ data class PrivateKey(@JvmField val value: ByteVector32) {
             )
         )
 
-    fun publicKey(): PublicKey {
+    public fun publicKey(): PublicKey {
         val pub = Secp256k1.computePublicKey(value.toByteArray())
         return PublicKey(PublicKey.compress(pub)
         )
     }
 
-    fun toBase58(prefix: Byte) = Base58Check.encode(prefix, value.toByteArray() + 1.toByte())
+    public fun toBase58(prefix: Byte): String = Base58Check.encode(prefix, value.toByteArray() + 1.toByte())
 
-    companion object {
+    public companion object {
         @JvmStatic
-        fun isCompressed(data: ByteArray): Boolean {
+        public fun isCompressed(data: ByteArray): Boolean {
             return when {
                 data.size == 32 -> false
                 data.size == 33 && data.last() == 1.toByte() -> true
@@ -75,7 +75,7 @@ data class PrivateKey(@JvmField val value: ByteVector32) {
         }
 
         @JvmStatic
-        fun fromBase58(value: String, prefix: Byte): Pair<PrivateKey, Boolean> {
+        public fun fromBase58(value: String, prefix: Byte): Pair<PrivateKey, Boolean> {
             require(setOf(Base58.Prefix.SecretKey, Base58.Prefix.SecretKeyTestnet, Base58.Prefix.SecretKeySegnet).contains(prefix)) { "invalid base 58 prefix for a private key" }
             val (prefix1, data) = Base58Check.decode(value)
             require(prefix1 == prefix) { "prefix $prefix1 does not match expected prefix $prefix" }
@@ -86,6 +86,6 @@ data class PrivateKey(@JvmField val value: ByteVector32) {
         }
 
         @JvmStatic
-        fun fromHex(hex: String) = PrivateKey(Hex.decode(hex))
+        public fun fromHex(hex: String): PrivateKey = PrivateKey(Hex.decode(hex))
     }
 }

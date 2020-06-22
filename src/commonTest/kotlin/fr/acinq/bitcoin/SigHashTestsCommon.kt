@@ -18,13 +18,9 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.SigHash.SIGHASH_ALL
 import fr.acinq.bitcoin.SigHash.SIGHASH_ANYONECANPAY
-import kotlinx.serialization.InternalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertFails
 
-@ExperimentalUnsignedTypes
-@ExperimentalStdlibApi
-@InternalSerializationApi
 class SighashSpec {
     fun MilliBtc(value: Long) = Satoshi(value * 100000)
 

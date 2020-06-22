@@ -16,27 +16,27 @@
 
 package fr.acinq.bitcoin.crypto
 
-interface Digest {
+public interface Digest {
     /**
      * return the algorithm name
      *
      * @return the algorithm name
      */
-    fun getAlgorithmName(): String
+    public fun getAlgorithmName(): String
 
     /**
      * return the size, in bytes, of the digest produced by this message digest.
      *
      * @return the size, in bytes, of the digest produced by this message digest.
      */
-    fun getDigestSize(): Int
+    public fun getDigestSize(): Int
 
     /**
      * update the message digest with a single byte.
      *
      * @param `in` the input byte to be entered.
      */
-    fun update(input: Byte)
+    public fun update(input: Byte)
 
     /**
      * update the message digest with a block of bytes.
@@ -45,7 +45,7 @@ interface Digest {
      * @param inputOffset the offset into the byte array where the data starts.
      * @param len the length of the data.
      */
-    fun update(input: ByteArray, inputOffset: Int, len: Int)
+    public fun update(input: ByteArray, inputOffset: Int, len: Int)
 
     /**
      * close the digest, producing the final digest value. The doFinal
@@ -54,14 +54,14 @@ interface Digest {
      * @param out the array the digest is to be copied into.
      * @param outOffset the offset into the out array the digest is to start at.
      */
-    fun doFinal(out: ByteArray, outOffset: Int): Int
+    public fun doFinal(out: ByteArray, outOffset: Int): Int
 
     /**
      * reset the digest back to it's initial state.
      */
-    fun reset()
+    public fun reset()
 
-    fun hash(input: ByteArray, inputOffset: Int, len: Int): ByteArray {
+    public fun hash(input: ByteArray, inputOffset: Int, len: Int): ByteArray {
         reset()
         update(input, inputOffset, len)
         val output = ByteArray(getDigestSize())
@@ -69,5 +69,5 @@ interface Digest {
         return output
     }
 
-    fun hash(input: ByteArray) = hash(input, 0, input.size)
+    public fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
 }

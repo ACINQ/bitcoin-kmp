@@ -25,7 +25,6 @@ import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 
-@ExperimentalStdlibApi
 class MnemonicCodeTestsJvm {
     val mapper = jacksonObjectMapper()
 

@@ -22,8 +22,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-@ExperimentalUnsignedTypes
-@ExperimentalStdlibApi
+@OptIn(ExperimentalStdlibApi::class)
 class CryptoTestsCommon {
     @Test
     fun `import private keys`() {
@@ -149,4 +148,17 @@ class CryptoTestsCommon {
         assertEquals("56bc84cffc7db1ca04046fc04ec8f84232c340be789bc4779d221fe8b978af06", Hex.encode(shared))
     }
 
+    @Test
+    fun `DER encoding compatibility tests`() {
+        val sig = ByteVector64(ByteArray(64) { 0xaa.toByte() })
+        val der = Crypto.compact2der(sig)
+        assertEquals(der.size(), 71)
+    }
+
+    @Test
+    fun `DER decoding compatibility tests`() {
+        val der = Hex.decode("3045022100b50cbdd83b17b722b0e1f58e21cf3789ab18b36648023ed3811b522342ddaa9e02207182673961b7a10bfa94fe89780da0d03bfe1de137e0be32cc47a51edcaf08f301")
+        val sig = Crypto.der2compact(der)
+        assertEquals(sig, ByteVector64("b50cbdd83b17b722b0e1f58e21cf3789ab18b36648023ed3811b522342ddaa9e7182673961b7a10bfa94fe89780da0d03bfe1de137e0be32cc47a51edcaf08f3"))
+    }
 }

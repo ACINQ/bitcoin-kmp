@@ -17,27 +17,19 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Secp256k1
-import kotlinx.io.ByteArrayInputStream
-import kotlinx.io.ByteArrayOutputStream
-import kotlinx.io.InputStream
-import kotlinx.io.OutputStream
-import kotlinx.serialization.InternalSerializationApi
+import fr.acinq.bitcoin.io.*
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
-@ExperimentalStdlibApi
-@InternalSerializationApi
-typealias RunnerCallback = (List<ScriptElt>, List<ByteVector>, Script.Runner.Companion.State) -> Boolean
+public typealias RunnerCallback = (List<ScriptElt>, List<ByteVector>, Script.Runner.Companion.State) -> Boolean
 
-@InternalSerializationApi
-@ExperimentalStdlibApi
-object Script {
-    const val MaxScriptElementSize = 520
-    val True = ByteVector("01")
-    val False = ByteVector.empty
+public object Script {
+    public const val MaxScriptElementSize: Int = 520
+    public val True: ByteVector = ByteVector("01")
+    public val False: ByteVector = ByteVector.empty
 
     @JvmField
-    val LockTimeThreshold = 500000000L
+    public val LockTimeThreshold: Long = 500000000L
 
     /**
      * parse a script from a input stream of binary data
@@ -46,7 +38,7 @@ object Script {
      * @param stack initial command stack
      * @return an updated command stack
      */
-    tailrec fun parse(input: InputStream, stack: List<ScriptElt> = listOf()): List<ScriptElt> {
+    public tailrec fun parse(input: Input, stack: List<ScriptElt> = listOf()): List<ScriptElt> {
         val code = input.read()
         return when {
             code == -1 -> stack
@@ -73,18 +65,18 @@ object Script {
     }
 
     @JvmStatic
-    fun parse(blob: ByteArray): List<ScriptElt> =
+    public fun parse(blob: ByteArray): List<ScriptElt> =
         if (blob.size > 10000) throw RuntimeException("script is too large") else parse(
-            ByteArrayInputStream(blob)
+            ByteArrayInput(blob)
         )
 
     @JvmStatic
-    fun parse(blob: ByteVector): List<ScriptElt> = parse(blob.toByteArray())
+    public fun parse(blob: ByteVector): List<ScriptElt> = parse(blob.toByteArray())
 
     @JvmStatic
-    fun parse(hex: String): List<ScriptElt> = parse(Hex.decode(hex))
+    public fun parse(hex: String): List<ScriptElt> = parse(Hex.decode(hex))
 
-    tailrec fun write(script: List<ScriptElt>, out: OutputStream): Unit {
+    public tailrec fun write(script: List<ScriptElt>, out: Output): Unit {
         if (script.isEmpty()) return
         else {
             val head = script.first()
@@ -120,46 +112,46 @@ object Script {
     }
 
     @JvmStatic
-    fun write(script: List<ScriptElt>): ByteArray {
-        val out = ByteArrayOutputStream()
+    public fun write(script: List<ScriptElt>): ByteArray {
+        val out = ByteArrayOutput()
         write(script, out)
         return out.toByteArray()
     }
 
     @JvmStatic
-    fun isUpgradableNop(op: ScriptElt) = when (op) {
+    public fun isUpgradableNop(op: ScriptElt): Boolean = when (op) {
         OP_NOP1, OP_NOP4, OP_NOP5, OP_NOP6, OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10 -> true
         else -> false
     }
 
     @JvmStatic
-    fun isSimpleValue(op: ScriptElt) = when (op) {
+    public fun isSimpleValue(op: ScriptElt): Boolean = when (op) {
         OP_1NEGATE, OP_0, OP_1, OP_2, OP_3, OP_4, OP_5, OP_6, OP_7, OP_8, OP_9, OP_10, OP_11, OP_12, OP_13, OP_14, OP_15, OP_16 -> true
         else -> false
     }
 
     @JvmStatic
-    fun simpleValue(op: ScriptElt): Byte {
+    public fun simpleValue(op: ScriptElt): Byte {
         require(isSimpleValue(op)) {}
         val value = if (op == OP_0) 0 else (ScriptEltMapping.elt2code.getValue(op) - 0x50)
         return value.toByte()
     }
 
     @JvmStatic
-    fun fromSimpleValue(value: Byte): ScriptElt = when (value.toInt()) {
+    public fun fromSimpleValue(value: Byte): ScriptElt = when (value.toInt()) {
         0 -> OP_0
         in -1..16 -> ScriptEltMapping.code2elt.getValue(value + 0x50)
         else -> throw IllegalArgumentException("cannot convert $value to a simple value operator")
     }
 
     @JvmStatic
-    fun isDisabled(op: ScriptElt) = when (op) {
+    public fun isDisabled(op: ScriptElt): Boolean = when (op) {
         OP_CAT, OP_SUBSTR, OP_LEFT, OP_RIGHT, OP_INVERT, OP_AND, OP_OR, OP_XOR, OP_2MUL, OP_2DIV, OP_MUL, OP_MUL, OP_DIV, OP_MOD, OP_LSHIFT, OP_RSHIFT -> true
         else -> false
     }
 
     @JvmStatic
-    fun cost(op: ScriptElt): Int = when {
+    public fun cost(op: ScriptElt): Int = when {
         isSimpleValue(op) -> 0
         op is OP_PUSHDATA -> 0
         op == OP_RESERVED -> 0
@@ -167,7 +159,7 @@ object Script {
     }
 
     @JvmStatic
-    fun encodeNumber(value: Long): ByteVector {
+    public fun encodeNumber(value: Long): ByteVector {
         if (value == 0L) return ByteVector.empty
         else {
             val result = arrayListOf<Byte>()
@@ -199,10 +191,10 @@ object Script {
     }
 
     @JvmStatic
-    fun encodeNumber(value: Int) = encodeNumber(value.toLong())
+    public fun encodeNumber(value: Int): ByteVector = encodeNumber(value.toLong())
 
     @JvmStatic
-    fun decodeNumber(input: ByteArray, checkMinimalEncoding: Boolean, maximumSize: Int = 4): Long {
+    public fun decodeNumber(input: ByteArray, checkMinimalEncoding: Boolean, maximumSize: Int = 4): Long {
         if (input.isEmpty()) return 0
         else if (input.size > maximumSize) throw RuntimeException("number cannot be encoded on more than $maximumSize bytes")
         else {
@@ -239,10 +231,10 @@ object Script {
     }
 
     @JvmStatic
-    fun decodeNumber(input: ByteVector, checkMinimalEncoding: Boolean, maximumSize: Int = 4): Long =
+    public fun decodeNumber(input: ByteVector, checkMinimalEncoding: Boolean, maximumSize: Int = 4): Long =
         decodeNumber(input.toByteArray(), checkMinimalEncoding, maximumSize)
 
-    fun castToBoolean(input: List<Byte>): Boolean {
+    public fun castToBoolean(input: List<Byte>): Boolean {
         return if (input.isEmpty()) false
         else {
             val input1 = input.reversed()
@@ -254,12 +246,12 @@ object Script {
         }
     }
 
-    fun castToBoolean(input: ByteArray): Boolean = castToBoolean(input.asList())
+    public fun castToBoolean(input: ByteArray): Boolean = castToBoolean(input.asList())
 
-    fun castToBoolean(input: ByteVector): Boolean = castToBoolean(input.toByteArray())
+    public fun castToBoolean(input: ByteVector): Boolean = castToBoolean(input.toByteArray())
 
     @JvmStatic
-    fun isPushOnly(script: List<ScriptElt>): Boolean = !script.any {
+    public fun isPushOnly(script: List<ScriptElt>): Boolean = !script.any {
         when {
             isSimpleValue(it) -> false
             it is OP_PUSHDATA -> false
@@ -268,7 +260,7 @@ object Script {
     }
 
     @JvmStatic
-    fun isPayToScript(script: ByteArray): Boolean =
+    public fun isPayToScript(script: ByteArray): Boolean =
         script.size == 23 && script[0] == ScriptEltMapping.elt2code.getValue(OP_HASH160)
             .toByte() && script[1] == 0x14.toByte() && script[22] == ScriptEltMapping.elt2code.getValue(OP_EQUAL)
             .toByte()
@@ -282,7 +274,7 @@ object Script {
      * @return a multisig redeem script
      */
     @JvmStatic
-    fun createMultiSigMofN(m: Int, pubkeys: List<PublicKey>): List<ScriptElt> {
+    public fun createMultiSigMofN(m: Int, pubkeys: List<PublicKey>): List<ScriptElt> {
         require(m in 1..16) { "number of required signatures is $m, should be between 1 and 16" }
         require(pubkeys.count() in 1..16) { "number of public keys is ${pubkeys.size}, should be between 1 and 16" }
         require(m <= pubkeys.count()) { "The required number of signatures shouldn't be greater than the number of public keys" }
@@ -298,13 +290,13 @@ object Script {
      * @return a pay-to-public-key-hash script
      */
     @JvmStatic
-    fun pay2pkh(pubKeyHash: ByteArray): List<ScriptElt> {
+    public fun pay2pkh(pubKeyHash: ByteArray): List<ScriptElt> {
         require(pubKeyHash.size == 20) { "pubkey hash length must be 20 bytes" }
         return listOf(OP_DUP, OP_HASH160, OP_PUSHDATA(pubKeyHash), OP_EQUALVERIFY, OP_CHECKSIG)
     }
 
     @JvmStatic
-    fun isPay2pkh(script: List<ScriptElt>): Boolean {
+    public fun isPay2pkh(script: List<ScriptElt>): Boolean {
         return when {
             script.size == 5 && script[0] == OP_DUP && script[1] == OP_HASH160 && script[2].isPush(20) && script[3] == OP_EQUALVERIFY && script[4] == OP_CHECKSIG -> true
             else -> false
@@ -312,10 +304,10 @@ object Script {
     }
 
     @JvmStatic
-    fun isPay2pkh(script: ByteArray): Boolean = isPay2pkh(Script.parse(script))
+    public fun isPay2pkh(script: ByteArray): Boolean = isPay2pkh(Script.parse(script))
 
     @JvmStatic
-    fun isPay2sh(script: List<ScriptElt>): Boolean {
+    public fun isPay2sh(script: List<ScriptElt>): Boolean {
         return when {
             script.size == 3 && script[0] == OP_HASH160 && script[1].isPush(20) && script[2] == OP_EQUAL -> true
             else -> false
@@ -323,10 +315,10 @@ object Script {
     }
 
     @JvmStatic
-    fun isPay2sh(script: ByteArray): Boolean = isPay2sh(Script.parse(script))
+    public fun isPay2sh(script: ByteArray): Boolean = isPay2sh(Script.parse(script))
 
     @JvmStatic
-    fun isPay2wpkh(script: List<ScriptElt>): Boolean {
+    public fun isPay2wpkh(script: List<ScriptElt>): Boolean {
         return when {
             script.size == 2 && script[0] == OP_0 && script[1].isPush(20) -> true
             else -> false
@@ -334,10 +326,10 @@ object Script {
     }
 
     @JvmStatic
-    fun isPay2wpkh(script: ByteArray): Boolean = isPay2wpkh(Script.parse(script))
+    public fun isPay2wpkh(script: ByteArray): Boolean = isPay2wpkh(Script.parse(script))
 
     @JvmStatic
-    fun isPay2wsh(script: List<ScriptElt>): Boolean {
+    public fun isPay2wsh(script: List<ScriptElt>): Boolean {
         return when {
             script.size == 2 && script[0] == OP_0 && script[1].isPush(32) -> true
             else -> false
@@ -345,7 +337,7 @@ object Script {
     }
 
     @JvmStatic
-    fun isPay2wsh(script: ByteArray): Boolean = isPay2wsh(Script.parse(script))
+    public fun isPay2wsh(script: ByteArray): Boolean = isPay2wsh(Script.parse(script))
 
     /**
      *
@@ -353,7 +345,7 @@ object Script {
      * @return a pay-to-public-key-hash script
      */
     @JvmStatic
-    fun pay2pkh(pubKey: PublicKey): List<ScriptElt> = pay2pkh(pubKey.hash160())
+    public fun pay2pkh(pubKey: PublicKey): List<ScriptElt> = pay2pkh(pubKey.hash160())
 
     /**
      *
@@ -361,7 +353,7 @@ object Script {
      * @return a pay-to-script script
      */
     @JvmStatic
-    fun pay2sh(script: List<ScriptElt>): List<ScriptElt> = pay2sh(Script.write(script))
+    public fun pay2sh(script: List<ScriptElt>): List<ScriptElt> = pay2sh(Script.write(script))
 
     /**
      *
@@ -369,7 +361,7 @@ object Script {
      * @return a pay-to-script script
      */
     @JvmStatic
-    fun pay2sh(script: ByteArray): List<ScriptElt> = listOf(OP_HASH160, OP_PUSHDATA(Crypto.hash160(script)), OP_EQUAL)
+    public fun pay2sh(script: ByteArray): List<ScriptElt> = listOf(OP_HASH160, OP_PUSHDATA(Crypto.hash160(script)), OP_EQUAL)
 
     /**
      *
@@ -377,7 +369,7 @@ object Script {
      * @return a pay-to-witness-script script
      */
     @JvmStatic
-    fun pay2wsh(script: List<ScriptElt>): List<ScriptElt> = pay2wsh(Script.write(script))
+    public fun pay2wsh(script: List<ScriptElt>): List<ScriptElt> = pay2wsh(Script.write(script))
 
     /**
      *
@@ -385,7 +377,7 @@ object Script {
      * @return a pay-to-witness-script script
      */
     @JvmStatic
-    fun pay2wsh(script: ByteArray): List<ScriptElt> = listOf(OP_0, OP_PUSHDATA(Crypto.sha256(script)))
+    public fun pay2wsh(script: ByteArray): List<ScriptElt> = listOf(OP_0, OP_PUSHDATA(Crypto.sha256(script)))
 
     /**
      *
@@ -393,7 +385,7 @@ object Script {
      * @return a pay-to-witness-script script
      */
     @JvmStatic
-    fun pay2wsh(script: ByteVector): List<ScriptElt> = pay2wsh(script.toByteArray())
+    public fun pay2wsh(script: ByteVector): List<ScriptElt> = pay2wsh(script.toByteArray())
 
     /**
      *
@@ -401,7 +393,7 @@ object Script {
      * @return a pay-to-witness-public-key-hash script
      */
     @JvmStatic
-    fun pay2wpkh(pubKeyHash: ByteArray): List<ScriptElt> {
+    public fun pay2wpkh(pubKeyHash: ByteArray): List<ScriptElt> {
         require(pubKeyHash.size == 20) { "pubkey hash length must be 20 bytes" }
         return listOf(OP_0, OP_PUSHDATA(pubKeyHash))
     }
@@ -412,17 +404,17 @@ object Script {
      * @return a pay-to-witness-public-key-hash script
      */
     @JvmStatic
-    fun pay2wpkh(pubKey: PublicKey): List<ScriptElt> = pay2wpkh(pubKey.hash160())
+    public fun pay2wpkh(pubKey: PublicKey): List<ScriptElt> = pay2wpkh(pubKey.hash160())
 
-    fun removeSignature(script: List<ScriptElt>, signature: ByteVector): List<ScriptElt> {
+    public fun removeSignature(script: List<ScriptElt>, signature: ByteVector): List<ScriptElt> {
         val toRemove = OP_PUSHDATA(signature)
         return script.filterNot { it == toRemove }
     }
 
-    fun removeSignatures(script: List<ScriptElt>, sigs: List<ByteVector>): List<ScriptElt> =
+    public fun removeSignatures(script: List<ScriptElt>, sigs: List<ByteVector>): List<ScriptElt> =
         sigs.fold(script, Script::removeSignature)
 
-    fun checkLockTime(lockTime: Long, tx: Transaction, inputIndex: Int): Boolean {
+    public fun checkLockTime(lockTime: Long, tx: Transaction, inputIndex: Int): Boolean {
         // There are two kinds of nLockTime: lock-by-blockheight
         // and lock-by-blocktime, distinguished by whether
         // nLockTime < LOCKTIME_THRESHOLD.
@@ -458,7 +450,7 @@ object Script {
         return true
     }
 
-    fun checkSequence(sequence: Long, tx: Transaction, inputIndex: Int): Boolean {
+    public fun checkSequence(sequence: Long, tx: Transaction, inputIndex: Int): Boolean {
         // Relative lock times are supported by comparing the passed
         // in operand to the sequence number of the input.
         val txToSequence = tx.txIn.elementAt(inputIndex).sequence
@@ -504,12 +496,12 @@ object Script {
         return true
     }
 
-    fun <T> List<T>.tail(): List<T> {
+    public fun <T> List<T>.tail(): List<T> {
         require(this.isNotEmpty()) { "tail of empty list" }
         return this.drop(1)
     }
 
-    fun <T> List<T>.dropCheck(n: Int): List<T> {
+    public fun <T> List<T>.dropCheck(n: Int): List<T> {
         require(this.size >= n) { "cannot drop $n elements on a list of $size elements" }
         return this.drop(n)
     }
@@ -521,18 +513,18 @@ object Script {
      * @param tx         transaction that is being verified
      * @param inputIndex 0-based index of the tx input that is being processed
      */
-    data class Context(val tx: Transaction, val inputIndex: Int, val amount: Satoshi) {
+    public data class Context(val tx: Transaction, val inputIndex: Int, val amount: Satoshi) {
         init {
             require(inputIndex >= 0 && inputIndex < tx.txIn.count()) { "invalid input index" }
         }
     }
 
-    class Runner(
-        val context: Script.Context,
-        val scriptFlag: Int = ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS,
-        val callback: RunnerCallback? = null
+    public class Runner(
+        public val context: Script.Context,
+        public val scriptFlag: Int = ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS,
+        public val callback: RunnerCallback? = null
     ) {
-        companion object {
+        public companion object {
             /**
              * This class represents the state of the script execution engine
              *
@@ -541,7 +533,7 @@ object Script {
              * @param opCount    initial op count
              * @param scriptCode initial script (can be modified by OP_CODESEPARATOR for example)
              */
-            data class State(
+            public data class State(
                 val conditions: List<Boolean>,
                 val altstack: List<ByteVector>,
                 val opCount: Int,
@@ -556,7 +548,7 @@ object Script {
          * @param signatureVersion version (legacy or segwit)
          * @return true if the signature is valid
          */
-        fun checkSignature(
+        public fun checkSignature(
             pubKey: ByteArray,
             sigBytes: ByteArray,
             scriptCode: ByteArray,
@@ -594,7 +586,7 @@ object Script {
             return check
         }
 
-        fun checkSignature(
+        public fun checkSignature(
             pubKey: ByteVector,
             sigBytes: ByteVector,
             scriptCode: ByteVector,
@@ -602,7 +594,7 @@ object Script {
         ): Boolean =
             checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), scriptCode.toByteArray(), signatureVersion)
 
-        tailrec fun checkSignatures(
+        public tailrec fun checkSignatures(
             pubKeys: List<ByteVector>,
             sigs: List<ByteVector>,
             scriptCode: ByteVector,
@@ -624,32 +616,27 @@ object Script {
             }
         }
 
-        fun checkMinimalEncoding(): Boolean = (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALDATA) != 0
+        public fun checkMinimalEncoding(): Boolean = (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALDATA) != 0
 
-        fun decodeNumber(input: ByteVector, maximumSize: Int = 4): Long =
+        public fun decodeNumber(input: ByteVector, maximumSize: Int = 4): Long =
             decodeNumber(input.toByteArray(), checkMinimalEncoding(), maximumSize)
 
-        fun decodeNumber(input: ByteArray, maximumSize: Int = 4): Long =
+        public fun decodeNumber(input: ByteArray, maximumSize: Int = 4): Long =
             decodeNumber(input, checkMinimalEncoding(), maximumSize)
 
-        @ExperimentalUnsignedTypes
-        fun run(script: ByteArray, signatureVersion: Int): List<ByteVector> =
+        public fun run(script: ByteArray, signatureVersion: Int): List<ByteVector> =
             run(parse(script), listOf(), signatureVersion)
 
-        @ExperimentalUnsignedTypes
-        fun run(script: List<ScriptElt>, signatureVersion: Int): List<ByteVector> =
+        public fun run(script: List<ScriptElt>, signatureVersion: Int): List<ByteVector> =
             run(script, listOf(), signatureVersion)
 
-        @ExperimentalUnsignedTypes
-        fun run(script: ByteArray, stack: List<ByteVector>, signatureVersion: Int): List<ByteVector> =
+        public fun run(script: ByteArray, stack: List<ByteVector>, signatureVersion: Int): List<ByteVector> =
             run(parse(script), stack, signatureVersion)
 
-        @ExperimentalUnsignedTypes
-        fun run(script: ByteVector, stack: List<ByteVector>, signatureVersion: Int): List<ByteVector> =
+        public fun run(script: ByteVector, stack: List<ByteVector>, signatureVersion: Int): List<ByteVector> =
             run(script.toByteArray(), stack, signatureVersion)
 
-        @ExperimentalUnsignedTypes
-        fun run(script: List<ScriptElt>, stack: List<ByteVector>, signatureVersion: Int) =
+        public fun run(script: List<ScriptElt>, stack: List<ByteVector>, signatureVersion: Int): List<ByteVector> =
             run(
                 script,
                 stack,
@@ -662,8 +649,7 @@ object Script {
                 signatureVersion
             )
 
-        @ExperimentalUnsignedTypes
-        tailrec fun run(
+        public tailrec fun run(
             script: List<ScriptElt>,
             stack: List<ByteVector>,
             state: Runner.Companion.State = Runner.Companion.State(
@@ -1412,8 +1398,7 @@ object Script {
             }
         }
 
-        @ExperimentalUnsignedTypes
-        fun verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteArray): Unit {
+        public fun verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteArray): Unit {
             val (stack, scriptPubKey) = when {
                 witnessVersion == 0L && program.size == 20 -> {
                     // P2WPKH, program is simply the pubkey hash
@@ -1444,12 +1429,10 @@ object Script {
             require(castToBoolean(stack1.first()))
         }
 
-        @ExperimentalUnsignedTypes
-        fun verifyScripts(scriptSig: ByteArray, scriptPubKey: ByteArray): Boolean =
+        public fun verifyScripts(scriptSig: ByteArray, scriptPubKey: ByteArray): Boolean =
             verifyScripts(scriptSig, scriptPubKey, ScriptWitness.empty)
 
-        @ExperimentalUnsignedTypes
-        fun verifyScripts(scriptSig: ByteVector, scriptPubKey: ByteVector, witness: ScriptWitness): Boolean =
+        public fun verifyScripts(scriptSig: ByteVector, scriptPubKey: ByteVector, witness: ScriptWitness): Boolean =
             verifyScripts(scriptSig.toByteArray(), scriptPubKey.toByteArray(), witness)
 
         /**
@@ -1465,8 +1448,7 @@ object Script {
          * @param scriptPubKey public key script
          * @return true if the scripts were successfully verified
          */
-        @ExperimentalUnsignedTypes
-        fun verifyScripts(scriptSig: ByteArray, scriptPubKey: ByteArray, witness: ScriptWitness): Boolean {
+        public fun verifyScripts(scriptSig: ByteArray, scriptPubKey: ByteArray, witness: ScriptWitness): Boolean {
             fun checkStack(stack: List<ByteVector>): Boolean {
                 return if (stack.isEmpty()) {
                     println("empty stask")

@@ -18,21 +18,21 @@ package fr.acinq.bitcoin.crypto
 
 import kotlin.experimental.xor
 
-object Pbkdf2 {
-    interface Prf {
-        fun outputLen(): Int
-        fun process(input: ByteArray): ByteArray
+public object Pbkdf2 {
+    public interface Prf {
+        public fun outputLen(): Int
+        public fun process(input: ByteArray): ByteArray
     }
 
-    class Hmac512(val password: ByteArray) : Prf {
-        val digest = Sha512()
+    public class Hmac512(public val password: ByteArray) : Prf {
+        public val digest: Sha512 = Sha512()
 
         override fun outputLen(): Int = 64
 
         override fun process(input: ByteArray): ByteArray = HMac.hmac(password, input, digest, 128)
     }
 
-    fun generate(salt: ByteArray, count: Int, dkLen: Int, prf: Prf): ByteArray {
+    public fun generate(salt: ByteArray, count: Int, dkLen: Int, prf: Prf): ByteArray {
         val hLen = prf.outputLen()
         val l = kotlin.math.ceil(dkLen.toFloat() / hLen).toInt()
         val r = dkLen - (l - 1) * hLen
@@ -46,7 +46,7 @@ object Pbkdf2 {
 
         fun f(index: Int): ByteArray {
             var u = prf.process(salt + Pack.writeUint32BE(index))
-            var output = u.copyOf()
+            val output = u.copyOf()
             for (i in 1 until count) {
                 u = prf.process(u)
                 xor(output, u)

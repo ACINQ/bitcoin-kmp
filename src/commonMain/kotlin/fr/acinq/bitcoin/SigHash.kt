@@ -16,20 +16,20 @@
 
 package fr.acinq.bitcoin
 
-object SigHash {
-    const val SIGHASH_ALL = 1
-    const val SIGHASH_NONE = 2
-    const val SIGHASH_SINGLE = 3
-    const val SIGHASH_ANYONECANPAY = 0x80
+public object SigHash {
+    public const val SIGHASH_ALL: Int = 1
+    public const val SIGHASH_NONE: Int = 2
+    public const val SIGHASH_SINGLE: Int = 3
+    public const val SIGHASH_ANYONECANPAY: Int = 0x80
 
-    fun isAnyoneCanPay(sighashType: Int): Boolean = (sighashType and SIGHASH_ANYONECANPAY) != 0
+    public fun isAnyoneCanPay(sighashType: Int): Boolean = (sighashType and SIGHASH_ANYONECANPAY) != 0
 
-    fun isHashSingle(sighashType: Int): Boolean = (sighashType and 0x1f) == SIGHASH_SINGLE
+    public fun isHashSingle(sighashType: Int): Boolean = (sighashType and 0x1f) == SIGHASH_SINGLE
 
-    fun isHashNone(sighashType: Int): Boolean = (sighashType and 0x1f) == SIGHASH_NONE
+    public fun isHashNone(sighashType: Int): Boolean = (sighashType and 0x1f) == SIGHASH_NONE
 }
 
-object SigVersion {
-    const val SIGVERSION_BASE = 0
-    const val SIGVERSION_WITNESS_V0 = 1
+public object SigVersion {
+    public const val SIGVERSION_BASE: Int = 0
+    public const val SIGVERSION_WITNESS_V0: Int = 1
 }

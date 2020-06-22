@@ -20,10 +20,10 @@ import fr.acinq.bitcoin.crypto.Secp256k1
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
-data class PublicKey(@JvmField val value: ByteVector) {
-    constructor(data: ByteArray) : this(ByteVector(data))
+public data class PublicKey(@JvmField val value: ByteVector) {
+    public constructor(data: ByteArray) : this(ByteVector(data))
 
-    operator fun plus(that: PublicKey): PublicKey {
+    public operator fun plus(that: PublicKey): PublicKey {
         val pub = Secp256k1.publicKeyAdd(
             value.toByteArray(),
             that.value.toByteArray()
@@ -32,7 +32,7 @@ data class PublicKey(@JvmField val value: ByteVector) {
         )
     }
 
-    operator fun times(that: PrivateKey): PublicKey {
+    public operator fun times(that: PrivateKey): PublicKey {
         val pub = Secp256k1.publicKeyMul(
             value.toByteArray(),
             that.value.toByteArray()
@@ -45,11 +45,11 @@ data class PublicKey(@JvmField val value: ByteVector) {
      * @return the hash160 of the binary representation of this point. This can be used to generated addresses (the address
      *         of a public key is he base58 encoding of its hash)
      */
-    fun hash160(): ByteArray = Crypto.hash160(value.toByteArray())
+    public fun hash160(): ByteArray = Crypto.hash160(value.toByteArray())
 
-    override fun toString() = value.toString()
+    override fun toString(): String = value.toString()
 
-    fun toUncompressedBin(): ByteArray {
+    public fun toUncompressedBin(): ByteArray {
         return Secp256k1.parsePublicKey(value.toByteArray())
     }
 
@@ -57,12 +57,12 @@ data class PublicKey(@JvmField val value: ByteVector) {
         require(Crypto.isPubKeyValid(value.toByteArray()))
     }
 
-    companion object {
+    public companion object {
         @JvmField
-        val Generator = PublicKey(Hex.decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"))
+        public val Generator: PublicKey = PublicKey(Hex.decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"))
 
         @JvmStatic
-        fun compress(pub: ByteArray): ByteArray {
+        public fun compress(pub: ByteArray): ByteArray {
             return if (Crypto.isPubKeyCompressed(pub)) pub else {
                 val pub1 = pub.copyOf(33)
                 pub1[0] = if (pub.last() % 2 == 0) 2.toByte() else 3.toByte()
@@ -71,6 +71,6 @@ data class PublicKey(@JvmField val value: ByteVector) {
         }
 
         @JvmStatic
-        fun fromHex(hex: String) = PublicKey(Hex.decode(hex))
+        public fun fromHex(hex: String): PublicKey = PublicKey(Hex.decode(hex))
     }
 }

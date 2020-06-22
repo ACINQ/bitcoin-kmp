@@ -21,19 +21,19 @@ import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 
-@ExperimentalUnsignedTypes
-class UInt256() : Comparable<UInt256> {
+@OptIn(ExperimentalUnsignedTypes::class)
+public class UInt256() : Comparable<UInt256> {
     private val pn = UIntArray(WIDTH)
 
-    constructor(rhs: UInt256) : this() {
+    public constructor(rhs: UInt256) : this() {
         rhs.pn.copyInto(pn, 0)
     }
 
-    constructor(value: Long) : this() {
+    public constructor(value: Long) : this() {
         setUInt64(value)
     }
 
-    constructor(value: ByteArray) : this() {
+    public constructor(value: ByteArray) : this() {
         require(value.size <= 32)
         val reversed = value.reversedArray() + ByteArray(32 - value.size)
         for (i in 0 until WIDTH) {
@@ -41,7 +41,7 @@ class UInt256() : Comparable<UInt256> {
         }
     }
 
-    fun setUInt64(value: Long) {
+    public fun setUInt64(value: Long) {
         pn[0] = (value and 0xffffffff).toUInt()
         pn[1] = (value.ushr(32) and 0xffffffff).toUInt()
         for (i in 2 until WIDTH) {
@@ -57,13 +57,13 @@ class UInt256() : Comparable<UInt256> {
         return 0
     }
 
-    operator fun inc(): UInt256 {
+    public operator fun inc(): UInt256 {
         var i = 0
-        while (i < WIDTH && ++pn[i] == 0U) i++;
-        return this;
+        while (i < WIDTH && ++pn[i] == 0U) i++
+        return this
     }
 
-    operator fun unaryMinus(): UInt256 {
+    public operator fun unaryMinus(): UInt256 {
         val a = UInt256(this)
         for (i in a.pn.indices) {
             a.pn[i] = a.pn[i].inv()
@@ -71,22 +71,22 @@ class UInt256() : Comparable<UInt256> {
         return a.inc()
     }
 
-    operator fun plusAssign(other: UInt256) {
+    public operator fun plusAssign(other: UInt256) {
         var carry = 0L
         for (i in 0 until WIDTH) {
-            val n = carry + pn[i].toLong() + other.pn[i].toLong();
+            val n = carry + pn[i].toLong() + other.pn[i].toLong()
             pn[i] = (n and 0xffffffffL).toUInt()
             carry = n ushr 32
         }
     }
 
-    operator fun minusAssign(other: UInt256) {
+    public operator fun minusAssign(other: UInt256) {
         plusAssign(-other)
     }
 
-    operator fun divAssign(other: UInt256) {
+    public operator fun divAssign(other: UInt256) {
         var div = other
-        var num = UInt256(this)
+        val num = UInt256(this)
         for (i in pn.indices) pn[i] = 0U
         val num_bits = num.bits()
         val div_bits = div.bits()
@@ -96,7 +96,7 @@ class UInt256() : Comparable<UInt256> {
         div = div shl shift
         while (shift >= 0) {
             if (num >= div) {
-                num -= div;
+                num -= div
                 pn[shift / 32] = pn[shift / 32] or (1U shl (shift and 31)) // set a bit of the result.
             }
             div = div shr 1 // shift back.
@@ -104,8 +104,8 @@ class UInt256() : Comparable<UInt256> {
         }
     }
 
-    operator fun timesAssign(other: UInt256) {
-        var a = UInt256()
+    public operator fun timesAssign(other: UInt256) {
+        val a = UInt256()
         for (j in 0 until WIDTH) {
             var carry = 0UL
             var i = 0
@@ -119,7 +119,7 @@ class UInt256() : Comparable<UInt256> {
         a.pn.copyInto(pn, 0)
     }
 
-    infix fun shl(bitCount: Int): UInt256 {
+    public infix fun shl(bitCount: Int): UInt256 {
         val a = UInt256()
         val k = bitCount / 32
         val shift = bitCount % 32
@@ -132,20 +132,20 @@ class UInt256() : Comparable<UInt256> {
         return a
     }
 
-    infix fun shr(bitCount: Int): UInt256 {
+    public infix fun shr(bitCount: Int): UInt256 {
         val a = UInt256()
         val k = bitCount / 32
         val shift = bitCount % 32
         for (i in 0 until WIDTH) {
             if (i - k - 1 >= 0 && shift != 0)
-                a.pn[i - k - 1] = a.pn[i - k - 1] or (pn[i] shl (32 - shift));
+                a.pn[i - k - 1] = a.pn[i - k - 1] or (pn[i] shl (32 - shift))
             if (i - k >= 0)
                 a.pn[i - k] = a.pn[i - k] or (pn[i] shr shift)
         }
         return a
     }
 
-    fun inv(): UInt256 {
+    public fun inv(): UInt256 {
         val a = UInt256(this)
         for (i in a.pn.indices) {
             a.pn[i] = a.pn[i].inv()
@@ -153,54 +153,54 @@ class UInt256() : Comparable<UInt256> {
         return a
     }
 
-    fun bits(): Int {
+    public fun bits(): Int {
         for (pos in WIDTH - 1 downTo 0) {
             if (pn[pos] != 0U) {
                 for (nbits in 31 downTo 0) {
                     if ((pn[pos] and 1U.shl(nbits)) != 0U)
-                        return 32 * pos + nbits + 1;
+                        return 32 * pos + nbits + 1
                 }
-                return 32 * pos + 1;
+                return 32 * pos + 1
             }
         }
-        return 0;
+        return 0
     }
 
-    fun getLow64(): Long = pn[0].toLong() or (pn[1].toLong().shl(32))
+    public fun getLow64(): Long = pn[0].toLong() or (pn[1].toLong().shl(32))
 
-    fun endodeCompact(fNegative: Boolean): Long {
-        var nSize = (bits() + 7) / 8;
-        var nCompact: Long;
+    public fun endodeCompact(fNegative: Boolean): Long {
+        var nSize = (bits() + 7) / 8
+        var nCompact: Long
         if (nSize <= 3) {
-            nCompact = getLow64() shl 8 * (3 - nSize);
+            nCompact = getLow64() shl 8 * (3 - nSize)
         } else {
-            val bn = UInt256(this) shr 8 * (nSize - 3);
-            nCompact = bn.getLow64();
+            val bn = UInt256(this) shr 8 * (nSize - 3)
+            nCompact = bn.getLow64()
         }
         // The 0x00800000 bit denotes the sign.
         // Thus, if it is already set, divide the mantissa by 256 and increase the exponent.
         if ((nCompact and 0x00800000L) != 0L) {
-            nCompact = nCompact ushr 8;
-            nSize++;
+            nCompact = nCompact ushr 8
+            nSize++
         }
-        require((nCompact and 0x007fffffL.inv()) == 0L);
-        require(nSize < 256);
-        nCompact = nCompact or (nSize.toLong() shl 24);
+        require((nCompact and 0x007fffffL.inv()) == 0L)
+        require(nSize < 256)
+        nCompact = nCompact or (nSize.toLong() shl 24)
         if (fNegative && (nCompact and 0x007fffffL.inv() != 0L)) {
             nCompact = nCompact or 0x00800000
         }
-        return nCompact;
+        return nCompact
 
     }
 
-    fun toDouble(): Double {
-        var ret: Double = 0.0
-        var fact: Double = 1.0
+    public fun toDouble(): Double {
+        var ret = 0.0
+        var fact = 1.0
         for (i in 0 until WIDTH) {
             ret += fact * pn[i].toDouble()
             fact *= 4294967296.0
         }
-        return ret;
+        return ret
     }
 
     override fun toString(): String {
@@ -226,29 +226,29 @@ class UInt256() : Comparable<UInt256> {
         return pn.contentHashCode()
     }
 
-    companion object {
+    public companion object {
         private const val WIDTH = 8
 
         @JvmField
-        val Zero = UInt256()
+        public val Zero: UInt256 = UInt256()
 
         @JvmStatic
-        fun decodeCompact(nCompact: Long): Triple<UInt256, Boolean, Boolean> {
-            val nSize = (nCompact ushr 24).toInt();
-            var nWord = nCompact and 0x007fffff;
+        public fun decodeCompact(nCompact: Long): Triple<UInt256, Boolean, Boolean> {
+            val nSize = (nCompact ushr 24).toInt()
+            var nWord = nCompact and 0x007fffff
             var result = UInt256()
             if (nSize <= 3) {
-                nWord = nWord ushr (8 * (3 - nSize));
-                result.setUInt64(nWord);
+                nWord = nWord ushr (8 * (3 - nSize))
+                result.setUInt64(nWord)
             } else {
-                result.setUInt64(nWord);
-                result = result.shl(8 * (nSize - 3));
+                result.setUInt64(nWord)
+                result = result.shl(8 * (nSize - 3))
             }
-            val pfNegative = nWord != 0L && (nCompact and 0x00800000L) != 0L;
+            val pfNegative = nWord != 0L && (nCompact and 0x00800000L) != 0L
             val pfOverflow = nWord != 0L && ((nSize > 34) ||
                     (nWord > 0xff && nSize > 33) ||
-                    (nWord > 0xffff && nSize > 32));
-            return Triple(result, pfNegative, pfOverflow);
+                    (nWord > 0xffff && nSize > 32))
+            return Triple(result, pfNegative, pfOverflow)
         }
     }
 }

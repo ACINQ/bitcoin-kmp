@@ -17,10 +17,11 @@
 package fr.acinq.bitcoin.crypto
 
 import fr.acinq.bitcoin.Hex
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-@ExperimentalStdlibApi
+@OptIn(ExperimentalStdlibApi::class)
 class Sha512TestsCommon {
     @Test
     fun `reference tests`() {
@@ -31,7 +32,7 @@ class Sha512TestsCommon {
         assertTrue { Sha512.hash(ByteArray(1000_000) { 0x61.toByte() }).contentEquals(Hex.decode("e718483d0ce769644e2e42c7bc15b4638e1f98b13b2044285632a803afa973ebde0ff244877ea60a4cb0432ce577c31beb009c5c2c49aa2e4eadb217ad8cc09b")) }
     }
 
-    @Test
+    @Test @Ignore
     fun `very long input`() {
         val sha512 = Sha512()
         val input = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno".encodeToByteArray()

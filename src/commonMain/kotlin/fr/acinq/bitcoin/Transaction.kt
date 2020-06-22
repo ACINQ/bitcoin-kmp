@@ -17,10 +17,9 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Protocol.PROTOCOL_VERSION
-import kotlinx.io.ByteArrayOutputStream
-import kotlinx.io.InputStream
-import kotlinx.io.OutputStream
-import kotlinx.serialization.InternalSerializationApi
+import fr.acinq.bitcoin.io.ByteArrayOutput
+import fr.acinq.bitcoin.io.Input
+import fr.acinq.bitcoin.io.Output
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -30,12 +29,10 @@ import kotlin.jvm.JvmStatic
  * @param hash  reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
  * @param index index of the output in tx that we want to refer to
  */
-@ExperimentalStdlibApi
-@InternalSerializationApi
-data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index: Long) : BtcSerializable<OutPoint> {
-    constructor(hash: ByteArray, index: Long) : this(hash.byteVector32(), index)
+public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index: Long) : BtcSerializable<OutPoint> {
+    public constructor(hash: ByteArray, index: Long) : this(hash.byteVector32(), index)
 
-    constructor(tx: Transaction, index: Long) : this(tx.hash, index)
+    public constructor(tx: Transaction, index: Long) : this(tx.hash, index)
 
     init {
         require(index >= -1)
@@ -46,23 +43,21 @@ data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index: Long)
      * @return the id of the transaction this output belongs to
      */
     @JvmField
-    val txid = hash.reversed()
+    public val txid: ByteVector32 = hash.reversed()
 
     @JvmField
-    val isCoinbase = OutPoint.isCoinbase(this)
+    public val isCoinbase: Boolean = isCoinbase(this)
 
-    @InternalSerializationApi
-    @ExperimentalStdlibApi
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
-    companion object : BtcSerializer<OutPoint>() {
-        override fun read(input: InputStream, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input))
+    public companion object : BtcSerializer<OutPoint>() {
+        override fun read(input: Input, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input))
 
         @JvmStatic
         override fun read(input: ByteArray): OutPoint {
             return super.read(input)
         }
 
-        override fun write(message: OutPoint, out: OutputStream, protocolVersion: Long) {
+        override fun write(message: OutPoint, out: Output, protocolVersion: Long) {
             out.write(message.hash.toByteArray())
             writeUInt32(message.index, out)
         }
@@ -72,39 +67,36 @@ data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index: Long)
             return super.write(message)
         }
 
-        fun isCoinbase(input: OutPoint) = input.index == 0xffffffffL && input.hash == ByteVector32.Zeroes
+        public fun isCoinbase(input: OutPoint): Boolean = input.index == 0xffffffffL && input.hash == ByteVector32.Zeroes
 
-        fun isNull(input: OutPoint) = isCoinbase(input)
+        public fun isNull(input: OutPoint): Boolean = isCoinbase(input)
     }
 
     override fun serializer(): BtcSerializer<OutPoint> = OutPoint
 }
 
-@ExperimentalStdlibApi
-@InternalSerializationApi
-data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSerializable<ScriptWitness> {
-    constructor() : this(listOf())
+public data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSerializable<ScriptWitness> {
+    public constructor() : this(listOf())
 
-    fun isNull() = stack.isEmpty()
+    public fun isNull(): Boolean = stack.isEmpty()
 
-    fun isNotNull() = !isNull()
+    public fun isNotNull(): Boolean = !isNull()
 
-    fun push(item: ByteVector) = this.copy(stack = this.stack + item)
+    public fun push(item: ByteVector): ScriptWitness = this.copy(stack = this.stack + item)
 
-    fun push(item: ByteArray) = push(ByteVector(item))
+    public fun push(item: ByteArray): ScriptWitness = push(ByteVector(item))
 
-    fun push(script: List<ScriptElt>) = push(Script.write(script))
+    public fun push(script: List<ScriptElt>): ScriptWitness = push(Script.write(script))
 
-    fun last() = stack.last()
+    public fun last(): ByteVector = stack.last()
 
-    @ExperimentalStdlibApi
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
-    companion object : BtcSerializer<ScriptWitness>() {
-        val empty = ScriptWitness(listOf())
+    public companion object : BtcSerializer<ScriptWitness>() {
+        public val empty: ScriptWitness = ScriptWitness(listOf())
 
-        override fun read(input: InputStream, protocolVersion: Long): ScriptWitness {
+        override fun read(input: Input, protocolVersion: Long): ScriptWitness {
             return ScriptWitness(
-                readCollection<ByteVector>(
+                readCollection(
                     input,
                     { i, _ -> script(i).byteVector() },
                     null,
@@ -113,8 +105,8 @@ data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSerializabl
             )
         }
 
-        override fun write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit {
-            writeCollection<ByteVector>(t.stack, out, { b, o, _ -> writeScript(b, o) }, protocolVersion)
+        override fun write(t: ScriptWitness, out: Output, protocolVersion: Long) {
+            writeCollection(t.stack, out, { b, o, _ -> writeScript(b, o) }, protocolVersion)
         }
     }
 
@@ -130,58 +122,56 @@ data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSerializabl
  *                        information is updated before inclusion into a block. Repurposed for OP_CSV (see BIPs 68 & 112)
  * @param witness         Transaction witness (i.e. what is in sig script for standard transactions).
  */
-@InternalSerializationApi
-@ExperimentalStdlibApi
-data class TxIn(
+public data class TxIn(
     @JvmField val outPoint: OutPoint,
     @JvmField val signatureScript: ByteVector,
     @JvmField val sequence: Long,
     @JvmField val witness: ScriptWitness = ScriptWitness.empty
 ) : BtcSerializable<TxIn> {
 
-    constructor(outPoint: OutPoint, signatureScript: ByteArray, sequence: Long) : this(
+    public constructor(outPoint: OutPoint, signatureScript: ByteArray, sequence: Long) : this(
         outPoint,
         signatureScript.byteVector(),
         sequence
     )
 
-    constructor(outPoint: OutPoint, sequence: Long) : this(outPoint, ByteVector.empty, sequence)
+    public constructor(outPoint: OutPoint, sequence: Long) : this(outPoint, ByteVector.empty, sequence)
 
-    constructor(outPoint: OutPoint, signatureScript: List<ScriptElt>, sequence: Long) : this(
+    public constructor(outPoint: OutPoint, signatureScript: List<ScriptElt>, sequence: Long) : this(
         outPoint,
         Script.write(signatureScript),
         sequence
     )
 
     @JvmField
-    val isFinal: Boolean = sequence == TxIn.SEQUENCE_FINAL
+    public val isFinal: Boolean = sequence == SEQUENCE_FINAL
 
     @JvmField
-    val hasWitness: Boolean = witness.isNotNull()
+    public val hasWitness: Boolean = witness.isNotNull()
 
-    fun updateSignatureScript(signatureScript: ByteVector) = this.copy(signatureScript = signatureScript)
+    public fun updateSignatureScript(signatureScript: ByteVector): TxIn = this.copy(signatureScript = signatureScript)
 
-    fun updateSignatureScript(signatureScript: ByteArray) = this.copy(signatureScript = ByteVector(signatureScript))
+    public fun updateSignatureScript(signatureScript: ByteArray): TxIn = this.copy(signatureScript = ByteVector(signatureScript))
 
-    fun updateWitness(witness: ScriptWitness) = this.copy(witness = witness)
+    public fun updateWitness(witness: ScriptWitness): TxIn = this.copy(witness = witness)
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
-    companion object : BtcSerializer<TxIn>() {
+    public companion object : BtcSerializer<TxIn>() {
         /* Setting nSequence to this value for every input in a transaction disables nLockTime. */
-        const val SEQUENCE_FINAL = 0xffffffffL
+        public const val SEQUENCE_FINAL: Long = 0xffffffffL
 
         /* Below flags apply in the context of BIP 68*/
         /* If this flag set, CTxIn::nSequence is NOT interpreted as a relative lock-time. */
-        const val SEQUENCE_LOCKTIME_DISABLE_FLAG = (1L shl 31)
+        public const val SEQUENCE_LOCKTIME_DISABLE_FLAG: Long = (1L shl 31)
 
         /* If CTxIn::nSequence encodes a relative lock-time and this flag
          * is set, the relative lock-time has units of 512 seconds,
          * otherwise it specifies blocks with a granularity of 1. */
-        const val SEQUENCE_LOCKTIME_TYPE_FLAG = (1L shl 22)
+        public const val SEQUENCE_LOCKTIME_TYPE_FLAG: Long = (1L shl 22)
 
         /* If CTxIn::nSequence encodes a relative lock-time, this mask is
          * applied to extract that lock-time from the sequence field. */
-        const val SEQUENCE_LOCKTIME_MASK = 0x0000ffffL
+        public const val SEQUENCE_LOCKTIME_MASK: Long = 0x0000ffffL
 
         /* In order to use the same number of bits to encode roughly the
          * same wall-clock duration, and because blocks are naturally
@@ -190,58 +180,55 @@ data class TxIn(
          * Converting from CTxIn::nSequence to seconds is performed by
          * multiplying by 512 = 2^9, or equivalently shifting up by
          * 9 bits. */
-        const val SEQUENCE_LOCKTIME_GRANULARITY = 9L
+        public const val SEQUENCE_LOCKTIME_GRANULARITY: Long = 9L
 
-        override fun read(input: InputStream, protocolVersion: Long): TxIn = TxIn(
+        override fun read(input: Input, protocolVersion: Long): TxIn = TxIn(
             outPoint = OutPoint.read(input),
-            signatureScript = BtcSerializer.script(input),
+            signatureScript = script(input),
             sequence = uint32(input)
         )
 
-        override fun write(message: TxIn, out: OutputStream, protocolVersion: Long) {
+        override fun write(message: TxIn, out: Output, protocolVersion: Long) {
             OutPoint.write(message.outPoint, out)
             writeScript(message.signatureScript, out)
             writeUInt32(message.sequence, out)
         }
 
-        override fun validate(input: TxIn): Unit {
+        override fun validate(input: TxIn) {
             require(input.signatureScript.size() <= Script.MaxScriptElementSize) { "signature script is ${input.signatureScript.size()} bytes, limit is $Script.MaxScriptElementSize bytes" }
         }
 
-        fun coinbase(script: ByteArray): TxIn {
+        public fun coinbase(script: ByteArray): TxIn {
             require(script.size in 2..100) { "coinbase script length must be between 2 and 100" }
             return TxIn(OutPoint(ByteArray(32), 0xffffffffL), script, sequence = 0xffffffffL)
         }
 
-        fun coinbase(script: List<ScriptElt>): TxIn = coinbase(Script.write(script))
+        public fun coinbase(script: List<ScriptElt>): TxIn = coinbase(Script.write(script))
     }
 
     override fun serializer(): BtcSerializer<TxIn> = TxIn
 }
 
-@ExperimentalStdlibApi
-@InternalSerializationApi
-data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeyScript: ByteVector) : BtcSerializable<TxOut> {
+public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeyScript: ByteVector) : BtcSerializable<TxOut> {
 
-    constructor(amount: Satoshi, publicKeyScript: ByteArray) : this(amount, publicKeyScript.byteVector())
+    public constructor(amount: Satoshi, publicKeyScript: ByteArray) : this(amount, publicKeyScript.byteVector())
 
-    constructor(amount: Satoshi, publicKeyScript: List<ScriptElt>) : this(
+    public constructor(amount: Satoshi, publicKeyScript: List<ScriptElt>) : this(
         amount,
         Script.write(publicKeyScript).byteVector()
     )
 
-    fun updateAmount(newAmount: Satoshi) = this.copy(amount = newAmount)
+    public fun updateAmount(newAmount: Satoshi): TxOut = this.copy(amount = newAmount)
 
-    fun updatePublicKeyScript(input: ByteVector) = this.copy(publicKeyScript = input)
+    public fun updatePublicKeyScript(input: ByteVector): TxOut = this.copy(publicKeyScript = input)
 
-    fun updatePublicKeyScript(input: ByteArray) = updatePublicKeyScript(input.byteVector())
+    public fun updatePublicKeyScript(input: ByteArray): TxOut = updatePublicKeyScript(input.byteVector())
 
-    fun updatePublicKeyScript(input: List<ScriptElt>) = updatePublicKeyScript(Script.write(input))
+    public fun updatePublicKeyScript(input: List<ScriptElt>): TxOut = updatePublicKeyScript(Script.write(input))
 
-    @ExperimentalStdlibApi
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
-    companion object : BtcSerializer<TxOut>() {
-        override fun write(t: TxOut, out: OutputStream, protocolVersion: Long) {
+    public companion object : BtcSerializer<TxOut>() {
+        override fun write(t: TxOut, out: Output, protocolVersion: Long) {
             writeUInt64(t.amount.toLong(), out)
             writeScript(t.publicKeyScript, out)
         }
@@ -251,7 +238,7 @@ data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeyScript: B
             return super.write(message)
         }
 
-        override fun read(input: InputStream, protocolVersion: Long): TxOut =
+        override fun read(input: Input, protocolVersion: Long): TxOut =
             TxOut(uint64(input).toSatoshi(), script(input))
 
         @JvmStatic
@@ -269,9 +256,7 @@ data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeyScript: B
     override fun serializer(): BtcSerializer<TxOut> = TxOut
 }
 
-@ExperimentalStdlibApi
-@InternalSerializationApi
-data class Transaction(
+public data class Transaction(
     @JvmField val version: Long,
     @JvmField val txIn: List<TxIn>,
     @JvmField val txOut: List<TxOut>,
@@ -280,10 +265,10 @@ data class Transaction(
     BtcSerializable<Transaction> {
 
     @JvmField
-    val hasWitness: Boolean = txIn.any { it.hasWitness }
+    public val hasWitness: Boolean = txIn.any { it.hasWitness }
 
     @JvmField
-    val hash: ByteVector32 = ByteVector32(
+    public val hash: ByteVector32 = ByteVector32(
         Crypto.hash256(
             Transaction.write(
                 this,
@@ -293,7 +278,7 @@ data class Transaction(
     )
 
     @JvmField
-    val txid: ByteVector32 = hash.reversed()
+    public val txid: ByteVector32 = hash.reversed()
 
     /**
      *
@@ -301,7 +286,7 @@ data class Transaction(
      * @param sigScript new signature script
      * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
      */
-    fun updateSigScript(i: Int, sigScript: ByteArray): Transaction {
+    public fun updateSigScript(i: Int, sigScript: ByteArray): Transaction {
         val updatedElement = txIn[i].copy(signatureScript = sigScript.byteVector())
         val updated = txIn.toMutableList().apply {
             this[i] = updatedElement
@@ -315,9 +300,9 @@ data class Transaction(
      * @param sigScript new signature script
      * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
      */
-    fun updateSigScript(i: Int, sigScript: List<ScriptElt>): Transaction = updateSigScript(i, Script.write(sigScript))
+    public fun updateSigScript(i: Int, sigScript: List<ScriptElt>): Transaction = updateSigScript(i, Script.write(sigScript))
 
-    fun updateWitness(i: Int, witness: ScriptWitness): Transaction {
+    public fun updateWitness(i: Int, witness: ScriptWitness): Transaction {
         val updatedElement = txIn[i].copy(witness = witness)
         val updated = txIn.toMutableList().apply {
             this[i] = updatedElement
@@ -325,7 +310,7 @@ data class Transaction(
         return this.copy(txIn = updated.toList())
     }
 
-    fun updateWitnesses(witnesses: List<ScriptWitness>): Transaction {
+    public fun updateWitnesses(witnesses: List<ScriptWitness>): Transaction {
         require(witnesses.count() == txIn.count())
         var tx = this
         for (i in 0..txIn.lastIndex) {
@@ -334,26 +319,26 @@ data class Transaction(
         return tx
     }
 
-    fun updateInputs(inputs: List<TxIn>) = this.copy(txIn = inputs)
+    public fun updateInputs(inputs: List<TxIn>): Transaction = this.copy(txIn = inputs)
 
-    fun addInput(input: TxIn): Transaction = this.copy(txIn = this.txIn + input)
+    public fun addInput(input: TxIn): Transaction = this.copy(txIn = this.txIn + input)
 
-    fun updateOutputs(outputs: List<TxOut>) = this.copy(txOut = outputs)
+    public fun updateOutputs(outputs: List<TxOut>): Transaction = this.copy(txOut = outputs)
 
-    fun addOutput(output: TxOut): Transaction = this.copy(txOut = this.txOut + output)
+    public fun addOutput(output: TxOut): Transaction = this.copy(txOut = this.txOut + output)
 
-    fun weight(): Int = Transaction.weight(this)
+    public fun weight(): Int = weight(this)
 
     override fun toString(): String {
-        return Hex.encode(Transaction.write(this))
+        return Hex.encode(write(this))
     }
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
-    companion object : BtcSerializer<Transaction>() {
-        const val SERIALIZE_TRANSACTION_NO_WITNESS = 0x40000000L
+    public companion object : BtcSerializer<Transaction>() {
+        public const val SERIALIZE_TRANSACTION_NO_WITNESS: Long = 0x40000000L
 
         // if lockTime >= LOCKTIME_THRESHOLD it is a unix timestamp otherwise it is a block height
-        const val LOCKTIME_THRESHOLD = 500000000L
+        public const val LOCKTIME_THRESHOLD: Long = 500000000L
 
         /**
          *
@@ -361,23 +346,23 @@ data class Transaction(
          * @return true if protocol version specifies that witness data is to be serialized
          */
         @JvmStatic
-        fun serializeTxWitness(version: Long): Boolean = (version and SERIALIZE_TRANSACTION_NO_WITNESS) == 0L
+        public fun serializeTxWitness(version: Long): Boolean = (version and SERIALIZE_TRANSACTION_NO_WITNESS) == 0L
 
         @JvmStatic
-        override fun write(tx: Transaction, out: OutputStream, protocolVersion: Long) {
+        override fun write(tx: Transaction, out: Output, protocolVersion: Long) {
             if (serializeTxWitness(protocolVersion) && tx.hasWitness) {
-                BtcSerializer.writeUInt32(tx.version, out)
-                BtcSerializer.writeUInt8(0x00, out)
-                BtcSerializer.writeUInt8(0x01, out)
-                BtcSerializer.writeCollection(tx.txIn, out, TxIn, protocolVersion)
-                BtcSerializer.writeCollection(tx.txOut, out, TxOut, protocolVersion)
+                writeUInt32(tx.version, out)
+                writeUInt8(0x00, out)
+                writeUInt8(0x01, out)
+                writeCollection(tx.txIn, out, TxIn, protocolVersion)
+                writeCollection(tx.txOut, out, TxOut, protocolVersion)
                 tx.txIn.forEach { it -> ScriptWitness.write(it.witness, out, protocolVersion) }
-                BtcSerializer.writeUInt32(tx.lockTime, out)
+                writeUInt32(tx.lockTime, out)
             } else {
-                BtcSerializer.writeUInt32(tx.version, out)
-                BtcSerializer.writeCollection(tx.txIn, out, TxIn, protocolVersion)
-                BtcSerializer.writeCollection(tx.txOut, out, TxOut, protocolVersion)
-                BtcSerializer.writeUInt32(tx.lockTime, out)
+                writeUInt32(tx.version, out)
+                writeCollection(tx.txIn, out, TxIn, protocolVersion)
+                writeCollection(tx.txOut, out, TxOut, protocolVersion)
+                writeUInt32(tx.lockTime, out)
             }
         }
 
@@ -385,16 +370,16 @@ data class Transaction(
         override fun write(message: Transaction): ByteArray = super.write(message)
 
         @JvmStatic
-        override fun read(input: InputStream, protocolVersion: Long): Transaction {
-            val tx = Transaction(uint32(input), BtcSerializer.readCollection(input, TxIn, protocolVersion), listOf(), 0)
+        override fun read(input: Input, protocolVersion: Long): Transaction {
+            val tx = Transaction(uint32(input), readCollection(input, TxIn, protocolVersion), listOf(), 0)
             val (flags, tx1) = if (tx.txIn.count() == 0 && serializeTxWitness(protocolVersion)) {
                 // we just read the 0x00 marker
-                val flags = BtcSerializer.uint8(input)
-                val txIn = BtcSerializer.readCollection(input, TxIn, protocolVersion)
+                val flags = uint8(input)
+                val txIn = readCollection(input, TxIn, protocolVersion)
                 if (flags == 0 && txIn.count() != 0) throw RuntimeException("Extended transaction format unnecessarily used")
-                val txOut = BtcSerializer.readCollection(input, TxOut, protocolVersion)
+                val txOut = readCollection(input, TxOut, protocolVersion)
                 Pair(flags, tx.copy(txIn = txIn, txOut = txOut))
-            } else Pair(0, tx.copy(txOut = BtcSerializer.readCollection(input, TxOut, protocolVersion)))
+            } else Pair(0, tx.copy(txOut = readCollection(input, TxOut, protocolVersion)))
 
             val tx2 = when (flags) {
                 0 -> tx1.copy(lockTime = uint32(input))
@@ -420,7 +405,7 @@ data class Transaction(
         }
 
         @JvmStatic
-        override fun validate(input: Transaction): Unit {
+        override fun validate(input: Transaction) {
             require(input.txIn.count() > 0) { "input list cannot be empty" }
             require(input.txOut.count() > 0) { "output list cannot be empty" }
             // require(Transaction.write(input).size <= Bitcoin.MaxBlockSize)
@@ -429,7 +414,7 @@ data class Transaction(
             input.txOut.forEach { TxOut.validate(it) }
             val outPoints = input.txIn.map { it.outPoint }
             require(outPoints.count() == outPoints.toSet().size) { "duplicate inputs" }
-            if (Transaction.isCoinbase(input)) {
+            if (isCoinbase(input)) {
                 require(input.txIn.first().signatureScript.size() >= 2) { "coinbase script size" }
                 require(input.txIn.first().signatureScript.size() <= 100) { "coinbase script size" }
             } else {
@@ -438,22 +423,22 @@ data class Transaction(
         }
 
         @JvmStatic
-        fun baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int =
+        public fun baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int =
             write(tx, protocolVersion or SERIALIZE_TRANSACTION_NO_WITNESS).size
 
         @JvmStatic
-        fun totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion).size
+        public fun totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion).size
 
         @JvmStatic
-        fun weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int =
+        public fun weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int =
             totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
 
         @JvmStatic
-        fun weight(tx: Transaction): Int = weight(tx, PROTOCOL_VERSION)
+        public fun weight(tx: Transaction): Int = weight(tx, PROTOCOL_VERSION)
 
 
         @JvmStatic
-        fun isCoinbase(input: Transaction) = input.txIn.count() == 1 && OutPoint.isCoinbase(input.txIn.first().outPoint)
+        public fun isCoinbase(input: Transaction): Boolean = input.txIn.count() == 1 && OutPoint.isCoinbase(input.txIn.first().outPoint)
 
         /**
          * prepare a transaction for signing a specific input
@@ -465,7 +450,7 @@ data class Transaction(
          * @return a new transaction with proper inputs and outputs according to SIGHASH_TYPE rules
          */
         @JvmStatic
-        fun prepareForSigning(
+        public fun prepareForSigning(
             tx: Transaction,
             inputIndex: Int,
             previousOutputScript: ByteArray,
@@ -524,7 +509,7 @@ data class Transaction(
          * @return a hash which can be used to sign the referenced tx input
          */
         @JvmStatic
-        fun hashForSigning(
+        public fun hashForSigning(
             tx: Transaction,
             inputIndex: Int,
             previousOutputScript: ByteArray,
@@ -535,7 +520,7 @@ data class Transaction(
             } else {
                 val txCopy = prepareForSigning(tx, inputIndex, previousOutputScript, sighashType)
                 Crypto.hash256(
-                    Transaction.write(txCopy, Transaction.SERIALIZE_TRANSACTION_NO_WITNESS) + writeUInt32(
+                    Transaction.write(txCopy, SERIALIZE_TRANSACTION_NO_WITNESS) + writeUInt32(
                         sighashType.toLong()
                     )
                 )
@@ -553,7 +538,7 @@ data class Transaction(
          * @return a hash which can be used to sign the referenced tx input
          */
         @JvmStatic
-        fun hashForSigning(
+        public fun hashForSigning(
             tx: Transaction,
             inputIndex: Int,
             previousOutputScript: ByteArray,
@@ -574,7 +559,7 @@ data class Transaction(
                                 sighashType
                             )
                         ) {
-                            val arrays = tx.txIn.map { it.sequence }.map { BtcSerializer.writeUInt32(it) }
+                            val arrays = tx.txIn.map { it.sequence }.map { writeUInt32(it) }
                             val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
                             Crypto.hash256(concatenated)
                         } else ByteArray(32)
@@ -584,20 +569,20 @@ data class Transaction(
                         val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
                         Crypto.hash256(concatenated)
                     } else if (SigHash.isHashSingle(sighashType) && inputIndex < tx.txOut.count()) {
-                        Crypto.hash256(TxOut.write(tx.txOut[inputIndex], Protocol.PROTOCOL_VERSION))
+                        Crypto.hash256(TxOut.write(tx.txOut[inputIndex], PROTOCOL_VERSION))
                     } else ByteArray(32)
 
-                    val out = ByteArrayOutputStream()
-                    BtcSerializer.writeUInt32(tx.version, out)
+                    val out = ByteArrayOutput()
+                    writeUInt32(tx.version, out)
                     out.write(hashPrevOut)
                     out.write(hashSequence)
-                    out.write(OutPoint.write(tx.txIn.elementAt(inputIndex).outPoint, Protocol.PROTOCOL_VERSION))
-                    BtcSerializer.writeScript(previousOutputScript, out)
-                    BtcSerializer.writeUInt64(amount.toLong(), out)
-                    BtcSerializer.writeUInt32(tx.txIn[inputIndex].sequence, out)
+                    out.write(OutPoint.write(tx.txIn.elementAt(inputIndex).outPoint, PROTOCOL_VERSION))
+                    writeScript(previousOutputScript, out)
+                    writeUInt64(amount.toLong(), out)
+                    writeUInt32(tx.txIn[inputIndex].sequence, out)
                     out.write(hashOutputs)
-                    BtcSerializer.writeUInt32(tx.lockTime, out)
-                    BtcSerializer.writeUInt32(sighashType.toLong(), out)
+                    writeUInt32(tx.lockTime, out)
+                    writeUInt32(sighashType.toLong(), out)
                     val preimage = out.toByteArray()
                     return Crypto.hash256(preimage)
                 }
@@ -616,7 +601,7 @@ data class Transaction(
          * @return a hash which can be used to sign the referenced tx input
          */
         @JvmStatic
-        fun hashForSigning(
+        public fun hashForSigning(
             tx: Transaction,
             inputIndex: Int,
             previousOutputScript: List<ScriptElt>,
@@ -639,7 +624,7 @@ data class Transaction(
          * @return the encoded signature of this tx for this specific tx input
          */
         @JvmStatic
-        fun signInput(
+        public fun signInput(
             tx: Transaction,
             inputIndex: Int,
             previousOutputScript: ByteArray,
@@ -654,7 +639,7 @@ data class Transaction(
         }
 
         @JvmStatic
-        fun signInput(
+        public fun signInput(
             tx: Transaction,
             inputIndex: Int,
             previousOutputScript: ByteVector,
@@ -662,7 +647,7 @@ data class Transaction(
             amount: Satoshi,
             signatureVersion: Int,
             privateKey: PrivateKey
-        ) = signInput(
+        ): ByteArray = signInput(
             tx,
             inputIndex,
             previousOutputScript.toByteArray(),
@@ -685,7 +670,7 @@ data class Transaction(
          * @return the encoded signature of this tx for this specific tx input
          */
         @JvmStatic
-        fun signInput(
+        public fun signInput(
             tx: Transaction,
             inputIndex: Int,
             previousOutputScript: List<ScriptElt>,
@@ -714,7 +699,7 @@ data class Transaction(
          * @return the encoded signature of this tx for this specific tx input
          */
         @JvmStatic
-        fun signInput(
+        public fun signInput(
             tx: Transaction,
             inputIndex: Int,
             previousOutputScript: ByteArray,
@@ -732,7 +717,7 @@ data class Transaction(
             )
 
         @JvmStatic
-        fun signInput(
+        public fun signInput(
             tx: Transaction,
             inputIndex: Int,
             previousOutputScript: ByteVector,
@@ -742,7 +727,7 @@ data class Transaction(
             signInput(tx, inputIndex, previousOutputScript.toByteArray(), sighashType, privateKey)
 
         @JvmStatic
-        fun signInput(
+        public fun signInput(
             tx: Transaction,
             inputIndex: Int,
             previousOutputScript: List<ScriptElt>,
@@ -751,14 +736,13 @@ data class Transaction(
         ): ByteArray =
             signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, privateKey)
 
-        @ExperimentalUnsignedTypes
         @JvmStatic
-        fun correctlySpends(
+        public fun correctlySpends(
             tx: Transaction,
             previousOutputs: Map<OutPoint, TxOut>,
             scriptFlags: Int,
             callback: RunnerCallback? = null
-        ): Unit {
+        ) {
             for (i in 0 until tx.txIn.count()) {
                 if (OutPoint.isCoinbase(tx.txIn.elementAt(i).outPoint)) continue
                 val prevOutput = previousOutputs.getValue(tx.txIn[i].outPoint)
@@ -775,19 +759,17 @@ data class Transaction(
             }
         }
 
-        @ExperimentalUnsignedTypes
         @JvmStatic
-        fun correctlySpends(tx: Transaction, previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int): Unit =
+        public fun correctlySpends(tx: Transaction, previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int): Unit =
             correctlySpends(tx, previousOutputs, scriptFlags, null)
 
-        @ExperimentalUnsignedTypes
         @JvmStatic
-        fun correctlySpends(
+        public fun correctlySpends(
             tx: Transaction,
             inputs: List<Transaction>,
             scriptFlags: Int,
             callback: RunnerCallback?
-        ): Unit {
+        ) {
             val map = mutableMapOf<OutPoint, TxOut>()
             for (outPoint in tx.txIn.map { it.outPoint }) {
                 val prevTx = inputs.find { it.txid == outPoint.txid }
@@ -797,26 +779,23 @@ data class Transaction(
             correctlySpends(tx, map.toMap(), scriptFlags, callback)
         }
 
-        @ExperimentalUnsignedTypes
         @JvmStatic
-        fun correctlySpends(
+        public fun correctlySpends(
             tx: Transaction,
             inputs: List<Transaction>,
             scriptFlags: Int
         ): Unit = correctlySpends(tx, inputs, scriptFlags, null)
 
-        @ExperimentalUnsignedTypes
         @JvmStatic
-        fun correctlySpends(
+        public fun correctlySpends(
             tx: Transaction,
             parent: Transaction,
             scriptFlags: Int,
             callback: RunnerCallback?
         ): Unit = correctlySpends(tx, listOf(parent), scriptFlags, callback)
 
-        @ExperimentalUnsignedTypes
         @JvmStatic
-        fun correctlySpends(
+        public fun correctlySpends(
             tx: Transaction,
             parent: Transaction,
             scriptFlags: Int

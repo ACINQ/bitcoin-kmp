@@ -125,11 +125,11 @@ public class Ripemd160 : Digest {
 
     override fun doFinal(out: ByteArray, outOffset: Int): Int {
         finish()
-        Pack.writeUint32LE(H0, out, outOffset)
-        Pack.writeUint32LE(H1, out, outOffset + 4)
-        Pack.writeUint32LE(H2, out, outOffset + 8)
-        Pack.writeUint32LE(H3, out, outOffset + 12)
-        Pack.writeUint32LE(H4, out, outOffset + 16)
+        Pack.writeInt32LE(H0, out, outOffset)
+        Pack.writeInt32LE(H1, out, outOffset + 4)
+        Pack.writeInt32LE(H2, out, outOffset + 8)
+        Pack.writeInt32LE(H3, out, outOffset + 12)
+        Pack.writeInt32LE(H4, out, outOffset + 16)
         reset()
         return DIGEST_SIZE
     }

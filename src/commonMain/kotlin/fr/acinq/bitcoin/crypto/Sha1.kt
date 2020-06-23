@@ -114,11 +114,11 @@ public class Sha1 : Digest {
 
     override fun doFinal(out: ByteArray, outOffset: Int): Int {
         finish()
-        Pack.writeUint32BE(H1, out, outOffset)
-        Pack.writeUint32BE(H2, out, outOffset + 4)
-        Pack.writeUint32BE(H3, out, outOffset + 8)
-        Pack.writeUint32BE(H4, out, outOffset + 12)
-        Pack.writeUint32BE(H5, out, outOffset + 16)
+        Pack.writeInt32BE(H1, out, outOffset)
+        Pack.writeInt32BE(H2, out, outOffset + 4)
+        Pack.writeInt32BE(H3, out, outOffset + 8)
+        Pack.writeInt32BE(H4, out, outOffset + 12)
+        Pack.writeInt32BE(H5, out, outOffset + 16)
         reset()
         return DIGEST_LENGTH
     }

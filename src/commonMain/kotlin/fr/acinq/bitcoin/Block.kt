@@ -31,6 +31,7 @@ import kotlin.jvm.JvmStatic
  * @param bits              The calculated difficulty target being used for this block
  * @param nonce             The nonce used to generate this block… to allow variations of the header and compute different hashes
  */
+@OptIn(ExperimentalUnsignedTypes::class)
 public data class BlockHeader(
     @JvmField val version: Long,
     @JvmField val hashPreviousBlock: ByteVector32,
@@ -67,12 +68,12 @@ public data class BlockHeader(
             val bits = uint32(input)
             val nonce = uint32(input)
             return BlockHeader(
-                version,
+                version.toLong(),
                 hashPreviousBlock.byteVector32(),
                 hashMerkleRoot.byteVector32(),
-                time,
-                bits,
-                nonce
+                time.toLong(),
+                bits.toLong(),
+                nonce.toLong()
             )
         }
 
@@ -87,12 +88,12 @@ public data class BlockHeader(
         }
 
         override fun write(message: BlockHeader, output: Output, protocolVersion: Long) {
-            writeUInt32(message.version, output)
+            writeUInt32(message.version.toUInt(), output)
             writeBytes(message.hashPreviousBlock, output)
             writeBytes(message.hashMerkleRoot, output)
-            writeUInt32(message.time, output)
-            writeUInt32(message.bits, output)
-            writeUInt32(message.nonce, output)
+            writeUInt32(message.time.toUInt(), output)
+            writeUInt32(message.bits.toUInt(), output)
+            writeUInt32(message.nonce.toUInt(), output)
         }
 
         @JvmStatic
@@ -103,7 +104,7 @@ public data class BlockHeader(
         @JvmStatic
         @OptIn(ExperimentalUnsignedTypes::class)
         public fun getDifficulty(header: BlockHeader): UInt256 {
-            val (diff, neg, _) = UInt256.decodeCompact(header.bits)
+            val (diff, neg, _) = UInt256.decodeCompact(header.bits.toLong())
             return if (neg) -diff else diff
         }
 
@@ -126,7 +127,7 @@ public data class BlockHeader(
         }
 
         @JvmStatic
-        public fun blockProof(header: BlockHeader): UInt256 = blockProof(header.bits)
+        public fun blockProof(header: BlockHeader): UInt256 = blockProof(header.bits.toLong())
 
         /**
          * Proof of work: hash(header) <= target difficulty
@@ -136,19 +137,19 @@ public data class BlockHeader(
          */
         @JvmStatic
         public fun checkProofOfWork(header: BlockHeader): Boolean {
-            val (target, _, _) = UInt256.decodeCompact(header.bits)
+            val (target, _, _) = UInt256.decodeCompact(header.bits.toLong())
             val hash = UInt256(header.blockId.toByteArray())
             return hash <= target
         }
 
         @JvmStatic
         public fun calculateNextWorkRequired(lastHeader: BlockHeader, lastRetargetTime: Long): Long {
-            var actualTimespan = lastHeader.time - lastRetargetTime
+            var actualTimespan = lastHeader.time.toLong() - lastRetargetTime
             val targetTimespan = 14 * 24 * 60 * 60L // two weeks
             if (actualTimespan < targetTimespan / 4) actualTimespan = targetTimespan / 4
             if (actualTimespan > targetTimespan * 4) actualTimespan = targetTimespan * 4
 
-            var (target, isnegative, overflow) = UInt256.decodeCompact(lastHeader.bits)
+            var (target, isnegative, overflow) = UInt256.decodeCompact(lastHeader.bits.toLong())
             require(!isnegative)
             require(!overflow)
             target *= UInt256(actualTimespan)
@@ -181,6 +182,7 @@ public object MerkleTree {
     }
 }
 
+@OptIn(ExperimentalUnsignedTypes::class, ExperimentalStdlibApi::class)
 public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Transaction>) {
     @JvmField
     val hash: ByteVector32 = header.hash
@@ -235,10 +237,9 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
 
         // genesis blocks
         @JvmField
-        @OptIn(ExperimentalStdlibApi::class)
         public val LivenetGenesisBlock: Block = {
             val script = listOf(
-                OP_PUSHDATA(writeUInt32(486604799L)),
+                OP_PUSHDATA(writeUInt32(486604799u)),
                 OP_PUSHDATA(ByteVector("04")),
                 OP_PUSHDATA("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks".encodeToByteArray())
             )

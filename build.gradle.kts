@@ -100,10 +100,6 @@ kotlin {
 val bintrayUsername: String? = (properties["bintrayUsername"] as String?) ?: System.getenv("BINTRAY_USER")
 val bintrayApiKey: String? = (properties["bintrayApiKey"] as String?) ?: System.getenv("BINTRAY_APIKEY")
 
-afterEvaluate {
-    tasks["compileIosMainKotlinMetadata"].enabled = false
-}
-
 if (bintrayUsername == null || bintrayApiKey == null) logger.warn("Skipping bintray configuration as bintrayUsername or bintrayApiKey is not defined")
 else {
     publishing {

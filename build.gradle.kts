@@ -1,64 +1,43 @@
 plugins {
-    kotlin("multiplatform") version "1.4-M2"
-    kotlin("plugin.serialization") version "1.4-M2"
+    kotlin("multiplatform") version "1.4-M2-mt"
     `maven-publish`
 }
 
 group = "fr.acinq"
-version = "0.2.0-1.4-M2"
+version = "0.1.0-1.4-M2"
 
 repositories {
-    jcenter()
+    mavenLocal()
+    google()
     maven("https://dl.bintray.com/kotlin/kotlinx")
     maven("https://dl.bintray.com/kotlin/kotlin-eap")
+    maven("https://dl.bintray.com/acinq/libs")
+    jcenter()
 }
 
 kotlin {
     explicitApi()
 
-    /* Targets configuration omitted. 
-    *  To find out how to configure the targets, please follow the link:
-    *  https://kotlinlang.org/docs/reference/building-mpp-with-gradle.html#setting-up-targets */
-    val cinterop_libsecp256k_location: String by extra
-
-    val buildNativeLib = tasks.register<Exec>("build-native-lib") {
-        //warning are issued at the end of command by cross-compilation to iOS, but they are only warnings ;-)
-        workingDir(project.file(cinterop_libsecp256k_location))
-        commandLine("./xbuild-secp256k1.sh")
-        outputs.dir("$cinterop_libsecp256k_location/secp256k1/build/ios")
-        outputs.dir("$cinterop_libsecp256k_location/secp256k1/build/linux")
-    }
-
-    jvm()
-
-    fun org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget.secp256k1CInterop() {
-        compilations["main"].cinterops {
-            val libsecp256k1 by creating {
-                includeDirs.headerFilterOnly(project.file("${cinterop_libsecp256k_location}/secp256k1/include/"))
-                includeDirs(project.file("$cinterop_libsecp256k_location/secp256k1/.libs"), "/usr/local/lib")
-                tasks[interopProcessingTaskName].dependsOn(buildNativeLib)
-            }
+    jvm {
+        compilations.all {
+            kotlinOptions.jvmTarget = "1.8"
         }
     }
 
-    linuxX64("linux") {
-        secp256k1CInterop()
-        // https://youtrack.jetbrains.com/issue/KT-39396
-        compilations["main"].kotlinOptions.freeCompilerArgs = listOf("-include-binary", "$rootDir/c/secp256k1/build/linux/libsecp256k1.a")
-    }
-    ios {
-        secp256k1CInterop()
-        // https://youtrack.jetbrains.com/issue/KT-39396
-        compilations["main"].kotlinOptions.freeCompilerArgs = listOf("-include-binary", "$rootDir/c/secp256k1/build/ios/libsecp256k1.a")
-    }
+    linuxX64("linux")
+
+//    ios {
+//        // https://youtrack.jetbrains.com/issue/KT-39396
+//        compilations["main"].kotlinOptions.freeCompilerArgs = listOf("-include-binary", "$rootDir/c/secp256k1/build/ios/libsecp256k1.a")
+//    }
 
     sourceSets {
-        val serialization_version: String by extra
+        val secp256k1KmpVersion = "0.1.0-1.4-M2"
 
         val commonMain by getting {
             dependencies {
                 implementation(kotlin("stdlib-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime:$serialization_version")
+                api("fr.acinq.secp256k1:secp256k1-kmp:$secp256k1KmpVersion")
             }
         }
         val commonTest by getting {
@@ -67,11 +46,11 @@ kotlin {
                 implementation(kotlin("test-annotations-common"))
             }
         }
+
         val jvmMain by getting {
             dependencies {
                 implementation(kotlin("stdlib-jdk8"))
                 implementation("org.bouncycastle:bcprov-jdk15on:1.64")
-                implementation("fr.acinq.bitcoin:secp256k1-jni:1.3")
             }
         }
         val jvmTest by getting {
@@ -79,17 +58,19 @@ kotlin {
                 implementation(kotlin("test-junit"))
                 implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.9.8")
                 implementation("com.google.guava:guava:28.2-jre")
+                implementation("fr.acinq.secp256k1:secp256k1-jni-jvm:$secp256k1KmpVersion")
             }
         }
+
         val linuxMain by getting {
             dependencies {
             }
         }
 
-        val iosMain by getting {
-            dependencies {
-            }
-        }
+//        val iosMain by getting {
+//            dependencies {
+//            }
+//        }
 
         all {
             languageSettings.useExperimentalAnnotation("kotlin.RequiresOptIn")
@@ -123,32 +104,6 @@ else {
                     password = bintrayApiKey
                 }
             }
-        }
-    }
-}
-
-// Disable cross compilation
-afterEvaluate {
-    val currentOs = org.gradle.internal.os.OperatingSystem.current()
-    val targets = when {
-        currentOs.isLinux -> listOf()
-        currentOs.isMacOsX -> listOf("linux")
-        currentOs.isWindows -> listOf("linux")
-        else -> listOf("linux")
-    }.mapNotNull { kotlin.targets.findByName(it) as? org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget }
-
-    configure(targets) {
-        compilations.all {
-            cinterops.all { tasks[interopProcessingTaskName].enabled = false }
-            compileKotlinTask.enabled = false
-            tasks[processResourcesTaskName].enabled = false
-        }
-        binaries.all { linkTask.enabled = false }
-
-        mavenPublication {
-            val publicationToDisable = this
-            tasks.withType<AbstractPublishToMaven>().all { onlyIf { publication != publicationToDisable } }
-            tasks.withType<GenerateModuleMetadata>().all { onlyIf { publication.get() != publicationToDisable } }
         }
     }
 }

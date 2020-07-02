@@ -35,14 +35,4 @@ class Ripemd160TestsCommon {
         assertTrue { Ripemd160.hash(Array(8) { "1234567890" }.reduce { acc, s -> acc + s }.encodeToByteArray()).contentEquals(Hex.decode("9b752e45573d4b39f4dbd3323cab82bf63326bfb")) }
         assertTrue { Ripemd160.hash(ByteArray(1000_000) { 0x61.toByte() }).contentEquals(Hex.decode("52783243c1697bdbe16d37f97f68f08325dc1528")) }
     }
-
-    @Test @Ignore
-    fun `very long input`() {
-        val ripemd160 = Ripemd160()
-        val input = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno".encodeToByteArray()
-        for (i in 0L until 167773) ripemd160.update(input, 0, input.size)
-        val output = ByteArray(20)
-        ripemd160.doFinal(output, 0)
-        assertTrue { output.contentEquals(Hex.decode("c22925cae5c03927e9a5e8cdb7f5449b2aa4efac")) }
-    }
 }

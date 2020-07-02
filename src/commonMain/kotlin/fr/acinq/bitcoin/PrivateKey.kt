@@ -16,7 +16,7 @@
 
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Secp256k1
+import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -33,7 +33,7 @@ public data class PrivateKey(@JvmField val value: ByteVector32) {
 
     public operator fun plus(that: PrivateKey): PrivateKey =
         PrivateKey(
-            Secp256k1.privateKeyAdd(
+            Secp256k1.privKeyTweakAdd(
                 value.toByteArray(),
                 that.value.toByteArray()
             )
@@ -42,7 +42,7 @@ public data class PrivateKey(@JvmField val value: ByteVector32) {
     public operator fun minus(that: PrivateKey): PrivateKey =
         plus(
             PrivateKey(
-                Secp256k1.privateKeyNegate(
+                Secp256k1.privKeyNegate(
                     that.value.toByteArray()
                 )
             )
@@ -50,16 +50,15 @@ public data class PrivateKey(@JvmField val value: ByteVector32) {
 
     public operator fun times(that: PrivateKey): PrivateKey =
         PrivateKey(
-            Secp256k1.privateKeyMul(
+            Secp256k1.privKeyTweakMul(
                 value.toByteArray(),
                 that.value.toByteArray()
             )
         )
 
     public fun publicKey(): PublicKey {
-        val pub = Secp256k1.computePublicKey(value.toByteArray())
-        return PublicKey(PublicKey.compress(pub)
-        )
+        val pub = Secp256k1.pubkeyCreate(value.toByteArray())
+        return PublicKey(PublicKey.compress(pub))
     }
 
     public fun toBase58(prefix: Byte): String = Base58Check.encode(prefix, value.toByteArray() + 1.toByte())

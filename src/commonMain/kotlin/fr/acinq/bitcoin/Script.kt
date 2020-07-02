@@ -16,7 +16,7 @@
 
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Secp256k1
+import fr.acinq.secp256k1.Secp256k1
 import fr.acinq.bitcoin.io.*
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
@@ -578,7 +578,7 @@ public object Script {
                         signatureVersion
                     )
                     // signature is normalized here, but high-S correctness has already been checked
-                    val normalized = ByteVector64(Secp256k1.signatureNormalize(sigBytes1).first)
+                    val normalized = Crypto.normalize(sigBytes1).first
                     val pub = PublicKey(pubKey)
                     val result = Crypto.verifySignature(hash, normalized, pub)
                     result

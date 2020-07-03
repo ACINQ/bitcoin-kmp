@@ -139,8 +139,8 @@ public object Crypto {
     @JvmStatic
     public fun verifySignature(data: ByteArray, signature: ByteVector64, publicKey: PublicKey): Boolean {
         return Secp256k1.verify(
-            data,
             signature.toByteArray(),
+            data,
             publicKey.value.toByteArray()
         )
     }
@@ -152,7 +152,11 @@ public object Crypto {
     private fun dropZeroAndFixSize(input: ByteArray, size: Int) = fixSize(input.dropWhile { it == 0.toByte() }.toByteArray(), size)
 
     @JvmStatic
-    public fun compact2der(signature: ByteVector64): ByteVector = ByteVector(Secp256k1.signatureNormalize(signature.bytes, SigFormat.DER).first)
+    public fun compact2der(signature: ByteVector64): ByteVector {
+        val normalized = Secp256k1.signatureNormalize(signature.toByteArray()).first
+        val der = Secp256k1.compact2der(normalized)
+        return ByteVector(der)
+    }
 
     @JvmStatic
     public fun der2compact(signature: ByteArray): ByteVector64{

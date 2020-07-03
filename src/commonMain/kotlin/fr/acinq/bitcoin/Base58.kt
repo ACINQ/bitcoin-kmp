@@ -172,7 +172,7 @@ public object Base58Check {
     public fun checksum(data: ByteArray): ByteArray = Crypto.hash256(data).copyOf(4)
 
     @JvmStatic
-    public fun encode(prefix: Int, data: ByteArray): String = encode(Pack.writeUint32BE(prefix), data)
+    public fun encode(prefix: Int, data: ByteArray): String = encode(Pack.writeInt32BE(prefix), data)
 
     /**
      * Encode data in Base58Check format.
@@ -227,7 +227,7 @@ public object Base58Check {
     @JvmStatic
     public fun decodeWithIntPrefix(encoded: String): Pair<Int, ByteArray> {
         val (prefix, data) = decodeWithPrefixLen(encoded, 4)
-        return Pair(Pack.uint32BE(prefix), data)
+        return Pair(Pack.int32BE(prefix), data)
     }
 
     /**

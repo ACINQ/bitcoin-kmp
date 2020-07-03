@@ -16,3 +16,20 @@
 
 package fr.acinq.bitcoin.crypto
 
+import fr.acinq.bitcoin.Hex
+import kotlin.test.Ignore
+import kotlin.test.Test
+import kotlin.test.assertTrue
+
+@OptIn(ExperimentalStdlibApi::class)
+class Ripemd160TestsJvm {
+    @Test
+    fun `very long input`() {
+        val ripemd160 = Ripemd160()
+        val input = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno".encodeToByteArray()
+        for (i in 0L until 167773) ripemd160.update(input, 0, input.size)
+        val output = ByteArray(20)
+        ripemd160.doFinal(output, 0)
+        assertTrue { output.contentEquals(Hex.decode("c22925cae5c03927e9a5e8cdb7f5449b2aa4efac")) }
+    }
+}

@@ -17,6 +17,7 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.DeterministicWallet.hardened
+import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import kotlin.jvm.JvmField
@@ -25,6 +26,7 @@ import kotlin.jvm.JvmStatic
 /**
  * see https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
  */
+@OptIn(ExperimentalUnsignedTypes::class)
 public object DeterministicWallet {
     public const val hardenedKeyIndex: Long = 0x80000000L
 
@@ -69,9 +71,9 @@ public object DeterministicWallet {
     @JvmStatic
     public fun encode(input: ExtendedPrivateKey, prefix: Int): String {
         val out = ByteArrayOutput()
-        BtcSerializer.writeUInt8(input.depth, out)
-        BtcSerializer.writeUInt32BE(input.parent, out)
-        BtcSerializer.writeUInt32BE(input.path.lastChildNumber, out)
+        out.write(input.depth)
+        Pack.writeInt32BE(input.parent.toInt(), out)
+        Pack.writeInt32BE(input.path.lastChildNumber.toInt(), out)
         out.write(input.chaincode.toByteArray())
         out.write(0)
         out.write(input.secretkeybytes.toByteArray())
@@ -85,9 +87,9 @@ public object DeterministicWallet {
     @JvmStatic
     public fun encode(input: ExtendedPublicKey, prefix: Int): String {
         val out = ByteArrayOutput()
-        BtcSerializer.writeUInt8(input.depth, out)
-        BtcSerializer.writeUInt32BE(input.parent, out)
-        BtcSerializer.writeUInt32BE(input.path.lastChildNumber, out)
+        out.write(input.depth)
+        Pack.writeInt32BE(input.parent.toInt(), out)
+        Pack.writeInt32BE(input.path.lastChildNumber.toInt(), out)
         out.write(input.chaincode.toByteArray())
         out.write(input.publickeybytes.toByteArray())
         val buffer = out.toByteArray()
@@ -138,11 +140,11 @@ public object DeterministicWallet {
      * @return the fingerprint for this public key
      */
     @JvmStatic
-    public fun fingerprint(input: ExtendedPublicKey): Long = BtcSerializer.uint32(
+    public fun fingerprint(input: ExtendedPublicKey): Long = Pack.int32LE(
         ByteArrayInput(
             Crypto.hash160(input.publickeybytes).take(4).reversed().toByteArray()
         )
-    )
+    ).toLong()
 
     /**
      *
@@ -162,10 +164,10 @@ public object DeterministicWallet {
     public fun derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey {
         val I = if (isHardened(index)) {
             val buffer = arrayOf(0.toByte()).toByteArray() + parent.secretkeybytes.toByteArray()
-            Crypto.hmac512(parent.chaincode.toByteArray(), buffer + BtcSerializer.writeUInt32BE(index))
+            Crypto.hmac512(parent.chaincode.toByteArray(), buffer + Pack.writeInt32BE(index.toInt()))
         } else {
             val pub = publicKey(parent).publickeybytes
-            Crypto.hmac512(parent.chaincode.toByteArray(), pub.toByteArray() + BtcSerializer.writeUInt32BE(index))
+            Crypto.hmac512(parent.chaincode.toByteArray(), pub.toByteArray() + Pack.writeInt32BE(index.toInt()))
         }
         val IL = I.take(32).toByteArray()
         val IR = I.takeLast(32).toByteArray()
@@ -193,7 +195,7 @@ public object DeterministicWallet {
 
         val I = Crypto.hmac512(
             parent.chaincode.toByteArray(),
-            parent.publickeybytes.toByteArray() + BtcSerializer.writeUInt32BE(index)
+            parent.publickeybytes.toByteArray() + Pack.writeInt32BE(index.toInt())
         )
         val IL = I.take(32).toByteArray()
         val IR = I.takeLast(32).toByteArray()

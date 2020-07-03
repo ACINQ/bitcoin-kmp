@@ -16,6 +16,8 @@ public data class Satoshi(val sat: Long) : Comparable<Satoshi> {
     public fun min(other: Satoshi): Satoshi = if (this < other) this else other
 
     public fun toLong(): Long = sat
+    @OptIn(ExperimentalUnsignedTypes::class)
+    public fun toULong(): ULong = sat.toULong()
     override fun toString(): String = "$sat sat"
     // @formatter:on
 }

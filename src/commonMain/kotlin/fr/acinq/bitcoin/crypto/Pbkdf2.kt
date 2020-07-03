@@ -45,7 +45,7 @@ public object Pbkdf2 {
         }
 
         fun f(index: Int): ByteArray {
-            var u = prf.process(salt + Pack.writeUint32BE(index))
+            var u = prf.process(salt + Pack.writeInt32BE(index))
             val output = u.copyOf()
             for (i in 1 until count) {
                 u = prf.process(u)

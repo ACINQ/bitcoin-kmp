@@ -37,7 +37,7 @@ public class UInt256() : Comparable<UInt256> {
         require(value.size <= 32)
         val reversed = value.reversedArray() + ByteArray(32 - value.size)
         for (i in 0 until WIDTH) {
-            pn[i] = Pack.uint32LE(reversed, 4 * i).toUInt()
+            pn[i] = Pack.int32LE(reversed, 4 * i).toUInt()
         }
     }
 
@@ -206,7 +206,7 @@ public class UInt256() : Comparable<UInt256> {
     override fun toString(): String {
         val bytes = ByteArray(32)
         for (i in 0 until WIDTH) {
-            Pack.writeUint32LE(pn[i], bytes, 4 * i)
+            Pack.writeInt32LE(pn[i].toInt(), bytes, 4 * i)
         }
         return Hex.encode(bytes.reversedArray())
     }

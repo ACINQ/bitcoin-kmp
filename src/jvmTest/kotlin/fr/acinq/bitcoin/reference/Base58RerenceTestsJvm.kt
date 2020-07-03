@@ -65,11 +65,11 @@ class Base58RerenceTestsJvm {
                     true -> {
                         assert(data.size == 33)
                         assert(data.last() == 1.toByte())
-                        assert(org.bouncycastle.util.encoders.Hex.toHexString(data.take(32).toByteArray()) == hex)
+                        assert(Hex.encode(data.take(32).toByteArray()) == hex)
                     }
                     false -> {
                         assert(data.size == 32)
-                        assert(org.bouncycastle.util.encoders.Hex.toHexString(data) == hex)
+                        assert(Hex.encode(data) == hex)
                     }
                 }
             } else {

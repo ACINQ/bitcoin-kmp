@@ -20,6 +20,7 @@ import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.*
 import kotlin.jvm.JvmStatic
 
+@OptIn(ExperimentalUnsignedTypes::class)
 public abstract class BtcSerializer<T> {
     /**
      * write a message to a stream
@@ -79,103 +80,58 @@ public abstract class BtcSerializer<T> {
 
     public companion object {
         @JvmStatic
-        public fun uint8(input: Input): Int = input.read()
+        public fun uint8(input: Input): UByte = input.read().toUByte()
 
         @JvmStatic
-        public fun writeUInt8(input: Int, out: Output): Unit = out.write(input and 0xff)
+        public fun writeUInt8(input: UByte, out: Output): Unit = out.write(input.toInt() and 0xff)
 
         @JvmStatic
-        public fun uint16(input: Input): Int {
-            val bin = ByteArray(2)
-            input.read(bin, 0, 2)
-            return Pack.uint16LE(bin, 0)
-        }
+        public fun uint16(input: Input): UShort = Pack.int16LE(input).toUShort()
 
         @JvmStatic
-        public fun uint16(input: ByteArray): Int = Pack.uint16LE(input, 0)
+        public fun uint16(input: ByteArray): UShort = Pack.int16LE(input).toUShort()
 
         @JvmStatic
-        public fun uint16BE(input: ByteArray): Int = Pack.uint16BE(input, 0)
+        public fun writeUInt16(input: UShort, out: Output): Unit = Pack.writeInt16LE(input.toShort(), out)
 
         @JvmStatic
-        public fun writeUInt16(input: Int, out: Output): Unit = out.write(Pack.writeUint16LE(input))
+        public fun writeUInt16(input: UShort): ByteArray = Pack.writeInt16LE(input.toShort())
 
         @JvmStatic
-        public fun writeUInt16(input: Int): ByteArray = Pack.writeUint16LE(input)
+        public fun uint32(input: Input): UInt = Pack.int32LE(input).toUInt()
 
         @JvmStatic
-        public fun writeUInt16BE(input: Int): ByteArray = Pack.writeUint16BE(input)
+        public fun uint32(input: ByteArray): UInt = Pack.int32LE(input).toUInt()
 
         @JvmStatic
-        public fun uint32(input: Input): Long {
-            val bin = ByteArray(4)
-            input.read(bin, 0, 4)
-            return Pack.uint32LE(bin, 0).toLong() and 0xffffffffL
-        }
+        public fun writeUInt32(input: UInt, out: Output): Unit = Pack.writeInt32LE(input.toInt(), out)
 
         @JvmStatic
-        public fun uint32(input: ByteArray): Int {
-            return Pack.uint32LE(input, 0)
-        }
+        public fun writeUInt32(input: UInt): ByteArray = Pack.writeInt32LE(input.toInt())
 
         @JvmStatic
-        public fun uint32BE(input: ByteArray): Int {
-            return Pack.uint32BE(input, 0)
-        }
+        public fun uint64(input: Input): ULong = Pack.int64LE(input).toULong()
 
         @JvmStatic
-        public fun writeUInt32(input: Long, out: Output): Unit = out.write(Pack.writeUint32LE(input.toInt()))
+        public fun uint64(input: ByteArray): ULong = Pack.int64LE(input).toULong()
 
         @JvmStatic
-        public fun writeUInt32(input: Long): ByteArray {
-            val out = ByteArrayOutput()
-            writeUInt32(input, out)
-            return out.toByteArray()
-        }
+        public fun writeUInt64(input: ULong, out: Output): Unit = Pack.writeInt64LE(input.toLong(), out)
 
         @JvmStatic
-        public fun writeUInt32BE(input: Long, out: Output): Unit = out.write(Pack.writeUint32BE(input.toInt()))
+        public fun writeUInt64(input: ULong): ByteArray = Pack.writeInt64LE(input.toLong())
 
         @JvmStatic
-        public fun writeUInt32BE(input: Long): ByteArray {
-            val out = ByteArrayOutput()
-            writeUInt32BE(input, out)
-            return out.toByteArray()
-        }
+        public fun varint(blob: ByteArray): ULong = varint(ByteArrayInput(blob))
 
         @JvmStatic
-        public fun uint64(input: Input): Long {
-            val bin = ByteArray(8)
-            input.read(bin, 0, 8)
-            return Pack.uint64LE(bin, 0)
-        }
-
-        @JvmStatic
-        public fun uint64(input: ByteArray): Long = Pack.uint64LE(input, 0)
-
-        @JvmStatic
-        public fun uint64BE(input: ByteArray): Long = Pack.uint64BE(input, 0)
-
-        @JvmStatic
-        public fun writeUInt64(input: Long, out: Output): Unit = out.write(Pack.writeUint64LE(input))
-
-        @JvmStatic
-        public fun writeUInt64(input: Long): ByteArray = Pack.writeUint64LE(input)
-
-        @JvmStatic
-        public fun writeUInt64BE(input: Long): ByteArray = Pack.writeUint64BE(input)
-
-        @JvmStatic
-        public fun varint(blob: ByteArray): Long = varint(ByteArrayInput(blob))
-
-        @JvmStatic
-        public fun varint(input: Input): Long {
+        public fun varint(input: Input): ULong {
             val first = input.read()
             return when {
-                first < 0xfd -> first.toLong()
-                first == 0xfd -> uint16(input).toLong()
-                first == 0xfe -> uint32(input)
-                first == 0xff -> uint64(input)
+                first < 0xFD -> first.toULong()
+                first == 0xFD -> uint16(input).toULong()
+                first == 0xFE -> uint32(input).toULong()
+                first == 0xFF -> uint64(input)
                 else -> {
                     throw IllegalArgumentException("invalid first byte $first for varint type")
                 }
@@ -183,22 +139,22 @@ public abstract class BtcSerializer<T> {
         }
 
         @JvmStatic
-        public fun writeVarint(input: Int, out: Output): Unit = writeVarint(input.toLong(), out)
+        public fun writeVarint(input: Int, out: Output): Unit = writeVarint(input.toULong(), out)
 
         @JvmStatic
-        public fun writeVarint(input: Long, out: Output) {
+        public fun writeVarint(input: ULong, out: Output) {
             when {
-                input < 0xfdL -> writeUInt8(input.toInt(), out)
-                input < 65535L -> {
-                    writeUInt8(0xfd, out)
-                    writeUInt16(input.toInt(), out)
+                input < 0xFDuL -> writeUInt8(input.toUByte(), out)
+                input < 65535uL -> {
+                    writeUInt8(0xFDu, out)
+                    writeUInt16(input.toUShort(), out)
                 }
-                input < 1048576L -> {
-                    writeUInt8(0xfe, out)
-                    writeUInt32(input, out)
+                input < 1048576uL -> {
+                    writeUInt8(0xFEu, out)
+                    writeUInt32(input.toUInt(), out)
                 }
                 else -> {
-                    writeUInt8(0xff, out)
+                    writeUInt8(0xFFu, out)
                     writeUInt64(input, out)
                 }
             }
@@ -229,7 +185,7 @@ public abstract class BtcSerializer<T> {
         @JvmStatic
         public fun varstring(input: Input): String {
             val length = varint(input)
-            val bytes = bytes(input, length)
+            val bytes = bytes(input, length.toInt())
             val chars = bytes.map { it.toChar() }.toCharArray()
             return String(chars)
         }
@@ -247,7 +203,7 @@ public abstract class BtcSerializer<T> {
         @JvmStatic
         public fun script(input: Input): ByteArray {
             val length = varint(input) // read size
-            return bytes(input, length) // read bytes
+            return bytes(input, length.toInt()) // read bytes
         }
 
         @JvmStatic
@@ -272,7 +228,7 @@ public abstract class BtcSerializer<T> {
             maxElement: Int?,
             protocolVersion: Long
         ): List<T> {
-            val count = varint(input)
+            val count = varint(input).toInt()
             if (maxElement != null) require(count <= maxElement) { "invalid length" }
             val items = mutableListOf<T>()
             for (i in 1..count) {

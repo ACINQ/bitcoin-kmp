@@ -16,13 +16,14 @@
 
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Secp256k1
+import fr.acinq.secp256k1.Secp256k1
 import fr.acinq.bitcoin.io.*
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 public typealias RunnerCallback = (List<ScriptElt>, List<ByteVector>, Script.Runner.Companion.State) -> Boolean
 
+@OptIn(ExperimentalUnsignedTypes::class)
 public object Script {
     public const val MaxScriptElementSize: Int = 520
     public val True: ByteVector = ByteVector("01")
@@ -46,15 +47,15 @@ public object Script {
             code in 1 until 0x4c -> parse(input, stack + OP_PUSHDATA(BtcSerializer.bytes(input, code), code))
             code == 0x4c -> parse(
                 input,
-                stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint8(input)), 0x4c)
+                stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint8(input).toInt()), 0x4c)
             )
             code == 0x4d -> parse(
                 input,
-                stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint16(input)), 0x4d)
+                stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint16(input).toInt()), 0x4d)
             )
             code == 0x4e -> parse(
                 input,
-                stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint32(input)), 0x4e)
+                stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint32(input).toInt()), 0x4e)
             )
             ScriptEltMapping.code2elt.containsKey(code) -> parse(
                 input,
@@ -88,16 +89,16 @@ public object Script {
                             out.write(head.data.size())
                         }
                         head.data.size() < 0xff && head.code == 0x4c -> {
-                            BtcSerializer.writeUInt8(0x4c, out)
-                            BtcSerializer.writeUInt8(head.data.size(), out)
+                            BtcSerializer.writeUInt8(0x4Cu, out)
+                            BtcSerializer.writeUInt8(head.data.size().toUByte(), out)
                         }
                         head.data.size() < 0xffff && head.code == 0x4d -> {
-                            BtcSerializer.writeUInt8(0x4d, out)
-                            BtcSerializer.writeUInt16(head.data.size(), out)
+                            BtcSerializer.writeUInt8(0x4Du, out)
+                            BtcSerializer.writeUInt16(head.data.size().toUShort(), out)
                         }
                         head.data.size() < 0xffffffff && head.code == 0x4e -> {
-                            BtcSerializer.writeUInt8(0x4e, out)
-                            BtcSerializer.writeUInt32(head.data.size().toLong(), out)
+                            BtcSerializer.writeUInt8(0x4Eu, out)
+                            BtcSerializer.writeUInt32(head.data.size().toUInt(), out)
                         }
                     }
                     out.write(head.data.toByteArray())
@@ -577,7 +578,7 @@ public object Script {
                         signatureVersion
                     )
                     // signature is normalized here, but high-S correctness has already been checked
-                    val normalized = ByteVector64(Secp256k1.signatureNormalize(sigBytes1).first)
+                    val normalized = Crypto.normalize(sigBytes1).first
                     val pub = PublicKey(pubKey)
                     val result = Crypto.verifySignature(hash, normalized, pub)
                     result

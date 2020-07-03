@@ -16,7 +16,7 @@
 
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.crypto.Secp256k1
+import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -24,16 +24,15 @@ public data class PublicKey(@JvmField val value: ByteVector) {
     public constructor(data: ByteArray) : this(ByteVector(data))
 
     public operator fun plus(that: PublicKey): PublicKey {
-        val pub = Secp256k1.publicKeyAdd(
+        val pub = Secp256k1.pubKeyAdd(
             value.toByteArray(),
             that.value.toByteArray()
         )
-        return PublicKey(compress(pub)
-        )
+        return PublicKey(compress(pub))
     }
 
     public operator fun times(that: PrivateKey): PublicKey {
-        val pub = Secp256k1.publicKeyMul(
+        val pub = Secp256k1.pubKeyTweakMul(
             value.toByteArray(),
             that.value.toByteArray()
         )
@@ -50,7 +49,7 @@ public data class PublicKey(@JvmField val value: ByteVector) {
     override fun toString(): String = value.toString()
 
     public fun toUncompressedBin(): ByteArray {
-        return Secp256k1.parsePublicKey(value.toByteArray())
+        return Secp256k1.pubkeyParse(value.toByteArray())
     }
 
     init {
@@ -59,7 +58,7 @@ public data class PublicKey(@JvmField val value: ByteVector) {
 
     public companion object {
         @JvmField
-        public val Generator: PublicKey = PublicKey(Hex.decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"))
+        public val Generator: PublicKey = PublicKey(Hex.decode("0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"))
 
         @JvmStatic
         public fun compress(pub: ByteArray): ByteArray {

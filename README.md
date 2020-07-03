@@ -38,20 +38,26 @@ Our runtime targets are:
 
 Native targets include libsecp256k1, called through KMP's c-interop, you don't have anything to do.
 
-### JVM target
+### JVM target & Android
 
-The JVM library uses JNI bindings for libsecp256k1, which is must faster than BouncyCastle. It will extract and load native bindings for your operating system in a temporary directory. If this process fails it will fallback to BouncyCastle.
+The JVM library uses JNI bindings for libsecp256k1, which is much faster than BouncyCastle. It will extract and load native bindings for your operating system in a temporary directory.
 
 JNI libraries are included for:
 - Linux 64 bits
 - Windows 64 bits
 - Macos 64 bits
 
-If you are using the JVM on an OS for which we don't provide JNI bindings (32 bits OS for example), you can use your own library native library by specifying its path with `-Dfr.acinq.secp256k1.lib.path` and optionally its name with `-Dfr.acinq.secp256k1.lib.name` (if unspecified
-bitcoink use the standard name for your OS i.e. libsecp256k1.so on Linux, secp256k1.dll on Windows, ...)
+Along this library, you **must** specify which JNI native library to use in your dependency manager:
 
-You can also specify the temporary directory where the library will be extracted with `-Djava.io.tmpdir` or `-Dfr.acinq.secp256k1.tmpdir` (if you want to use a different
-directory from `-Djava.io.tmpdir`).
+* For desktop or server JVMs, you must add the `fr.acinq.secp256k1:secp256k1-jni-jvm` dependency
+* For Android, you must add the `fr.acinq.secp256k1:secp256k1-jni-android` dependency
+
+If you are using the JVM on an OS for which we don't provide JNI bindings (32 bits OS for example), you can use your own library native library by
+adding the `fr.acinq.secp256k1:secp256k1-jni-jvm` dependency and specifying its path with `-Dfr.acinq.secp256k1.lib.path` and optionally its name with `-Dfr.acinq.secp256k1.lib.name`
+(if unspecified bitcoink use the standard name for your OS i.e. libsecp256k1.so on Linux, secp256k1.dll on Windows, ...).
+
+You can also specify the temporary directory where the library will be extracted with `-Djava.io.tmpdir` or `-Dfr.acinq.secp256k1.tmpdir`
+(if you want to use a different directory from `-Djava.io.tmpdir`).
 
 ## Usage
 

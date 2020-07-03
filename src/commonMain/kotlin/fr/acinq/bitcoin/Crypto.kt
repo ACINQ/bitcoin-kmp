@@ -21,6 +21,7 @@ import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_LOW_S
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_STRICTENC
 import fr.acinq.bitcoin.crypto.*
 import fr.acinq.bitcoin.io.ByteArrayInput
+import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmStatic
 
 public object Crypto {
@@ -138,8 +139,8 @@ public object Crypto {
     @JvmStatic
     public fun verifySignature(data: ByteArray, signature: ByteVector64, publicKey: PublicKey): Boolean {
         return Secp256k1.verify(
-            data,
             signature.toByteArray(),
+            data,
             publicKey.value.toByteArray()
         )
     }
@@ -147,11 +148,29 @@ public object Crypto {
     public fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean =
         verifySignature(data.toByteArray(), signature, publicKey)
 
-    @JvmStatic
-    public fun compact2der(signature: ByteVector64): ByteVector = ByteVector(Secp256k1.compact2der(signature.toByteArray()))
+
+    private fun dropZeroAndFixSize(input: ByteArray, size: Int) = fixSize(input.dropWhile { it == 0.toByte() }.toByteArray(), size)
 
     @JvmStatic
-    public fun der2compact(signature: ByteArray): ByteVector64 = ByteVector64(Secp256k1.der2compact(signature))
+    public fun compact2der(signature: ByteVector64): ByteVector {
+        val normalized = Secp256k1.signatureNormalize(signature.toByteArray()).first
+        val der = Secp256k1.compact2der(normalized)
+        return ByteVector(der)
+    }
+
+    @JvmStatic
+    public fun der2compact(signature: ByteArray): ByteVector64{
+        val (r, s) = decodeSignatureLax(ByteArrayInput(signature))
+        val lax = dropZeroAndFixSize(r, 32) + dropZeroAndFixSize(s, 32)
+        return ByteVector64(Secp256k1.signatureNormalize(lax).first)
+    }
+
+    @JvmStatic
+    public fun normalize(signature: ByteArray): Pair<ByteVector64, Boolean> {
+        val (r, s) = decodeSignatureLax(ByteArrayInput(signature))
+        val compact = dropZeroAndFixSize(r, 32) + dropZeroAndFixSize(s, 32)
+        return Secp256k1.signatureNormalize(compact).let { ByteVector64(it.first) to it.second }
+    }
 
     @JvmStatic
     public fun isDERSignature(sig: ByteArray): Boolean {
@@ -326,6 +345,6 @@ public object Crypto {
      */
     @JvmStatic
     public fun recoverPublicKey(sig: ByteVector64, message: ByteArray, recid: Int): PublicKey {
-        return PublicKey(PublicKey.compress(Secp256k1.recoverPublicKey(sig.toByteArray(), message, recid)))
+        return PublicKey(PublicKey.compress(Secp256k1.ecdsaRecover(sig.toByteArray(), message, recid)))
     }
 }

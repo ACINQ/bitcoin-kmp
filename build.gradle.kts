@@ -26,10 +26,10 @@ kotlin {
 
     linuxX64("linux")
 
-//    ios {
-//        // https://youtrack.jetbrains.com/issue/KT-39396
-//        compilations["main"].kotlinOptions.freeCompilerArgs = listOf("-include-binary", "$rootDir/c/secp256k1/build/ios/libsecp256k1.a")
-//    }
+    ios {
+        // https://youtrack.jetbrains.com/issue/KT-39396
+        compilations["main"].kotlinOptions.freeCompilerArgs = listOf("-include-binary", "$rootDir/c/secp256k1/build/ios/libsecp256k1.a")
+    }
 
     sourceSets {
         val secp256k1KmpVersion = "0.1.0-1.4-M2"
@@ -65,10 +65,10 @@ kotlin {
             }
         }
 
-//        val iosMain by getting {
-//            dependencies {
-//            }
-//        }
+        val iosMain by getting {
+            dependencies {
+            }
+        }
 
         all {
             languageSettings.useExperimentalAnnotation("kotlin.RequiresOptIn")

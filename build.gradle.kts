@@ -73,6 +73,34 @@ kotlin {
     }
 }
 
+// Disable cross compilation
+allprojects {
+    plugins.withId("org.jetbrains.kotlin.multiplatform") {
+        afterEvaluate {
+            val currentOs = org.gradle.internal.os.OperatingSystem.current()
+            val targets = when {
+                currentOs.isLinux -> listOf()
+                else -> listOf("linux")
+            }.mapNotNull { kotlin.targets.findByName(it) as? org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget }
+
+            configure(targets) {
+                compilations.all {
+                    cinterops.all { tasks[interopProcessingTaskName].enabled = false }
+                    compileKotlinTask.enabled = false
+                    tasks[processResourcesTaskName].enabled = false
+                }
+                binaries.all { linkTask.enabled = false }
+
+                mavenPublication {
+                    val publicationToDisable = this
+                    tasks.withType<AbstractPublishToMaven>().all { onlyIf { publication != publicationToDisable } }
+                    tasks.withType<GenerateModuleMetadata>().all { onlyIf { publication.get() != publicationToDisable } }
+                }
+            }
+        }
+    }
+}
+
 val bintrayUsername: String? = (properties["bintrayUsername"] as String?) ?: System.getenv("BINTRAY_USER")
 val bintrayApiKey: String? = (properties["bintrayApiKey"] as String?) ?: System.getenv("BINTRAY_APIKEY")
 

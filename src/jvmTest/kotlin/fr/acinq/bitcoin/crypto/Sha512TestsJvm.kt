@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalStdlibApi::class)
 class Sha512TestsJvm {
-    @Test @Ignore
+    @Test
     fun `very long input`() {
         val sha512 = Sha512()
         val input = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno".encodeToByteArray()

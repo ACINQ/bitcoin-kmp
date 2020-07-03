@@ -50,14 +50,12 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation(kotlin("stdlib-jdk8"))
-                implementation("org.bouncycastle:bcprov-jdk15on:1.64")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
-                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.9.8")
-                implementation("com.google.guava:guava:28.2-jre")
+                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.11.0")
                 implementation("fr.acinq.secp256k1:secp256k1-jni-jvm:$secp256k1KmpVersion")
             }
         }

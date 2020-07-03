@@ -16,7 +16,6 @@
 
 package fr.acinq.bitcoin
 
-import com.google.common.io.ByteStreams
 import fr.acinq.bitcoin.io.InputStreamInput
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -47,8 +46,7 @@ class BlockTestsJvm {
 
     @Test
     fun `serialize and deserialize blocks`() {
-        val stream = javaClass.getResourceAsStream("/block1.dat")
-        val bytes = ByteStreams.toByteArray(stream)
+        val bytes = javaClass.getResourceAsStream("/block1.dat").use { it.readBytes() }
         val block = Block.read(bytes)
         val check = Block.write(block)
         assert(check.byteVector() == bytes.byteVector())

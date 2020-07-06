@@ -9,8 +9,8 @@ on:
       - '**.md'
       - '**.adoc'
       - '**/.gitignore'
-      - './github/**'
-      - '!./github/workflow/test.yml'
+      - '.github/**'
+      - '!.github/workflows/test.yml'
 
 jobs:
 

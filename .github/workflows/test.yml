@@ -1,16 +1,22 @@
 name: Check
 
 on:
-  push:
-    branches:
-      - 'master'
-    pull_request:
+  pull_request:
     paths-ignore:
       - '**.md'
       - '**.adoc'
       - '**/.gitignore'
-      - './github/**'
-      - '!./github/workflow/test.yml'
+      - '.github/**'
+      - '!.github/workflows/test.yml'
+  push:
+    branches:
+      - 'master'
+    paths-ignore:
+      - '**.md'
+      - '**.adoc'
+      - '**/.gitignore'
+      - '.github/**'
+      - '!.github/workflows/test.yml'
 
 jobs:
 

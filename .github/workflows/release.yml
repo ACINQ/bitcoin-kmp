@@ -1,21 +1,44 @@
-name: Check
+name: Publish release
 
 on:
-  push:
-    branches:
-      - 'master'
-    pull_request:
-    paths-ignore:
-      - '**.md'
-      - '**.adoc'
-      - '**/.gitignore'
-      - './github/**'
-      - '!./github/workflow/test.yml'
+  release:
+    types: [published]
 
 jobs:
 
-  linux:
-    name: JNI & Linux
+  publish-ios:
+    name: Publish iOS native
+    runs-on: macOS-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v2
+        with:
+          submodules: 'true'
+      - name: Cached Konan
+        uses: actions/cache@v2
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle*') }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-konan-
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Check
+        uses: eskatos/gradle-command-action@v1
+        with:
+          wrapper-cache-enabled: true
+          arguments: iosX64Test
+      - name: Publish
+        uses: eskatos/gradle-command-action@v1
+        env:
+          BINTRAY_USER: ${{ secrets.bintray_user }}
+          BINTRAY_APIKEY: ${{ secrets.bintray_apikey }}
+        with:
+          arguments: publishIosArm64PublicationToBintrayRepository publishIosX64PublicationToBintrayRepository
+
+  publish:
+    name: Publish JVM & Linux native
     runs-on: ubuntu-latest
     steps:
       - name: Check out
@@ -32,45 +55,15 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
-      - name: Check JNI
+      - name: Check
         uses: eskatos/gradle-command-action@v1
         with:
           wrapper-cache-enabled: true
-          dependencies-cache-enabled: true
-          arguments: jvmTest -PnoCrossCompile=true
-      - name: Check Linux
-        uses: eskatos/gradle-command-action@v1
-        with:
           arguments: check
-
-  macos:
-    name: iOS & Android
-    runs-on: macos-latest
-    steps:
-      - name: Check out
-        uses: actions/checkout@v2
-        with:
-          submodules: 'true'
-      - name: Cached Konan
-        uses: actions/cache@v2
-        with:
-          path: ~/.konan
-          key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle*') }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: ${{ runner.os }}-konan-
-      - name: Set up JDK 11
-        uses: actions/setup-java@v1
-        with:
-          java-version: 11
-      - name: Check iOS
+      - name: Publish
         uses: eskatos/gradle-command-action@v1
+        env:
+          BINTRAY_USER: ${{ secrets.bintray_user }}
+          BINTRAY_APIKEY: ${{ secrets.bintray_apikey }}
         with:
-          wrapper-cache-enabled: true
-          dependencies-cache-enabled: true
-          arguments: iosX64Test
-      - name: Check Android
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 29
-          ndk: 21.3.6528147
-          cmake: 3.10.2.4988404
-          script: ./gradlew connectedCheck
+          arguments: publishAllPublicationsToBintrayRepository

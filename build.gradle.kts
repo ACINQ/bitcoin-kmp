@@ -101,31 +101,46 @@ allprojects {
     }
 }
 
-val bintrayUsername: String? = (properties["bintrayUsername"] as String?) ?: System.getenv("BINTRAY_USER")
-val bintrayApiKey: String? = (properties["bintrayApiKey"] as String?) ?: System.getenv("BINTRAY_APIKEY")
+publishing {
+    val snapshotNumber: String? by project
 
-if (bintrayUsername == null || bintrayApiKey == null) logger.warn("Skipping bintray configuration as bintrayUsername or bintrayApiKey is not defined")
-else {
-    publishing {
-        val snapshotName: String? by project
-        val snapshotNumber: String? by project
-
-        val snapshot = snapshotName?.let { name -> snapshotNumber?.let { number -> name to number } }
-
-        publications.withType<MavenPublication> {
-            if (snapshot != null) version = "${project.version}-${snapshot.first}-${snapshot.second}"
-        }
-
+    val bintrayUsername: String? = (properties["bintrayUsername"] as String?) ?: System.getenv("BINTRAY_USER")
+    val bintrayApiKey: String? = (properties["bintrayApiKey"] as String?) ?: System.getenv("BINTRAY_APIKEY")
+    if (bintrayUsername == null || bintrayApiKey == null) logger.warn("Skipping bintray configuration as bintrayUsername or bintrayApiKey is not defined")
+    else {
+        val btRepo = if (snapshotNumber != null) "snapshots" else "libs"
+        val btPublish = if (snapshotNumber != null) "1" else "0"
         repositories {
             maven {
                 name = "bintray"
-                val btRepo = if (snapshotNumber != null) "${rootProject.name}-dev" else rootProject.name
-                val btIsSnaphost = if (snapshotNumber != null) 1 else 0
-                setUrl("https://api.bintray.com/maven/acinq/$btRepo/${project.name}/;publish=0;override=$btIsSnaphost")
+                setUrl("https://api.bintray.com/maven/acinq/$btRepo/${rootProject.name}/;publish=$btPublish")
                 credentials {
                     username = bintrayUsername
                     password = bintrayApiKey
                 }
+            }
+        }
+    }
+
+    val gitRef: String? by project
+    val gitSha: String? by project
+    val eapBranch = gitRef?.split("/")?.last() ?: "dev"
+    val eapSuffix = gitSha?.let { "-${it.substring(0, 7)}" } ?: ""
+    publications.withType<MavenPublication>().configureEach {
+        if (snapshotNumber != null) version = "${project.version}-$eapBranch-$snapshotNumber$eapSuffix"
+        pom {
+            description.set("A simple Kotlin Multiplatform library which implements most of the bitcoin protocol")
+            url.set("https://github.com/ACINQ/bitcoink")
+            licenses {
+                name.set("Apache License v2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0")
+            }
+            issueManagement {
+                system.set("Github")
+                url.set("https://github.com/ACINQ/bitcoink/issues")
+            }
+            scm {
+                connection.set("https://github.com/ACINQ/bitcoink.git")
             }
         }
     }

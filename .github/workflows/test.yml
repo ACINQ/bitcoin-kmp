@@ -9,13 +9,13 @@ on:
       - '**.md'
       - '**.adoc'
       - '**/.gitignore'
-      - './github/**'
-      - '!./github/workflow/test.yml'
+      - '.github/**'
+      - '!.github/workflows/test.yml'
 
 jobs:
 
   linux:
-    name: JNI & Linux
+    name: Linux JNI & native
     runs-on: ubuntu-latest
     steps:
       - name: Check out
@@ -32,19 +32,15 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
-      - name: Check JNI
+      - name: Check
         uses: eskatos/gradle-command-action@v1
         with:
           wrapper-cache-enabled: true
           dependencies-cache-enabled: true
-          arguments: jvmTest -PnoCrossCompile=true
-      - name: Check Linux
-        uses: eskatos/gradle-command-action@v1
-        with:
           arguments: check
 
   macos:
-    name: iOS & Android
+    name: MacOS JNI & iOS native
     runs-on: macos-latest
     steps:
       - name: Check out
@@ -61,16 +57,9 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
-      - name: Check iOS
+      - name: Check
         uses: eskatos/gradle-command-action@v1
         with:
           wrapper-cache-enabled: true
           dependencies-cache-enabled: true
-          arguments: iosX64Test
-      - name: Check Android
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 29
-          ndk: 21.3.6528147
-          cmake: 3.10.2.4988404
-          script: ./gradlew connectedCheck
+          arguments: check

@@ -196,6 +196,6 @@ public object Bech32 {
     public fun encode(hrp: String, int5s: ByteArray): String {
         require(hrp.toLowerCase() == hrp || hrp.toUpperCase() == hrp) { "mixed case strings are not valid bech32 prefixes" }
         val checksum = checksum(hrp, int5s.toTypedArray())
-        return hrp + "1" + String((int5s.toTypedArray() + checksum).map { i -> alphabet[i.toInt()] }.toCharArray())
+        return hrp + "1" + (int5s.toTypedArray() + checksum).map { i -> alphabet[i.toInt()] }.toCharArray().concatToString()
     }
 }

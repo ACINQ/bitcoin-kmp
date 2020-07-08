@@ -1,10 +1,12 @@
 plugins {
-    kotlin("multiplatform") version "1.4-M2-mt"
+    kotlin("multiplatform") version "1.4-M3"
     `maven-publish`
 }
 
+val currentOs = org.gradle.internal.os.OperatingSystem.current()
+
 group = "fr.acinq"
-version = "0.1.0-1.4-M2"
+version = "0.1.0-1.4-M3"
 
 repositories {
     mavenLocal()
@@ -29,12 +31,12 @@ kotlin {
     ios()
 
     sourceSets {
-        val secp256k1KmpVersion = "0.1.0-1.4-M2"
+        val secp256k1KmpVersion = "0.2.0-1.4-M3"
 
         val commonMain by getting {
             dependencies {
                 implementation(kotlin("stdlib-common"))
-                api("fr.acinq.secp256k1:secp256k1-kmp:$secp256k1KmpVersion")
+                api("fr.acinq.secp256k1:secp256k1:$secp256k1KmpVersion")
             }
         }
         val commonTest by getting {
@@ -53,7 +55,13 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.11.0")
-                implementation("fr.acinq.secp256k1:secp256k1-jni-jvm:$secp256k1KmpVersion")
+                val target = when {
+                    currentOs.isLinux -> "linux"
+                    currentOs.isMacOsX -> "darwin"
+                    currentOs.isWindows -> "mingw"
+                    else -> error("UnsupportedmOS $currentOs")
+                }
+                implementation("fr.acinq.secp256k1:secp256k1-jni-jvm-$target:$secp256k1KmpVersion")
             }
         }
 

@@ -41,8 +41,8 @@ jobs:
       - name: Check
         uses: eskatos/gradle-command-action@v1
         with:
-          wrapper-cache-enabled: true
-          dependencies-cache-enabled: true
+          wrapper-cache-enabled: false # https://github.com/eskatos/gradle-command-action/issues/24
+          dependencies-cache-enabled: false
           arguments: check
 
   macos:
@@ -66,6 +66,6 @@ jobs:
       - name: Check
         uses: eskatos/gradle-command-action@v1
         with:
-          wrapper-cache-enabled: true
-          dependencies-cache-enabled: true
+          wrapper-cache-enabled: false # https://github.com/eskatos/gradle-command-action/issues/24
+          dependencies-cache-enabled: false
           arguments: check

@@ -35,7 +35,7 @@ jobs:
       - name: Check
         uses: eskatos/gradle-command-action@v1
         with:
-          wrapper-cache-enabled: true
+          wrapper-cache-enabled: false # https://github.com/eskatos/gradle-command-action/issues/24
           arguments: iosX64Test
       - name: Publish
         uses: eskatos/gradle-command-action@v1
@@ -43,6 +43,7 @@ jobs:
           BINTRAY_USER: ${{ secrets.bintray_user }}
           BINTRAY_APIKEY: ${{ secrets.bintray_apikey }}
         with:
+          wrapper-cache-enabled: false # https://github.com/eskatos/gradle-command-action/issues/24
           arguments: publishIosArm64PublicationToBintrayRepository publishIosX64PublicationToBintrayRepository -PsnapshotNumber=${{ github.run_number }} -PgitRef=${{ github.ref }}  -PgitSha=${{ github.sha }}
 
   publish:
@@ -66,7 +67,7 @@ jobs:
       - name: Check
         uses: eskatos/gradle-command-action@v1
         with:
-          wrapper-cache-enabled: true
+          wrapper-cache-enabled: false # https://github.com/eskatos/gradle-command-action/issues/24
           arguments: check
       - name: Publish
         uses: eskatos/gradle-command-action@v1
@@ -74,4 +75,5 @@ jobs:
           BINTRAY_USER: ${{ secrets.bintray_user }}
           BINTRAY_APIKEY: ${{ secrets.bintray_apikey }}
         with:
+          wrapper-cache-enabled: false # https://github.com/eskatos/gradle-command-action/issues/24
           arguments: publishAllPublicationsToBintrayRepository -PsnapshotNumber=${{ github.run_number }} -PgitRef=${{ github.ref }} -PgitSha=${{ github.sha }}

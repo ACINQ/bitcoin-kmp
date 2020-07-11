@@ -31,7 +31,7 @@ kotlin {
     ios()
 
     sourceSets {
-        val secp256k1KmpVersion = "0.2.0-1.4-M3"
+        val secp256k1KmpVersion = "0.2.1-1.4-M3"
 
         val commonMain by getting {
             dependencies {

@@ -18,6 +18,7 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.*
+import fr.acinq.secp256k1.Hex
 import kotlin.jvm.JvmStatic
 
 @OptIn(ExperimentalUnsignedTypes::class)

@@ -19,8 +19,8 @@ package fr.acinq.bitcoin.reference
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import fr.acinq.bitcoin.Hex
 import fr.acinq.bitcoin.Transaction
+import fr.acinq.secp256k1.Hex
 import org.junit.Test
 
 class SigHashTestsJvm {

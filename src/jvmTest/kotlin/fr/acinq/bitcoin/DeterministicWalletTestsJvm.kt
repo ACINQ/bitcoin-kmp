@@ -21,6 +21,7 @@ import fr.acinq.bitcoin.DeterministicWallet.encode
 import fr.acinq.bitcoin.DeterministicWallet.fingerprint
 import fr.acinq.bitcoin.DeterministicWallet.generate
 import fr.acinq.bitcoin.DeterministicWallet.publicKey
+import fr.acinq.secp256k1.Hex
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails

@@ -16,7 +16,7 @@
 
 package fr.acinq.bitcoin.crypto
 
-import fr.acinq.bitcoin.Hex
+import fr.acinq.secp256k1.Hex
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

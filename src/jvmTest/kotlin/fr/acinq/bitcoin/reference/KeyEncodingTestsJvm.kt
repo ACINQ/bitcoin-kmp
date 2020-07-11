@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import fr.acinq.bitcoin.*
+import fr.acinq.secp256k1.Hex
 import org.junit.Test
 
 class KeyEncodingTestsJvm {

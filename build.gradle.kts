@@ -5,7 +5,7 @@ plugins {
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
-group = "fr.acinq"
+group = "fr.acinq.bitcoink"
 version = "0.2.0-1.4-M3"
 
 repositories {

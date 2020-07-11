@@ -20,9 +20,12 @@ on:
 
 jobs:
 
-  linux:
-    name: Linux JNI & native
-    runs-on: ubuntu-latest
+  upload:
+    name: Check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest]
     steps:
       - name: Check out
         uses: actions/checkout@v2
@@ -34,38 +37,15 @@ jobs:
           path: ~/.konan
           key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle*') }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-konan-
-      - name: Set up JDK 11
-        uses: actions/setup-java@v1
-        with:
-          java-version: 11
-      - name: Check
-        uses: eskatos/gradle-command-action@v1
-        with:
-          wrapper-cache-enabled: false # https://github.com/eskatos/gradle-command-action/issues/24
-          dependencies-cache-enabled: false
-          arguments: check
-
-  macos:
-    name: MacOS JNI & iOS native
-    runs-on: macos-latest
-    steps:
-      - name: Check out
-        uses: actions/checkout@v2
-        with:
-          submodules: 'true'
-      - name: Cached Konan
+      - name: Cached Gradle
         uses: actions/cache@v2
         with:
-          path: ~/.konan
-          key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle*') }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: ${{ runner.os }}-konan-
+          path: ~/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
           java-version: 11
       - name: Check
-        uses: eskatos/gradle-command-action@v1
-        with:
-          wrapper-cache-enabled: false # https://github.com/eskatos/gradle-command-action/issues/24
-          dependencies-cache-enabled: false
-          arguments: check
+        run: ./gradlew check

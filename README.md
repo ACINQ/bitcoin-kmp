@@ -1,5 +1,7 @@
 # Kotlin Multiplatform Bitcoin Library
 
+ [ ![Download](https://api.bintray.com/packages/acinq/libs/bitcoink/images/download.svg) ](https://bintray.com/acinq/libs/bitcoink/_latestVersion)
+
 ## Overview
 
 This is a simple Kotlin Multiplatform library which implements most of the bitcoin protocol:
@@ -32,32 +34,25 @@ Our runtime targets are:
 - [X] Passing core reference tests (scripts & transactions)
 - [X] Passing core reference segwit tests
 
+## Install
+
+First, add the ACINQ libraries repository:
+
+```kotlin
+// build.gradle.kts
+repositories {
+    maven(url = "https://dl.bintray.com/acinq/libs")
+}
+```
+
+- **Multiplatform**: Add the `fr.acinq.bitcoink:bitcoink` dependency to your common source set dependencies (You need Gradle 5.0 minimum).
+- **JVM**: Add the `fr.acinq.bitcoink:bitcoink-jvm` dependency to your project.
+
 ## libscp256k1 support
 
-### Native targets (iOS, linux64)
+**You need to add a JVM implementation of Secp256k1** to your project in order to use BitcoinK with JVM.
 
-Native targets include libsecp256k1, called through KMP's c-interop, you don't have anything to do.
-
-### JVM target & Android
-
-The JVM library uses JNI bindings for libsecp256k1, which is much faster than BouncyCastle. It will extract and load native bindings for your operating system in a temporary directory.
-
-JNI libraries are included for:
-- Linux 64 bits
-- Windows 64 bits
-- Macos 64 bits
-
-Along this library, you **must** specify which JNI native library to use in your dependency manager:
-
-* For desktop or server JVMs, you must add the `fr.acinq.secp256k1:secp256k1-jni-jvm` dependency
-* For Android, you must add the `fr.acinq.secp256k1:secp256k1-jni-android` dependency
-
-If you are using the JVM on an OS for which we don't provide JNI bindings (32 bits OS for example), you can use your own library native library by
-adding the `fr.acinq.secp256k1:secp256k1-jni-jvm` dependency and specifying its path with `-Dfr.acinq.secp256k1.lib.path` and optionally its name with `-Dfr.acinq.secp256k1.lib.name`
-(if unspecified bitcoink use the standard name for your OS i.e. libsecp256k1.so on Linux, secp256k1.dll on Windows, ...).
-
-You can also specify the temporary directory where the library will be extracted with `-Djava.io.tmpdir` or `-Dfr.acinq.secp256k1.tmpdir`
-(if you want to use a different directory from `-Djava.io.tmpdir`).
+Please refer the [Secp256k1 installation section](https://github.com/ACINQ/secp256k1-kmp#installation).
 
 ## Usage
 

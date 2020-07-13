@@ -16,6 +16,7 @@
 
 package fr.acinq.bitcoin
 
+import fr.acinq.secp256k1.Hex
 import org.junit.Test
 import kotlin.test.assertEquals
 

@@ -18,6 +18,7 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
+import fr.acinq.secp256k1.Hex
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 

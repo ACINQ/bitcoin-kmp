@@ -20,6 +20,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import fr.acinq.bitcoin.MnemonicCode.toMnemonics
 import fr.acinq.bitcoin.MnemonicCode.toSeed
+import fr.acinq.secp256k1.Hex
 import org.junit.Test
 import java.util.*
 import kotlin.test.assertEquals

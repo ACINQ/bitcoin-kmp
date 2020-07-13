@@ -20,6 +20,7 @@ import fr.acinq.bitcoin.Protocol.PROTOCOL_VERSION
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
+import fr.acinq.secp256k1.Hex
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 

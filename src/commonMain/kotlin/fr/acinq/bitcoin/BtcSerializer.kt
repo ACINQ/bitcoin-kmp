@@ -18,6 +18,7 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.*
+import fr.acinq.secp256k1.Hex
 import kotlin.jvm.JvmStatic
 
 @OptIn(ExperimentalUnsignedTypes::class)
@@ -187,7 +188,7 @@ public abstract class BtcSerializer<T> {
             val length = varint(input)
             val bytes = bytes(input, length.toInt())
             val chars = bytes.map { it.toChar() }.toCharArray()
-            return String(chars)
+            return chars.concatToString()
         }
 
         @JvmStatic

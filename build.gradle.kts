@@ -1,10 +1,19 @@
+import org.gradle.internal.impldep.org.apache.http.auth.UsernamePasswordCredentials
+import org.gradle.internal.impldep.org.apache.http.client.methods.HttpPost
+import org.gradle.internal.impldep.org.apache.http.entity.ContentType
+import org.gradle.internal.impldep.org.apache.http.impl.client.HttpClients
+import org.gradle.internal.impldep.org.apache.http.entity.StringEntity
+import org.gradle.internal.impldep.org.apache.http.impl.auth.BasicScheme
+
 plugins {
-    kotlin("multiplatform") version "1.4-M2-mt"
+    kotlin("multiplatform") version "1.4-M3"
     `maven-publish`
 }
 
-group = "fr.acinq"
-version = "0.1.0-1.4-M2"
+val currentOs = org.gradle.internal.os.OperatingSystem.current()
+
+group = "fr.acinq.bitcoink"
+version = "0.2.0-1.4-M3"
 
 repositories {
     mavenLocal()
@@ -29,12 +38,12 @@ kotlin {
     ios()
 
     sourceSets {
-        val secp256k1KmpVersion = "0.1.0-1.4-M2"
+        val secp256k1KmpVersion = "0.2.1-1.4-M3"
 
         val commonMain by getting {
             dependencies {
                 implementation(kotlin("stdlib-common"))
-                api("fr.acinq.secp256k1:secp256k1-kmp:$secp256k1KmpVersion")
+                api("fr.acinq.secp256k1:secp256k1:$secp256k1KmpVersion")
             }
         }
         val commonTest by getting {
@@ -53,7 +62,13 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.11.0")
-                implementation("fr.acinq.secp256k1:secp256k1-jni-jvm:$secp256k1KmpVersion")
+                val target = when {
+                    currentOs.isLinux -> "linux"
+                    currentOs.isMacOsX -> "darwin"
+                    currentOs.isWindows -> "mingw"
+                    else -> error("UnsupportedmOS $currentOs")
+                }
+                implementation("fr.acinq.secp256k1:secp256k1-jni-jvm-$target:$secp256k1KmpVersion")
             }
         }
 
@@ -74,46 +89,48 @@ kotlin {
 }
 
 // Disable cross compilation
-allprojects {
-    plugins.withId("org.jetbrains.kotlin.multiplatform") {
-        afterEvaluate {
-            val currentOs = org.gradle.internal.os.OperatingSystem.current()
-            val targets = when {
-                currentOs.isLinux -> listOf()
-                else -> listOf("linux")
-            }.mapNotNull { kotlin.targets.findByName(it) as? org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget }
+plugins.withId("org.jetbrains.kotlin.multiplatform") {
+    afterEvaluate {
+        val currentOs = org.gradle.internal.os.OperatingSystem.current()
+        val targets = when {
+            currentOs.isLinux -> listOf()
+            else -> listOf("linux")
+        }.mapNotNull { kotlin.targets.findByName(it) as? org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget }
 
-            configure(targets) {
-                compilations.all {
-                    cinterops.all { tasks[interopProcessingTaskName].enabled = false }
-                    compileKotlinTask.enabled = false
-                    tasks[processResourcesTaskName].enabled = false
-                }
-                binaries.all { linkTask.enabled = false }
+        configure(targets) {
+            compilations.all {
+                cinterops.all { tasks[interopProcessingTaskName].enabled = false }
+                compileKotlinTask.enabled = false
+                tasks[processResourcesTaskName].enabled = false
+            }
+            binaries.all { linkTask.enabled = false }
 
-                mavenPublication {
-                    val publicationToDisable = this
-                    tasks.withType<AbstractPublishToMaven>().all { onlyIf { publication != publicationToDisable } }
-                    tasks.withType<GenerateModuleMetadata>().all { onlyIf { publication.get() != publicationToDisable } }
-                }
+            mavenPublication {
+                val publicationToDisable = this
+                tasks.withType<AbstractPublishToMaven>().all { onlyIf { publication != publicationToDisable } }
+                tasks.withType<GenerateModuleMetadata>().all { onlyIf { publication.get() != publicationToDisable } }
             }
         }
     }
 }
 
-publishing {
-    val snapshotNumber: String? by project
+val snapshotNumber: String? by project
+val gitRef: String? by project
+val eapBranch = gitRef?.split("/")?.last() ?: "dev"
+val bintrayVersion = if (snapshotNumber != null) "${project.version}-$eapBranch-$snapshotNumber" else project.version.toString()
+val bintrayRepo = if (snapshotNumber != null) "snapshots" else "libs"
 
-    val bintrayUsername: String? = (properties["bintrayUsername"] as String?) ?: System.getenv("BINTRAY_USER")
-    val bintrayApiKey: String? = (properties["bintrayApiKey"] as String?) ?: System.getenv("BINTRAY_APIKEY")
-    if (bintrayUsername == null || bintrayApiKey == null) logger.warn("Skipping bintray configuration as bintrayUsername or bintrayApiKey is not defined")
-    else {
-        val btRepo = if (snapshotNumber != null) "snapshots" else "libs"
-        val btPublish = if (snapshotNumber != null) "1" else "0"
+val bintrayUsername: String? = (properties["bintrayUsername"] as String?) ?: System.getenv("BINTRAY_USER")
+val bintrayApiKey: String? = (properties["bintrayApiKey"] as String?) ?: System.getenv("BINTRAY_APIKEY")
+val hasBintray = bintrayUsername != null && bintrayApiKey != null
+if (!hasBintray) logger.warn("Skipping bintray configuration as bintrayUsername or bintrayApiKey is not defined")
+
+publishing {
+    if (hasBintray) {
         repositories {
             maven {
                 name = "bintray"
-                setUrl("https://api.bintray.com/maven/acinq/$btRepo/${rootProject.name}/;publish=$btPublish")
+                setUrl("https://api.bintray.com/maven/acinq/$bintrayRepo/${rootProject.name}/;publish=0")
                 credentials {
                     username = bintrayUsername
                     password = bintrayApiKey
@@ -122,12 +139,8 @@ publishing {
         }
     }
 
-    val gitRef: String? by project
-    val gitSha: String? by project
-    val eapBranch = gitRef?.split("/")?.last() ?: "dev"
-    val eapSuffix = gitSha?.let { "-${it.substring(0, 7)}" } ?: ""
     publications.withType<MavenPublication>().configureEach {
-        if (snapshotNumber != null) version = "${project.version}-$eapBranch-$snapshotNumber$eapSuffix"
+        version = bintrayVersion
         pom {
             description.set("A simple Kotlin Multiplatform library which implements most of the bitcoin protocol")
             url.set("https://github.com/ACINQ/bitcoink")
@@ -142,6 +155,42 @@ publishing {
             scm {
                 connection.set("https://github.com/ACINQ/bitcoink.git")
             }
+        }
+    }
+}
+
+if (hasBintray) {
+    val postBintrayPublish by tasks.creating {
+        doLast {
+            HttpClients.createDefault().use { client ->
+                val post = HttpPost("https://api.bintray.com/content/acinq/$bintrayRepo/${rootProject.name}/$bintrayVersion/publish").apply {
+                    entity = StringEntity("{}", ContentType.APPLICATION_JSON)
+                    addHeader(BasicScheme().authenticate(UsernamePasswordCredentials(bintrayUsername, bintrayApiKey), this, null))
+                }
+                client.execute(post)
+            }
+        }
+    }
+
+    val postBintrayDiscard by tasks.creating {
+        doLast {
+            HttpClients.createDefault().use { client ->
+                val post = HttpPost("https://api.bintray.com/content/acinq/$bintrayRepo/${rootProject.name}/$bintrayVersion/publish").apply {
+                    entity = StringEntity("{ \"discard\": true }", ContentType.APPLICATION_JSON)
+                    addHeader(BasicScheme().authenticate(UsernamePasswordCredentials(bintrayUsername, bintrayApiKey), this, null))
+                }
+                client.execute(post)
+            }
+        }
+    }
+}
+
+afterEvaluate {
+    tasks.withType<AbstractTestTask>() {
+        testLogging {
+            events("passed", "skipped", "failed", "standard_out", "standard_error")
+            showExceptions = true
+            showStackTraces = true
         }
     }
 }

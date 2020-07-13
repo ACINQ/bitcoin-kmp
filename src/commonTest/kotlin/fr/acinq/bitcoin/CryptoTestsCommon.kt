@@ -16,6 +16,7 @@
 
 package fr.acinq.bitcoin
 
+import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
 import kotlin.random.Random
 import kotlin.test.Test

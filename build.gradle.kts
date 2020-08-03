@@ -6,14 +6,14 @@ import org.gradle.internal.impldep.org.apache.http.entity.StringEntity
 import org.gradle.internal.impldep.org.apache.http.impl.auth.BasicScheme
 
 plugins {
-    kotlin("multiplatform") version "1.4-M3"
+    kotlin("multiplatform") version "1.4.0-rc"
     `maven-publish`
 }
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoink"
-version = "0.2.0-1.4-M3"
+version = "0.2.0-1.4-rc"
 
 repositories {
     mavenLocal()
@@ -38,7 +38,7 @@ kotlin {
     ios()
 
     sourceSets {
-        val secp256k1KmpVersion = "0.2.1-1.4-M3"
+        val secp256k1KmpVersion = "0.3.0-1.4-rc"
 
         val commonMain by getting {
             dependencies {

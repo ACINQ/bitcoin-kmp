@@ -46,11 +46,9 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
      *
      * @return the id of the transaction this output belongs to
      */
-    @JvmField
-    public val txid: ByteVector32 = hash.reversed()
+    public val txid: ByteVector32 get() = hash.reversed()
 
-    @JvmField
-    public val isCoinbase: Boolean = isCoinbase(this)
+    public val isCoinbase: Boolean get() = isCoinbase(this)
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     public companion object : BtcSerializer<OutPoint>() {
@@ -150,11 +148,9 @@ public data class TxIn(
         sequence
     )
 
-    @JvmField
-    public val isFinal: Boolean = sequence == SEQUENCE_FINAL
+    public val isFinal: Boolean get() = sequence == SEQUENCE_FINAL
 
-    @JvmField
-    public val hasWitness: Boolean = witness.isNotNull()
+    public val hasWitness: Boolean get() = witness.isNotNull()
 
     public fun updateSignatureScript(signatureScript: ByteVector): TxIn = this.copy(signatureScript = signatureScript)
 
@@ -275,11 +271,9 @@ public data class Transaction(
 ) :
     BtcSerializable<Transaction> {
 
-    @JvmField
-    public val hasWitness: Boolean = txIn.any { it.hasWitness }
+    public val hasWitness: Boolean get() = txIn.any { it.hasWitness }
 
-    @JvmField
-    public val hash: ByteVector32 = ByteVector32(
+    public val hash: ByteVector32 get() = ByteVector32(
         Crypto.hash256(
             Transaction.write(
                 this,
@@ -288,8 +282,7 @@ public data class Transaction(
         )
     )
 
-    @JvmField
-    public val txid: ByteVector32 = hash.reversed()
+    public val txid: ByteVector32 get() = hash.reversed()
 
     /**
      *

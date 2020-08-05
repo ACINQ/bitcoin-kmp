@@ -45,11 +45,9 @@ public object DeterministicWallet {
         @JvmField val path: KeyPath,
         @JvmField val parent: Long
     ) {
-        @JvmField
-        val privateKey: PrivateKey = PrivateKey(secretkeybytes)
+        val privateKey: PrivateKey get() = PrivateKey(secretkeybytes)
 
-        @JvmField
-        val publicKey: PublicKey = privateKey.publicKey()
+        val publicKey: PublicKey get() = privateKey.publicKey()
     }
 
     @Serializable
@@ -64,8 +62,7 @@ public object DeterministicWallet {
             require(publickeybytes.size() == 33)
         }
 
-        @JvmField
-        val publicKey: PublicKey = PublicKey(publickeybytes)
+        val publicKey: PublicKey get() = PublicKey(publickeybytes)
     }
 
     @JvmStatic
@@ -276,8 +273,7 @@ public object DeterministicWallet {
 public data class KeyPath(@JvmField val path: List<Long>) {
     public constructor(path: String) : this(computePath(path))
 
-    @JvmField
-    public val lastChildNumber: Long = if (path.isEmpty()) 0L else path.last()
+    public val lastChildNumber: Long get() = if (path.isEmpty()) 0L else path.last()
 
     public fun derive(number: Long): KeyPath = KeyPath(path + listOf(number))
 

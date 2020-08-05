@@ -43,11 +43,9 @@ public data class BlockHeader(
     @JvmField val bits: Long,
     @JvmField val nonce: Long
 ) {
-    @JvmField
-    public val hash: ByteVector32 = ByteVector32(Crypto.hash256(write(this)))
+    public val hash: ByteVector32 get() = ByteVector32(Crypto.hash256(write(this)))
 
-    @JvmField
-    public val blockId: ByteVector32 = hash.reversed()
+    public val blockId: ByteVector32 get() = hash.reversed()
 
     public fun setVersion(input: Long): BlockHeader = this.copy(version = input)
 

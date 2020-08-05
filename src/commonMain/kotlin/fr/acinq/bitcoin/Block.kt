@@ -19,6 +19,7 @@ package fr.acinq.bitcoin
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
+import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -33,6 +34,7 @@ import kotlin.jvm.JvmStatic
  * @param nonce             The nonce used to generate this block… to allow variations of the header and compute different hashes
  */
 @OptIn(ExperimentalUnsignedTypes::class)
+@Serializable
 public data class BlockHeader(
     @JvmField val version: Long,
     @JvmField val hashPreviousBlock: ByteVector32,

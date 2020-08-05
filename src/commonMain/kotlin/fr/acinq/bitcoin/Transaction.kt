@@ -21,6 +21,7 @@ import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
+import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -31,6 +32,7 @@ import kotlin.jvm.JvmStatic
  * @param index index of the output in tx that we want to refer to
  */
 @OptIn(ExperimentalUnsignedTypes::class)
+@Serializable
 public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index: Long) : BtcSerializable<OutPoint> {
     public constructor(hash: ByteArray, index: Long) : this(hash.byteVector32(), index)
 
@@ -77,6 +79,7 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
     override fun serializer(): BtcSerializer<OutPoint> = OutPoint
 }
 
+@Serializable
 public data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSerializable<ScriptWitness> {
     public constructor() : this(listOf())
 
@@ -125,6 +128,7 @@ public data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSeri
  * @param witness         Transaction witness (i.e. what is in sig script for standard transactions).
  */
 @OptIn(ExperimentalUnsignedTypes::class)
+@Serializable
 public data class TxIn(
     @JvmField val outPoint: OutPoint,
     @JvmField val signatureScript: ByteVector,
@@ -213,6 +217,7 @@ public data class TxIn(
 }
 
 @OptIn(ExperimentalUnsignedTypes::class)
+@Serializable
 public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeyScript: ByteVector) : BtcSerializable<TxOut> {
 
     public constructor(amount: Satoshi, publicKeyScript: ByteArray) : this(amount, publicKeyScript.byteVector())
@@ -261,6 +266,7 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
 }
 
 @OptIn(ExperimentalUnsignedTypes::class)
+@Serializable
 public data class Transaction(
     @JvmField val version: Long,
     @JvmField val txIn: List<TxIn>,

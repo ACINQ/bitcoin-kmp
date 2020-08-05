@@ -19,14 +19,9 @@ package fr.acinq.bitcoin
 import fr.acinq.secp256k1.Hex
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Serializer
-import kotlinx.serialization.builtins.ArraySerializer
-import kotlinx.serialization.builtins.ByteArraySerializer
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.experimental.or
@@ -39,9 +34,9 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
     public constructor(input: String) : this(Hex.decode(input))
 
     init {
-        require(offset >= 0){ "offset must be > 0"}
-        require(size >= 0){"size must be > 0"}
-        require(offset + size <= bytes.size){"offset + size must be <= buffer size"}
+        require(offset >= 0){ "offset ($size) must be > 0"}
+        require(size >= 0){"size ($size) must be > 0"}
+        require(offset + size <= bytes.size){"offset ($offset) + size ($size) must be <= buffer size (${bytes.size})"}
     }
 
     public fun size(): Int = size
@@ -205,11 +200,6 @@ public class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, off
 public class ByteVector64(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 64) {
     public constructor(bytes: ByteArray) : this(bytes, 0)
     public constructor(input: String) : this(Hex.decode(input), 0)
-
-    init {
-        require(offset >= 0 && offset < bytes.size)
-        require(bytes.size - offset == 64) { "ByteVector64 must contain 64 bytes, not ${bytes.size - offset}" }
-    }
 
     public companion object {
         @JvmField

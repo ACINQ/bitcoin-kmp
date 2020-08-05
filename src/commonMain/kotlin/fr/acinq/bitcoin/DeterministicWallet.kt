@@ -21,6 +21,7 @@ import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -45,9 +46,11 @@ public object DeterministicWallet {
         @JvmField val path: KeyPath,
         @JvmField val parent: Long
     ) {
-        val privateKey: PrivateKey get() = PrivateKey(secretkeybytes)
+        @JvmField @Transient
+        val privateKey: PrivateKey = PrivateKey(secretkeybytes)
 
-        val publicKey: PublicKey get() = privateKey.publicKey()
+        @JvmField @Transient
+        val publicKey: PublicKey = privateKey.publicKey()
     }
 
     @Serializable

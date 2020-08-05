@@ -22,6 +22,7 @@ import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -46,7 +47,8 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
      *
      * @return the id of the transaction this output belongs to
      */
-    public val txid: ByteVector32 get() = hash.reversed()
+    @JvmField @Transient
+    public val txid: ByteVector32 = hash.reversed()
 
     public val isCoinbase: Boolean get() = isCoinbase(this)
 
@@ -273,7 +275,8 @@ public data class Transaction(
 
     public val hasWitness: Boolean get() = txIn.any { it.hasWitness }
 
-    public val hash: ByteVector32 get() = ByteVector32(
+    @JvmField @Transient
+    public val hash: ByteVector32 = ByteVector32(
         Crypto.hash256(
             Transaction.write(
                 this,
@@ -282,7 +285,8 @@ public data class Transaction(
         )
     )
 
-    public val txid: ByteVector32 get() = hash.reversed()
+    @JvmField @Transient
+    public val txid: ByteVector32 = hash.reversed()
 
     /**
      *

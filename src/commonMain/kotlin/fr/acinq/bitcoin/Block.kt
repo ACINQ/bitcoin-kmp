@@ -20,6 +20,7 @@ import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -43,9 +44,11 @@ public data class BlockHeader(
     @JvmField val bits: Long,
     @JvmField val nonce: Long
 ) {
-    public val hash: ByteVector32 get() = ByteVector32(Crypto.hash256(write(this)))
+    @JvmField @Transient
+    public val hash: ByteVector32 = ByteVector32(Crypto.hash256(write(this)))
 
-    public val blockId: ByteVector32 get() = hash.reversed()
+    @JvmField @Transient
+    public val blockId: ByteVector32 = hash.reversed()
 
     public fun setVersion(input: Long): BlockHeader = this.copy(version = input)
 

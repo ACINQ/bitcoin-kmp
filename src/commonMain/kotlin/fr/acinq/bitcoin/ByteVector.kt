@@ -17,18 +17,26 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.secp256k1.Hex
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlin.experimental.or
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
+@Serializable(with = ByteVector.Serializer::class)
 public open class ByteVector(internal val bytes: ByteArray, internal val offset: Int, private val size: Int) {
     public constructor(bytes: ByteArray) : this(bytes, 0, bytes.size)
     public constructor(input: String) : this(Hex.decode(input))
 
     init {
-        require(offset >= 0){ "offset must be > 0"}
-        require(size >= 0){"size must be > 0"}
-        require(offset + size <= bytes.size){"offset + size must be <= buffer size"}
+        require(offset >= 0){ "offset ($size) must be > 0"}
+        require(size >= 0){"size ($size) must be > 0"}
+        require(offset + size <= bytes.size){"offset ($offset) + size ($size) must be <= buffer size (${bytes.size})"}
     }
 
     public fun size(): Int = size
@@ -136,9 +144,21 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
         @JvmField
         public val empty: ByteVector = ByteVector(ByteArray(0))
     }
+
+    public object Serializer: KSerializer<ByteVector> {
+        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ByteVector", PrimitiveKind.STRING)
+
+        override fun serialize(encoder: Encoder, value: ByteVector) {
+            encoder.encodeString(value.toHex())
+        }
+
+        override fun deserialize(decoder: Decoder): ByteVector {
+            return ByteVector(decoder.decodeString())
+        }
+    }
 }
 
-
+@Serializable(with = ByteVector32.Serializer::class)
 public class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 32) {
     public constructor(bytes: ByteArray) : this(bytes, 0)
     public constructor(input: String) : this(Hex.decode(input), 0)
@@ -162,16 +182,24 @@ public class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, off
         @JvmStatic
         public fun fromValidHex(input: String): ByteVector32 = ByteVector32(input)
     }
+
+    public object Serializer: KSerializer<ByteVector32> {
+        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ByteVector32", PrimitiveKind.STRING)
+
+        override fun serialize(encoder: Encoder, value: ByteVector32) {
+            encoder.encodeString(value.toHex())
+        }
+
+        override fun deserialize(decoder: Decoder): ByteVector32 {
+            return ByteVector32(decoder.decodeString())
+        }
+    }
 }
 
+@Serializable(with = ByteVector64.Serializer::class)
 public class ByteVector64(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 64) {
     public constructor(bytes: ByteArray) : this(bytes, 0)
     public constructor(input: String) : this(Hex.decode(input), 0)
-
-    init {
-        require(offset >= 0 && offset < bytes.size)
-        require(bytes.size - offset == 64) { "ByteVector64 must contain 64 bytes, not ${bytes.size - offset}" }
-    }
 
     public companion object {
         @JvmField
@@ -179,6 +207,18 @@ public class ByteVector64(bytes: ByteArray, offset: Int) : ByteVector(bytes, off
 
         @JvmStatic
         public fun fromValidHex(input: String): ByteVector64 = ByteVector64(input)
+    }
+
+    public object Serializer: KSerializer<ByteVector64> {
+        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ByteVector64", PrimitiveKind.STRING)
+
+        override fun serialize(encoder: Encoder, value: ByteVector64) {
+            encoder.encodeString(value.toHex())
+        }
+
+        override fun deserialize(decoder: Decoder): ByteVector64 {
+            return ByteVector64(decoder.decodeString())
+        }
     }
 }
 

@@ -18,9 +18,11 @@ package fr.acinq.bitcoin
 
 import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
+import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
+@Serializable
 public data class PublicKey(@JvmField val value: ByteVector) {
     public constructor(data: ByteArray) : this(ByteVector(data))
 

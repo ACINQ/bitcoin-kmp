@@ -21,6 +21,8 @@ import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -31,6 +33,7 @@ import kotlin.jvm.JvmStatic
  * @param index index of the output in tx that we want to refer to
  */
 @OptIn(ExperimentalUnsignedTypes::class)
+@Serializable
 public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index: Long) : BtcSerializable<OutPoint> {
     public constructor(hash: ByteArray, index: Long) : this(hash.byteVector32(), index)
 
@@ -44,11 +47,10 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
      *
      * @return the id of the transaction this output belongs to
      */
-    @JvmField
+    @JvmField @Transient
     public val txid: ByteVector32 = hash.reversed()
 
-    @JvmField
-    public val isCoinbase: Boolean = isCoinbase(this)
+    public val isCoinbase: Boolean get() = isCoinbase(this)
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     public companion object : BtcSerializer<OutPoint>() {
@@ -77,6 +79,7 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
     override fun serializer(): BtcSerializer<OutPoint> = OutPoint
 }
 
+@Serializable
 public data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSerializable<ScriptWitness> {
     public constructor() : this(listOf())
 
@@ -125,6 +128,7 @@ public data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSeri
  * @param witness         Transaction witness (i.e. what is in sig script for standard transactions).
  */
 @OptIn(ExperimentalUnsignedTypes::class)
+@Serializable
 public data class TxIn(
     @JvmField val outPoint: OutPoint,
     @JvmField val signatureScript: ByteVector,
@@ -146,11 +150,9 @@ public data class TxIn(
         sequence
     )
 
-    @JvmField
-    public val isFinal: Boolean = sequence == SEQUENCE_FINAL
+    public val isFinal: Boolean get() = sequence == SEQUENCE_FINAL
 
-    @JvmField
-    public val hasWitness: Boolean = witness.isNotNull()
+    public val hasWitness: Boolean get() = witness.isNotNull()
 
     public fun updateSignatureScript(signatureScript: ByteVector): TxIn = this.copy(signatureScript = signatureScript)
 
@@ -213,6 +215,7 @@ public data class TxIn(
 }
 
 @OptIn(ExperimentalUnsignedTypes::class)
+@Serializable
 public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeyScript: ByteVector) : BtcSerializable<TxOut> {
 
     public constructor(amount: Satoshi, publicKeyScript: ByteArray) : this(amount, publicKeyScript.byteVector())
@@ -261,6 +264,7 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
 }
 
 @OptIn(ExperimentalUnsignedTypes::class)
+@Serializable
 public data class Transaction(
     @JvmField val version: Long,
     @JvmField val txIn: List<TxIn>,
@@ -269,10 +273,9 @@ public data class Transaction(
 ) :
     BtcSerializable<Transaction> {
 
-    @JvmField
-    public val hasWitness: Boolean = txIn.any { it.hasWitness }
+    public val hasWitness: Boolean get() = txIn.any { it.hasWitness }
 
-    @JvmField
+    @JvmField @Transient
     public val hash: ByteVector32 = ByteVector32(
         Crypto.hash256(
             Transaction.write(
@@ -282,7 +285,7 @@ public data class Transaction(
         )
     )
 
-    @JvmField
+    @JvmField @Transient
     public val txid: ByteVector32 = hash.reversed()
 
     /**

@@ -20,8 +20,6 @@ import fr.acinq.bitcoin.DeterministicWallet.hardened
 import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.ByteArrayOutput
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -38,7 +36,6 @@ public object DeterministicWallet {
     @JvmStatic
     public fun isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
-    @Serializable
     public data class ExtendedPrivateKey(
         @JvmField val secretkeybytes: ByteVector32,
         @JvmField val chaincode: ByteVector32,
@@ -46,14 +43,13 @@ public object DeterministicWallet {
         @JvmField val path: KeyPath,
         @JvmField val parent: Long
     ) {
-        @JvmField @Transient
+        @JvmField
         val privateKey: PrivateKey = PrivateKey(secretkeybytes)
 
-        @JvmField @Transient
+        @JvmField
         val publicKey: PublicKey = privateKey.publicKey()
     }
 
-    @Serializable
     public data class ExtendedPublicKey(
         @JvmField val publickeybytes: ByteVector,
         @JvmField val chaincode: ByteVector32,
@@ -272,7 +268,6 @@ public object DeterministicWallet {
     public const val vpub: Int = 0x045f1cf6
 }
 
-@Serializable
 public data class KeyPath(@JvmField val path: List<Long>) {
     public constructor(path: String) : this(computePath(path))
 

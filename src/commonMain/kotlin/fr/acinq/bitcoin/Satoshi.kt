@@ -1,8 +1,6 @@
 package fr.acinq.bitcoin
 
-import kotlinx.serialization.Serializable
 
-@Serializable
 public data class Satoshi(val sat: Long) : Comparable<Satoshi> {
     // @formatter:off
     public operator fun plus(other: Satoshi): Satoshi = Satoshi(sat + other.sat)

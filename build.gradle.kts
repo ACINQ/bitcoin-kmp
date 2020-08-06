@@ -7,14 +7,13 @@ import org.gradle.internal.impldep.org.apache.http.impl.auth.BasicScheme
 
 plugins {
     kotlin("multiplatform") version "1.4.0-rc"
-    kotlin("plugin.serialization") version "1.4.0-rc"
     `maven-publish`
 }
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoink"
-version = "0.3.0-1.4-rc"
+version = "0.4.0-1.4-rc"
 
 repositories {
     mavenLocal()
@@ -44,7 +43,6 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(kotlin("stdlib-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime:1.0-M1-1.4.0-rc")
                 api("fr.acinq.secp256k1:secp256k1:$secp256k1KmpVersion")
             }
         }

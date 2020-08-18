@@ -6,20 +6,19 @@ import org.gradle.internal.impldep.org.apache.http.entity.StringEntity
 import org.gradle.internal.impldep.org.apache.http.impl.auth.BasicScheme
 
 plugins {
-    kotlin("multiplatform") version "1.4.0-rc"
+    kotlin("multiplatform") version "1.4.0"
     `maven-publish`
 }
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoink"
-version = "snapshot"
+version = "0.5.0"
 
 repositories {
     mavenLocal()
     google()
     maven("https://dl.bintray.com/kotlin/kotlinx")
-    maven("https://dl.bintray.com/kotlin/kotlin-eap")
     maven("https://dl.bintray.com/acinq/libs")
     jcenter()
 }
@@ -38,11 +37,10 @@ kotlin {
     ios()
 
     sourceSets {
-        val secp256k1KmpVersion = "0.3.0-1.4-rc"
+        val secp256k1KmpVersion = "0.3.0"
 
         val commonMain by getting {
             dependencies {
-                implementation(kotlin("stdlib-common"))
                 api("fr.acinq.secp256k1:secp256k1:$secp256k1KmpVersion")
             }
         }
@@ -53,11 +51,6 @@ kotlin {
             }
         }
 
-        val jvmMain by getting {
-            dependencies {
-                implementation(kotlin("stdlib-jdk8"))
-            }
-        }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
@@ -69,16 +62,6 @@ kotlin {
                     else -> error("UnsupportedmOS $currentOs")
                 }
                 implementation("fr.acinq.secp256k1:secp256k1-jni-jvm-$target:$secp256k1KmpVersion")
-            }
-        }
-
-        val linuxMain by getting {
-            dependencies {
-            }
-        }
-
-        val iosMain by getting {
-            dependencies {
             }
         }
 

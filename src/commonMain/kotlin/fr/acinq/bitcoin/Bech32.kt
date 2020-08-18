@@ -110,7 +110,7 @@ public object Bech32 {
      * @return a sequence of 5 bits integers
      */
     @JvmStatic
-    public fun eight2five(input: Array<Byte>): Array<Int5> {
+    public fun eight2five(input: ByteArray): Array<Int5> {
         var buffer = 0L
         val output = ArrayList<Int5>()
         var count = 0
@@ -132,7 +132,7 @@ public object Bech32 {
      * @return a sequence of 8 bits integers
      */
     @JvmStatic
-    public fun five2eight(input: Array<Int5>, offset: Int): Array<Byte> {
+    public fun five2eight(input: Array<Int5>, offset: Int): ByteArray {
         var buffer = 0L
         val output = ArrayList<Byte>()
         var count = 0
@@ -147,7 +147,7 @@ public object Bech32 {
         }
         require(count <= 4) { "Zero-padding of more than 4 bits" }
         require((buffer and ((1L shl count) - 1L)) == 0L) { "Non-zero padding in 8-to-5 conversion" }
-        return output.toTypedArray()
+        return output.toByteArray()
     }
 
     /**
@@ -160,7 +160,7 @@ public object Bech32 {
     @JvmStatic
     public fun encodeWitnessAddress(hrp: String, witnessVersion: Byte, data: ByteArray): String {
         // prepend witness version: 0
-        val data1 = arrayOf(witnessVersion) + eight2five(data.toTypedArray())
+        val data1 = arrayOf(witnessVersion) + eight2five(data)
         val checksum = checksum(hrp, data1)
         val chars = (data1 + checksum).map { i -> alphabet[i.toInt()] }
         val sb = StringBuilder()
@@ -183,7 +183,7 @@ public object Bech32 {
         val bin = five2eight(data, 1)
         require(bin.size in 2..40) { "invalid witness program length ${bin.size}" }
         if (version == 0.toByte()) require(bin.size == 20 || bin.size == 32) { "invalid witness program length ${bin.size}" }
-        return Triple(hrp, version, bin.toByteArray())
+        return Triple(hrp, version, bin)
     }
 
     /**

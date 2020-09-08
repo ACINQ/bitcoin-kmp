@@ -1,4 +1,4 @@
-rootProject.name = "bitcoink"
+rootProject.name = "bitcoin-kmp"
 
 pluginManagement {
     repositories {

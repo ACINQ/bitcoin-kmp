@@ -1,6 +1,6 @@
 # Kotlin Multiplatform Bitcoin Library
 
- [ ![Download](https://api.bintray.com/packages/acinq/libs/bitcoink/images/download.svg) ](https://bintray.com/acinq/libs/bitcoink/_latestVersion)
+ [ ![Download](https://api.bintray.com/packages/acinq/libs/bitcoin-kmp/images/download.svg) ](https://bintray.com/acinq/libs/bitcoin-kmp/_latestVersion)
 
 ## Overview
 
@@ -45,12 +45,12 @@ repositories {
 }
 ```
 
-- **Multiplatform**: Add the `fr.acinq.bitcoink:bitcoink` dependency to your common source set dependencies (You need Gradle 5.0 minimum).
-- **JVM**: Add the `fr.acinq.bitcoink:bitcoink-jvm` dependency to your project.
+- **Multiplatform**: Add the `fr.acinq.bitcoin-kmp:bitcoin-kmp` dependency to your common source set dependencies (You need Gradle 5.0 minimum).
+- **JVM**: Add the `fr.acinq.bitcoin-kmp:bitcoin-kmp-jvm` dependency to your project.
 
 ## libscp256k1 support
 
-**You need to add a JVM implementation of Secp256k1** to your project in order to use BitcoinK with JVM.
+**You need to add a JVM implementation of Secp256k1** to your project in order to use bitcoin-kmp with JVM.
 
 Please refer the [Secp256k1 installation section](https://github.com/ACINQ/secp256k1-kmp#installation).
 

@@ -12,8 +12,8 @@ plugins {
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
-group = "fr.acinq.bitcoink"
-version = "0.5.0"
+group = "fr.acinq.bitcoin-kmp"
+version = "0.6.0"
 
 repositories {
     mavenLocal()
@@ -126,17 +126,17 @@ publishing {
         version = bintrayVersion
         pom {
             description.set("A simple Kotlin Multiplatform library which implements most of the bitcoin protocol")
-            url.set("https://github.com/ACINQ/bitcoink")
+            url.set("https://github.com/ACINQ/bitcoin-kmp")
             licenses {
                 name.set("Apache License v2.0")
                 url.set("https://www.apache.org/licenses/LICENSE-2.0")
             }
             issueManagement {
                 system.set("Github")
-                url.set("https://github.com/ACINQ/bitcoink/issues")
+                url.set("https://github.com/ACINQ/bitcoin-kmp/issues")
             }
             scm {
-                connection.set("https://github.com/ACINQ/bitcoink.git")
+                connection.set("https://github.com/ACINQ/bitcoin-kmp.git")
             }
         }
     }

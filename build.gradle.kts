@@ -12,8 +12,8 @@ plugins {
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
-group = "fr.acinq.bitcoin-kmp"
-version = "0.6.1"
+group = "fr.acinq.bitcoin"
+version = "0.6.0"
 
 repositories {
     mavenLocal()

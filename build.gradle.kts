@@ -13,7 +13,7 @@ plugins {
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin-kmp"
-version = "0.6.0"
+version = "0.6.1"
 
 repositories {
     mavenLocal()
@@ -37,11 +37,11 @@ kotlin {
     ios()
 
     sourceSets {
-        val secp256k1KmpVersion = "0.3.0"
+        val secp256k1KmpVersion = "0.4.0"
 
         val commonMain by getting {
             dependencies {
-                api("fr.acinq.secp256k1:secp256k1:$secp256k1KmpVersion")
+                api("fr.acinq.secp256k1:secp256k1-kmp:$secp256k1KmpVersion")
             }
         }
         val commonTest by getting {
@@ -61,7 +61,7 @@ kotlin {
                     currentOs.isWindows -> "mingw"
                     else -> error("UnsupportedmOS $currentOs")
                 }
-                implementation("fr.acinq.secp256k1:secp256k1-jni-jvm-$target:$secp256k1KmpVersion")
+                implementation("fr.acinq.secp256k1:secp256k1-kmp-jni-jvm-$target:$secp256k1KmpVersion")
             }
         }
 

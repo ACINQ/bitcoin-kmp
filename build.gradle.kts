@@ -6,14 +6,14 @@ import org.gradle.internal.impldep.org.apache.http.entity.StringEntity
 import org.gradle.internal.impldep.org.apache.http.impl.auth.BasicScheme
 
 plugins {
-    kotlin("multiplatform") version "1.4.0"
+    kotlin("multiplatform") version "1.4.10"
     `maven-publish`
 }
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.6.1"
+version = "snapshot"
 
 repositories {
     mavenLocal()

@@ -26,9 +26,9 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
     public constructor(input: String) : this(Hex.decode(input))
 
     init {
-        require(offset >= 0){ "offset ($size) must be > 0"}
-        require(size >= 0){"size ($size) must be > 0"}
-        require(offset + size <= bytes.size){"offset ($offset) + size ($size) must be <= buffer size (${bytes.size})"}
+        require(offset >= 0) { "offset ($size) must be > 0" }
+        require(size >= 0) { "size ($size) must be > 0" }
+        require(offset + size <= bytes.size) { "offset ($offset) + size ($size) must be <= buffer size (${bytes.size})" }
     }
 
     public fun size(): Int = size
@@ -66,22 +66,22 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
     public operator fun plus(other: ByteArray): ByteVector = concat(other)
 
     public fun or(other: ByteVector): ByteVector {
-        require(size() == other.size){ "cannot call or() on byte vectors of different sizes"}
+        require(size() == other.size) { "cannot call or() on byte vectors of different sizes" }
         val data = toByteArray()
-        for(i in data.indices) {
+        for (i in data.indices) {
             data[i] = data[i] or other[i]
         }
         return ByteVector(data)
     }
 
     public fun padLeft(length: Int): ByteVector {
-        require(size <= length){"byte vector larger than padding target"}
+        require(size <= length) { "byte vector larger than padding target" }
         if (length == size) return this
         return ByteVector(ByteArray(length - size) + toByteArray())
     }
 
     public fun padRight(length: Int): ByteVector {
-        require(size <= length){"byte vector larger than padding target"}
+        require(size <= length) { "byte vector larger than padding target" }
         if (length == size) return this
         return ByteVector(toByteArray() + ByteArray(length - size))
     }

@@ -159,7 +159,7 @@ public object Crypto {
     }
 
     @JvmStatic
-    public fun der2compact(signature: ByteArray): ByteVector64{
+    public fun der2compact(signature: ByteArray): ByteVector64 {
         val (r, s) = decodeSignatureLax(ByteArrayInput(signature))
         val lax = dropZeroAndFixSize(r, 32) + dropZeroAndFixSize(s, 32)
         return ByteVector64(Secp256k1.signatureNormalize(lax).first)

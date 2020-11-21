@@ -55,7 +55,9 @@ public object Pack {
     public fun writeInt16BE(n: Short): ByteArray = ByteArray(Short.SIZE_BYTES).also { writeInt16BE(n, it) }
 
     @JvmStatic
-    public fun writeInt16BE(n: Short, output: Output) { output.write(writeInt16BE(n)) }
+    public fun writeInt16BE(n: Short, output: Output) {
+        output.write(writeInt16BE(n))
+    }
 
     @JvmStatic
     public fun writeInt16LE(n: Short, bs: ByteArray, off: Int = 0) {
@@ -68,7 +70,9 @@ public object Pack {
     public fun writeInt16LE(n: Short): ByteArray = ByteArray(Short.SIZE_BYTES).also { writeInt16LE(n, it) }
 
     @JvmStatic
-    public fun writeInt16LE(n: Short, output: Output) { output.write(writeInt16LE(n)) }
+    public fun writeInt16LE(n: Short, output: Output) {
+        output.write(writeInt16LE(n))
+    }
 
     @JvmStatic
     public fun int32BE(bs: ByteArray, off: Int = 0): Int {
@@ -109,7 +113,9 @@ public object Pack {
     public fun writeInt32BE(n: Int): ByteArray = ByteArray(Int.SIZE_BYTES).also { writeInt32BE(n, it) }
 
     @JvmStatic
-    public fun writeInt32BE(n: Int, output: Output) { output.write(writeInt32BE(n)) }
+    public fun writeInt32BE(n: Int, output: Output) {
+        output.write(writeInt32BE(n))
+    }
 
     @JvmStatic
     public fun writeInt32LE(n: Int, bs: ByteArray, off: Int = 0) {
@@ -124,7 +130,9 @@ public object Pack {
     public fun writeInt32LE(n: Int): ByteArray = ByteArray(Int.SIZE_BYTES).also { writeInt32LE(n, it) }
 
     @JvmStatic
-    public fun writeInt32LE(n: Int, output: Output) { output.write(writeInt32LE(n)) }
+    public fun writeInt32LE(n: Int, output: Output) {
+        output.write(writeInt32LE(n))
+    }
 
     @JvmStatic
     public fun int64BE(bs: ByteArray, off: Int = 0): Long {
@@ -159,7 +167,9 @@ public object Pack {
     public fun writeInt64BE(n: Long): ByteArray = ByteArray(Long.SIZE_BYTES).also { writeInt64BE(n, it) }
 
     @JvmStatic
-    public fun writeInt64BE(n: Long, output: Output) { output.write(writeInt64BE(n)) }
+    public fun writeInt64BE(n: Long, output: Output) {
+        output.write(writeInt64BE(n))
+    }
 
     @JvmStatic
     public fun writeInt64LE(n: Long, bs: ByteArray, off: Int = 0) {
@@ -172,5 +182,7 @@ public object Pack {
     public fun writeInt64LE(n: Long): ByteArray = ByteArray(Long.SIZE_BYTES).also { writeInt64LE(n, it) }
 
     @JvmStatic
-    public fun writeInt64LE(n: Long, output: Output) { output.write(writeInt64LE(n)) }
+    public fun writeInt64LE(n: Long, output: Output) {
+        output.write(writeInt64LE(n))
+    }
 }

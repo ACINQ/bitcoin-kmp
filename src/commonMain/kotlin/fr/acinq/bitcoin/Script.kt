@@ -16,9 +16,11 @@
 
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.io.ByteArrayInput
+import fr.acinq.bitcoin.io.ByteArrayOutput
+import fr.acinq.bitcoin.io.Input
+import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
-import fr.acinq.secp256k1.Secp256k1
-import fr.acinq.bitcoin.io.*
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -425,9 +427,9 @@ public object Script {
         // unless the type of nLockTime being tested is the same as
         // the nLockTime in the transaction.
         if (!(
-                (tx.lockTime < Transaction.LOCKTIME_THRESHOLD && lockTime < Transaction.LOCKTIME_THRESHOLD) ||
-                    (tx.lockTime >= Transaction.LOCKTIME_THRESHOLD && lockTime >= Transaction.LOCKTIME_THRESHOLD)
-                )
+                    (tx.lockTime < Transaction.LOCKTIME_THRESHOLD && lockTime < Transaction.LOCKTIME_THRESHOLD) ||
+                            (tx.lockTime >= Transaction.LOCKTIME_THRESHOLD && lockTime >= Transaction.LOCKTIME_THRESHOLD)
+                    )
         )
             return false
 
@@ -483,9 +485,9 @@ public object Script {
         // unless the type of nSequenceMasked being tested is the same as
         // the nSequenceMasked in the transaction.
         if (!(
-                (txToSequenceMasked < TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG && nSequenceMasked < TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG) ||
-                    (txToSequenceMasked >= TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG && nSequenceMasked >= TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG)
-                )
+                    (txToSequenceMasked < TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG && nSequenceMasked < TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG) ||
+                            (txToSequenceMasked >= TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG && nSequenceMasked >= TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG)
+                    )
         ) {
             return false
         }

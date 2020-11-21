@@ -17,7 +17,10 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Pack
-import fr.acinq.bitcoin.io.*
+import fr.acinq.bitcoin.io.ByteArrayInput
+import fr.acinq.bitcoin.io.ByteArrayOutput
+import fr.acinq.bitcoin.io.Input
+import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
 import kotlin.jvm.JvmStatic
 
@@ -214,7 +217,9 @@ public abstract class BtcSerializer<T> {
         }
 
         @JvmStatic
-        public fun writeScript(input: ByteVector, out: Output) { writeScript(input.toByteArray(), out) }
+        public fun writeScript(input: ByteVector, out: Output) {
+            writeScript(input.toByteArray(), out)
+        }
 
         public fun <T> readCollection(
             input: Input,

@@ -133,13 +133,13 @@ public class Sha512 : Digest {
 
     private fun processWord(`in`: ByteArray, inOff: Int) {
         W[wOff++] = ((`in`[inOff].toInt() and 0xff).toLong() shl 56
-            or ((`in`[inOff + 1].toInt() and 0xff).toLong() shl 48)
-            or ((`in`[inOff + 2].toInt() and 0xff).toLong() shl 40)
-            or ((`in`[inOff + 3].toInt() and 0xff).toLong() shl 32)
-            or ((`in`[inOff + 4].toInt() and 0xff).toLong() shl 24)
-            or ((`in`[inOff + 5].toInt() and 0xff).toLong() shl 16)
-            or ((`in`[inOff + 6].toInt() and 0xff).toLong() shl 8)
-            or (`in`[inOff + 7].toInt() and 0xff).toLong())
+                or ((`in`[inOff + 1].toInt() and 0xff).toLong() shl 48)
+                or ((`in`[inOff + 2].toInt() and 0xff).toLong() shl 40)
+                or ((`in`[inOff + 3].toInt() and 0xff).toLong() shl 32)
+                or ((`in`[inOff + 4].toInt() and 0xff).toLong() shl 24)
+                or ((`in`[inOff + 5].toInt() and 0xff).toLong() shl 16)
+                or ((`in`[inOff + 6].toInt() and 0xff).toLong() shl 8)
+                or (`in`[inOff + 7].toInt() and 0xff).toLong())
         if (wOff == 16) processBlock()
     }
 

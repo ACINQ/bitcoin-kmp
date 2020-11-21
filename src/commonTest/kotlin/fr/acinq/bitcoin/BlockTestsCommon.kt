@@ -16,41 +16,54 @@
 
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.io.InputStreamInput
 import fr.acinq.secp256k1.Hex
-import org.junit.Test
+import org.kodein.memory.file.FileSystem
+import org.kodein.memory.file.openReadableFile
+import org.kodein.memory.file.resolve
+import org.kodein.memory.use
+import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
-class BlockTestsJvm {
+class BlockTestsCommon {
+    private val blockData = run {
+        val file = FileSystem.currentDirectory.resolve("src/commonTest/resources/block1.dat")
+        file.openReadableFile().use {
+            val len = it.available
+            // workaround for a bug in kotlin memory file where dstOffset cannot be 0 but is still ignored...
+            val buffer = ByteArray(len)
+            for (i in buffer.indices) buffer[i] = it.readByte()
+            buffer
+        }
+    }
+
     @Test
     fun `read blocks`() {
-        val stream = javaClass.getResourceAsStream("/block1.dat")
-        val block = Block.read(InputStreamInput(stream))
-        // assert(Block.checkProofOfWork(block))
+        val block = Block.read(blockData)
+        assertTrue(Block.checkProofOfWork(block))
 
-        assert(MerkleTree.computeRoot(block.tx.map { it.hash }) == block.header.hashMerkleRoot)
+        assertEquals(MerkleTree.computeRoot(block.tx.map { it.hash }), block.header.hashMerkleRoot)
 
         // check that we can deserialize and re-serialize scripts
         for (tx in block.tx) {
             for (txin in tx.txIn) {
                 if (!OutPoint.isCoinbase(txin.outPoint)) {
                     val script = Script.parse(txin.signatureScript)
-                    assert(txin.signatureScript == Script.write(script).byteVector())
+                    assertEquals(txin.signatureScript, Script.write(script).byteVector())
                 }
             }
             for (txout in tx.txOut) {
                 val script = Script.parse(txout.publicKeyScript)
-                assert(txout.publicKeyScript == Script.write(script).byteVector())
+                assertEquals(txout.publicKeyScript, Script.write(script).byteVector())
             }
         }
     }
 
     @Test
     fun `serialize and deserialize blocks`() {
-        val bytes = javaClass.getResourceAsStream("/block1.dat").use { it.readBytes() }
-        val block = Block.read(bytes)
+        val block = Block.read(blockData)
         val check = Block.write(block)
-        assert(check.byteVector() == bytes.byteVector())
+        assertEquals(check.byteVector(), blockData.byteVector())
     }
 
     @Test
@@ -82,7 +95,7 @@ class BlockTestsJvm {
             "00000020620187836ab16deef958960bc1f8321fe2c32971a447ba7888bc050000000000c91a344b1a95579235f66776652529c60fd50099af021977f073388abb44862e8fbdda58c0b3271ca4e63787"
         ).map { BlockHeader.read(it) }
 
-        headers.forEach { assert(BlockHeader.checkProofOfWork(it)) }
+        headers.forEach { assertTrue(BlockHeader.checkProofOfWork(it)) }
     }
 
     @Test
@@ -96,23 +109,8 @@ class BlockTestsJvm {
             nonce = 0L
         )
 
-        assert(
-            BlockHeader.calculateNextWorkRequired(
-                header.copy(time = 1262152739, bits = 0x1d00ffff),
-                1261130161
-            ) == 0x1d00d86aL
-        )
-        assert(
-            BlockHeader.calculateNextWorkRequired(
-                header.copy(time = 1233061996, bits = 0x1d00ffff),
-                1231006505
-            ) == 0x1d00ffffL
-        )
-        assert(
-            BlockHeader.calculateNextWorkRequired(
-                header.copy(time = 1279297671, bits = 0x1c05a3f4),
-                1279008237
-            ) == 0x1c0168fdL
-        )
+        assertEquals(BlockHeader.calculateNextWorkRequired(header.copy(time = 1262152739, bits = 0x1d00ffff), 1261130161), 0x1d00d86aL)
+        assertEquals(BlockHeader.calculateNextWorkRequired(header.copy(time = 1233061996, bits = 0x1d00ffff), 1231006505), 0x1d00ffffL)
+        assertEquals(BlockHeader.calculateNextWorkRequired(header.copy(time = 1279297671, bits = 0x1c05a3f4), 1279008237), 0x1c0168fdL)
     }
 }

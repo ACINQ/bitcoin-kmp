@@ -18,6 +18,11 @@ package fr.acinq.bitcoin
 
 import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
+import org.kodein.memory.file.FileSystem
+import org.kodein.memory.file.openReadableFile
+import org.kodein.memory.file.resolve
+import org.kodein.memory.io.readLine
+import org.kodein.memory.use
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -70,6 +75,14 @@ class CryptoTestsCommon {
         val encoded = Crypto.sign(data, privateKey)
         assertEquals(ByteVector64("fb36b33afe9308f9eebfcdb0f50cb9c51c72e98a578ee26cabf4a26b5aba1fbf2429e5f5081488190fb01c5165189f2c70e619a3b667e6f1e0fc861d5a8a25d1"), encoded)
         assertTrue(Crypto.verifySignature(data, encoded, publicKey))
+    }
+
+    @Test
+    fun `der2compact`() {
+        assertEquals(
+            ByteVector64("3f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e78223ea13203caf853b71e97e5cc149f65547d1d7ab98c96353d0d8318934e7716"),
+            Crypto.der2compact(Hex.decode("304402203f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e780220ddc15ecdfc3507ac48e1681a33eb60996631bf6bf5bc0a0682c4db743ce7ca2b01"))
+        )
     }
 
     @Test
@@ -161,5 +174,36 @@ class CryptoTestsCommon {
         val der = Hex.decode("3045022100b50cbdd83b17b722b0e1f58e21cf3789ab18b36648023ed3811b522342ddaa9e02207182673961b7a10bfa94fe89780da0d03bfe1de137e0be32cc47a51edcaf08f301")
         val sig = Crypto.der2compact(der)
         assertEquals(sig, ByteVector64("b50cbdd83b17b722b0e1f58e21cf3789ab18b36648023ed3811b522342ddaa9e7182673961b7a10bfa94fe89780da0d03bfe1de137e0be32cc47a51edcaf08f3"))
+    }
+
+    @Test
+    fun `recover public keys from signatures (secp256k1 test)`() {
+        var priv: PrivateKey? = null
+        var message: ByteVector? = null
+        var pub: PublicKey? = null
+        var sig: ByteVector? = null
+        var recid: Int
+        val file = FileSystem.currentDirectory.resolve("src/commonTest/resources/recid.txt")
+        file.openReadableFile().use {
+            while (true) {
+                val line = it.readLine() ?: return
+                val values = line.split(" = ")
+                val lhs = values[0]
+                val rhs = values[1]
+                when (lhs) {
+                    "privkey" -> priv = PrivateKey(ByteVector(rhs).toByteArray())
+                    "message" -> message = ByteVector(rhs)
+                    "pubkey" -> pub = PublicKey(ByteVector(rhs))
+                    "sig" -> sig = ByteVector(rhs)
+                    "recid" -> {
+                        recid = rhs.toInt()
+                        assertEquals(priv!!.publicKey(), pub)
+                        val sig1 = Crypto.sign(message!!.toByteArray(), priv!!)
+                        val pub1 = Crypto.recoverPublicKey(sig1, message!!.toByteArray(), recid)
+                        assertEquals(pub1, pub)
+                    }
+                }
+            }
+        }
     }
 }

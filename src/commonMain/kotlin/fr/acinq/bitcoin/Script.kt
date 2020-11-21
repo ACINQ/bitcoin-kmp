@@ -1455,10 +1455,8 @@ public object Script {
         public fun verifyScripts(scriptSig: ByteArray, scriptPubKey: ByteArray, witness: ScriptWitness): Boolean {
             fun checkStack(stack: List<ByteVector>): Boolean {
                 return if (stack.isEmpty()) {
-                    println("empty stask")
                     false
                 } else if (!castToBoolean(stack.first())) {
-                    println("cast failed")
                     false
                 } else if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CLEANSTACK) != 0) {
                     if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) == 0) throw RuntimeException("illegal script flag")

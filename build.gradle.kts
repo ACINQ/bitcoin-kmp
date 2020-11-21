@@ -20,6 +20,8 @@ repositories {
     google()
     maven("https://dl.bintray.com/kotlin/kotlinx")
     maven("https://dl.bintray.com/acinq/libs")
+    maven("https://dl.bintray.com/kotlin/ktor")
+    maven("https://dl.bintray.com/kodein-framework/Kodein-Memory")
     jcenter()
 }
 
@@ -48,6 +50,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
+                implementation("org.kodein.memory:kodein-memory-files:0.4.0")
             }
         }
 
@@ -59,7 +62,7 @@ kotlin {
                     currentOs.isLinux -> "linux"
                     currentOs.isMacOsX -> "darwin"
                     currentOs.isWindows -> "mingw"
-                    else -> error("UnsupportedmOS $currentOs")
+                    else -> error("Unsupported OS $currentOs")
                 }
                 implementation("fr.acinq.secp256k1:secp256k1-kmp-jni-jvm-$target:$secp256k1KmpVersion")
             }

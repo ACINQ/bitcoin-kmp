@@ -172,7 +172,7 @@ public abstract class BtcSerializer<T> {
             val blob = ByteArray(size)
             if (size > 0) {
                 val count = input.read(blob, 0, size)
-                require(count >= size)
+                require(count >= size){"cannot read $size bytes from a stream that has $count bytes left"}
             }
             return blob
         }

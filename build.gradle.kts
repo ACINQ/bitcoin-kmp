@@ -40,6 +40,7 @@ kotlin {
 
     sourceSets {
         val secp256k1KmpVersion = "0.4.1"
+        val serializationVersion = "1.0.0"
 
         val commonMain by getting {
             dependencies {
@@ -51,6 +52,7 @@ kotlin {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
                 implementation("org.kodein.memory:kodein-memory-files:0.4.0")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
             }
         }
 

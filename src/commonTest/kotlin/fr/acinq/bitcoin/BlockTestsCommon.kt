@@ -16,8 +16,8 @@
 
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.reference.TransactionTestsCommon
 import fr.acinq.secp256k1.Hex
-import org.kodein.memory.file.FileSystem
 import org.kodein.memory.file.openReadableFile
 import org.kodein.memory.file.resolve
 import org.kodein.memory.use
@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
 
 class BlockTestsCommon {
     private val blockData = run {
-        val file = FileSystem.currentDirectory.resolve("src/commonTest/resources/block1.dat")
+        val file = TransactionTestsCommon.resourcesDir().resolve("block1.dat")
         file.openReadableFile().use {
             val len = it.available
             // workaround for a bug in kotlin memory file where dstOffset cannot be 0 but is still ignored...

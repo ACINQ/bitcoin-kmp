@@ -16,9 +16,9 @@
 
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.reference.TransactionTestsCommon
 import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
-import org.kodein.memory.file.FileSystem
 import org.kodein.memory.file.openReadableFile
 import org.kodein.memory.file.resolve
 import org.kodein.memory.io.readLine
@@ -183,7 +183,7 @@ class CryptoTestsCommon {
         var pub: PublicKey? = null
         var sig: ByteVector? = null
         var recid: Int
-        val file = FileSystem.currentDirectory.resolve("src/commonTest/resources/recid.txt")
+        val file = TransactionTestsCommon.resourcesDir().resolve("recid.txt")
         file.openReadableFile().use {
             while (true) {
                 val line = it.readLine() ?: return

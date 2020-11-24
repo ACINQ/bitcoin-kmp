@@ -23,7 +23,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import org.kodein.memory.file.FileSystem
 import org.kodein.memory.file.openReadableFile
 import org.kodein.memory.file.resolve
 import org.kodein.memory.text.readString
@@ -32,7 +31,7 @@ import kotlin.test.Test
 class SigHashTestsCommon {
     @Test
     fun `reference client sighash test`() {
-        val file = FileSystem.currentDirectory.resolve("src/commonTest/resources/data/sighash.json")
+        val file = TransactionTestsCommon.resourcesDir().resolve("data/sighash.json")
         val raw = file.openReadableFile().readString()
         val format = Json { ignoreUnknownKeys = true }
         val json = format.parseToJsonElement(raw)

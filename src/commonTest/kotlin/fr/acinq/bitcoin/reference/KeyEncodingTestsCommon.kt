@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
 class KeyEncodingTestsCommon {
     @Test
     fun `valid keys`() {
-        val tests = TransactionTestsCommon.readData("src/commonTest/resources/data/key_io_valid.json")
+        val tests = TransactionTestsCommon.readData("data/key_io_valid.json")
         tests.jsonArray.filter { it.jsonArray.size == 3 }.map { it.jsonArray }.forEach {
             var encoded: String = it[0].jsonPrimitive.content
             val hex: String = it[1].jsonPrimitive.content
@@ -94,7 +94,7 @@ class KeyEncodingTestsCommon {
 
     @Test
     fun `invalid keys`() {
-        val tests = TransactionTestsCommon.readData("src/commonTest/resources/data/key_io_invalid.json")
+        val tests = TransactionTestsCommon.readData("data/key_io_invalid.json")
         tests.jsonArray.forEach {
             val value = it.jsonArray[0].jsonPrimitive.content
             assertTrue(!isValidBase58(value))

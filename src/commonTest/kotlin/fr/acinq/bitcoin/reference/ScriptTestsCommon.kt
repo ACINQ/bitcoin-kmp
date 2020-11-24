@@ -54,7 +54,7 @@ class ScriptTestsCommon {
     @Test
     fun `reference client script test`() {
         // 	["Format is: [[wit..., amount]?, scriptSig, scriptPubKey, flags, expected_scripterror, ... comments]"]
-        val tests = TransactionTestsCommon.readData("src/commonTest/resources/data/script_tests.json")
+        val tests = TransactionTestsCommon.readData("data/script_tests.json")
         var count = 0
         tests.jsonArray.filter { it.jsonArray.size >= 4 }.forEach {
             runTest(it.jsonArray)

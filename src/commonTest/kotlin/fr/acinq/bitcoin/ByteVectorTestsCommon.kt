@@ -7,7 +7,8 @@ import kotlin.test.assertFailsWith
 
 class ByteVectorTestsCommon {
 
-    @Test fun `equality between different byte vectors`() {
+    @Test
+    fun `equality between different byte vectors`() {
         assertEquals(
             ByteVector32("0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"),
             ByteVector(Hex.decode("FFFF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0000"), 2, 32)
@@ -29,7 +30,8 @@ class ByteVectorTestsCommon {
         )
     }
 
-    @Test fun `bad sized vectors`() {
+    @Test
+    fun `bad sized vectors`() {
         assertFailsWith<IllegalArgumentException> { ByteVector32("0123456789ABCDEF") }.let {
             assertEquals("offset (0) + size (32) must be <= buffer size (8)", it.message)
         }

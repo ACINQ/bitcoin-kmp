@@ -16,28 +16,32 @@
 
 package fr.acinq.bitcoin.reference
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
+
 import fr.acinq.bitcoin.Transaction
 import fr.acinq.secp256k1.Hex
-import org.junit.Test
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import org.kodein.memory.file.openReadableFile
+import org.kodein.memory.file.resolve
+import org.kodein.memory.text.readString
+import kotlin.test.Test
 
-class SigHashTestsJvm {
-    val mapper = jacksonObjectMapper()
-
+class SigHashTestsCommon {
     @Test
     fun `reference client sighash test`() {
-        val stream = javaClass.getResourceAsStream("/data/sighash.json")
+        val file = TransactionTestsCommon.resourcesDir().resolve("data/sighash.json")
+        val raw = file.openReadableFile().readString()
+        val format = Json { ignoreUnknownKeys = true }
+        val json = format.parseToJsonElement(raw)
         // 	["raw_transaction, script, input_index, hashType, signature_hash (result)"],
-
-        val tests = mapper.readValue<Array<Array<JsonNode>>>(stream)
-        tests.filter { it -> it.size == 5 }.forEach { it ->
-            val raw_transaction = it[0].textValue()
-            val script = it[1].textValue()
-            val input_index = it[2].intValue()
-            val hashType = it[3].intValue()
-            val signature_hash = it[4].textValue()
+        json.jsonArray.filter { it.jsonArray.size == 5 }.map { it.jsonArray }.forEach {
+            val raw_transaction = it[0].jsonPrimitive.content
+            val script = it[1].jsonPrimitive.content
+            val input_index = it[2].jsonPrimitive.int
+            val hashType = it[3].jsonPrimitive.int
+            val signature_hash = it[4].jsonPrimitive.content
 
             val tx = Transaction.read(raw_transaction)
             val hash = Transaction.hashForSigning(tx, input_index, Hex.decode(script), hashType)

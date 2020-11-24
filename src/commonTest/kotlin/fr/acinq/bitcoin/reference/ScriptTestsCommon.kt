@@ -16,9 +16,6 @@
 
 package fr.acinq.bitcoin.reference
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_CHECKSEQUENCEVERIFY
@@ -39,26 +36,28 @@ import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_STRICTENC
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_WITNESS
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_WITNESS_PUBKEYTYPE
 import fr.acinq.secp256k1.Hex
-import org.junit.Test
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.Test
 
-class ScriptTestsJvm {
-    val mapper = jacksonObjectMapper()
+class ScriptTestsCommon {
 
-    @Test
-    fun `error #1`() {
-        val raw =
-            """["0x48 0x304502202de8c03fc525285c9c535631019a5f2af7c6454fa9eb392a3756a4917c420edd02210046130bf2baf7cfc065067c8b9e33a066d9c15edcea9feb0ca2d233e3597925b401", "0x21 0x038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508 CHECKSIG", "", "OK", "P2PK with too much S padding but no DERSIG"]"""
-        runTest(mapper.readValue(raw))
-    }
-
+    //    @Test
+//    fun `error #1`() {
+//        val raw =
+//            """["0x48 0x304502202de8c03fc525285c9c535631019a5f2af7c6454fa9eb392a3756a4917c420edd02210046130bf2baf7cfc065067c8b9e33a066d9c15edcea9feb0ca2d233e3597925b401", "0x21 0x038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508 CHECKSIG", "", "OK", "P2PK with too much S padding but no DERSIG"]"""
+//        runTest(mapper.readValue(raw))
+//    }
+//
     @Test
     fun `reference client script test`() {
-        val stream = javaClass.getResourceAsStream("/data/script_tests.json")
         // 	["Format is: [[wit..., amount]?, scriptSig, scriptPubKey, flags, expected_scripterror, ... comments]"]
-        val tests = mapper.readValue<List<List<JsonNode>>>(stream)
+        val tests = TransactionTestsCommon.readData("data/script_tests.json")
         var count = 0
-        tests.filter { it -> it.size >= 4 }.forEach { it ->
-            runTest(it)
+        tests.jsonArray.filter { it.jsonArray.size >= 4 }.forEach {
+            runTest(it.jsonArray)
             count += 1
         }
         println("passed $count reference tests")
@@ -128,7 +127,7 @@ class ScriptTestsJvm {
                             acc + Script.write(
                                 listOf(
                                     OP_PUSHDATA(
-                                        head.drop(1).dropLast(1).toByteArray(charset("UTF-8"))
+                                        head.drop(1).dropLast(1).encodeToByteArray()
                                     )
                                 )
                             )
@@ -203,47 +202,47 @@ class ScriptTestsJvm {
             }
         }
 
-        fun runTest(it: List<JsonNode>) {
+        fun runTest(testCase: JsonArray) {
             when {
-                it.size == 4 && it[0].isTextual -> {
-                    val scriptSig = it[0].textValue()
-                    val scriptPubKey = it[1].textValue()
-                    val flags = it[2].textValue()
-                    val expected = it[3].textValue()
+                testCase.size == 4 && testCase[0].jsonPrimitive.isString -> {
+                    val scriptSig = testCase[0].jsonPrimitive.content
+                    val scriptPubKey = testCase[1].jsonPrimitive.content
+                    val flags = testCase[2].jsonPrimitive.content
+                    val expected = testCase[3].jsonPrimitive.content
                     runTest(listOf(), scriptSig, scriptPubKey, flags, null, expected)
                 }
-                it.size == 5 && it[0].isTextual -> {
-                    val scriptSig = it[0].textValue()
-                    val scriptPubKey = it[1].textValue()
-                    val flags = it[2].textValue()
-                    val expected = it[3].textValue()
-                    val comments = it[4].textValue()
-                    runTest(listOf(), scriptSig, scriptPubKey, flags, comments, expected)
-                }
-                it.size == 5 && it[0].isArray -> {
-                    val elements = it[0].elements().asSequence().toList()
-                    val strings = elements.dropLast(1).map { it.textValue() }
-                    val amount = (elements.last().doubleValue() * 100_000_000).toLong().toSatoshi()
-                    val scriptSig = it[1].textValue()
-                    val scriptPubKey = it[2].textValue()
-                    val flags = it[3].textValue()
-                    val expected = it[4].textValue()
+                testCase.size == 5 && testCase[0] is JsonArray -> {
+                    val elements = testCase[0].jsonArray.asSequence().toList()
+                    val strings = elements.dropLast(1).map { it.jsonPrimitive.content }
+                    val amount = (elements.last().jsonPrimitive.double * 100_000_000).toLong().toSatoshi()
+                    val scriptSig = testCase[1].jsonPrimitive.content
+                    val scriptPubKey = testCase[2].jsonPrimitive.content
+                    val flags = testCase[3].jsonPrimitive.content
+                    val expected = testCase[4].jsonPrimitive.content
                     val comments = null
                     runTest(strings, amount, scriptSig, scriptPubKey, flags, comments, expected)
                 }
-                it.size == 6 && it[0].isArray -> {
-                    val elements = it[0].elements().asSequence().toList()
-                    val strings = elements.dropLast(1).map { it.textValue() }
-                    val amount = (elements.last().doubleValue() * 100_000_000).toLong().toSatoshi()
-                    val scriptSig = it[1].textValue()
-                    val scriptPubKey = it[2].textValue()
-                    val flags = it[3].textValue()
-                    val expected = it[4].textValue()
-                    val comments = it[5].textValue()
+                testCase.size == 5 && testCase[0].jsonPrimitive.isString -> {
+                    val scriptSig = testCase[0].jsonPrimitive.content
+                    val scriptPubKey = testCase[1].jsonPrimitive.content
+                    val flags = testCase[2].jsonPrimitive.content
+                    val expected = testCase[3].jsonPrimitive.content
+                    val comments = testCase[4].jsonPrimitive.content
+                    runTest(listOf(), scriptSig, scriptPubKey, flags, comments, expected)
+                }
+                testCase.size == 6 && testCase[0] is JsonArray -> {
+                    val elements = testCase[0].jsonArray.asSequence().toList()
+                    val strings = elements.dropLast(1).map { it.jsonPrimitive.content }
+                    val amount = (elements.last().jsonPrimitive.double * 100_000_000).toLong().toSatoshi()
+                    val scriptSig = testCase[1].jsonPrimitive.content
+                    val scriptPubKey = testCase[2].jsonPrimitive.content
+                    val flags = testCase[3].jsonPrimitive.content
+                    val expected = testCase[4].jsonPrimitive.content
+                    val comments = testCase[5].jsonPrimitive.content
                     runTest(strings, amount, scriptSig, scriptPubKey, flags, comments, expected)
                 }
                 else -> {
-                    println("don't understand $it")
+                    println("don't understand $testCase")
                 }
             }
         }

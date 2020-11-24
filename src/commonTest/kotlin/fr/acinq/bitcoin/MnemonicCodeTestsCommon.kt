@@ -16,19 +16,19 @@
 
 package fr.acinq.bitcoin
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import fr.acinq.bitcoin.MnemonicCode.toMnemonics
 import fr.acinq.bitcoin.MnemonicCode.toSeed
+import fr.acinq.bitcoin.reference.TransactionTestsCommon
 import fr.acinq.secp256k1.Hex
-import org.junit.Test
-import java.util.*
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.random.Random
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 
-class MnemonicCodeTestsJvm {
-    val mapper = jacksonObjectMapper()
-
+class MnemonicCodeTestsCommon {
     @Test
     fun `to seed`() {
         val mnemonics = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
@@ -42,13 +42,12 @@ class MnemonicCodeTestsJvm {
 
     @Test
     fun `reference tests`() {
-        val stream = javaClass.getResourceAsStream("/bip39_vectors.json")
-        val tests = mapper.readValue<TestVectors>(stream)
+        val tests = TransactionTestsCommon.readData("bip39_vectors.json")
 
-        tests.english.map { it ->
-            val raw = it[0]
-            val mnemonics = it[1]
-            val seed = it[2]
+        tests.jsonObject["english"]!!.jsonArray.map {
+            val raw = it.jsonArray[0].jsonPrimitive.content
+            val mnemonics = it.jsonArray[1].jsonPrimitive.content
+            val seed = it.jsonArray[2].jsonPrimitive.content
             assertEquals(toMnemonics(Hex.decode(raw)).joinToString(" "), mnemonics)
             assertEquals(Hex.encode(toSeed(toMnemonics(Hex.decode(raw)), "TREZOR")), seed)
         }
@@ -56,13 +55,13 @@ class MnemonicCodeTestsJvm {
 
     @Test
     fun `validate mnemonics(valid)`() {
-        val random = Random()
+        val random = Random
 
         for (i in 0..99) {
             for (length in listOf(16, 20, 24, 28, 32, 36, 40)) {
                 val entropy = ByteArray(length)
                 random.nextBytes(entropy)
-                val mnemonics = MnemonicCode.toMnemonics(entropy)
+                val mnemonics = toMnemonics(entropy)
                 MnemonicCode.validate(mnemonics)
             }
         }
@@ -82,9 +81,4 @@ class MnemonicCodeTestsJvm {
             }
         }
     }
-
-    companion object {
-        data class TestVectors(val english: List<List<String>>)
-    }
-
 }

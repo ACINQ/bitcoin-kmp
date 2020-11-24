@@ -4,22 +4,27 @@ import org.gradle.internal.impldep.org.apache.http.entity.ContentType
 import org.gradle.internal.impldep.org.apache.http.impl.client.HttpClients
 import org.gradle.internal.impldep.org.apache.http.entity.StringEntity
 import org.gradle.internal.impldep.org.apache.http.impl.auth.BasicScheme
+import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "1.4.0"
+    kotlin("multiplatform") version "1.4.10"
     `maven-publish`
 }
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.6.1"
+version = "snapshot"
 
 repositories {
     mavenLocal()
     google()
     maven("https://dl.bintray.com/kotlin/kotlinx")
     maven("https://dl.bintray.com/acinq/libs")
+    maven("https://dl.bintray.com/kotlin/ktor")
+    maven("https://dl.bintray.com/kodein-framework/Kodein-Memory")
     jcenter()
 }
 
@@ -38,6 +43,7 @@ kotlin {
 
     sourceSets {
         val secp256k1KmpVersion = "0.4.1"
+        val serializationVersion = "1.0.0"
 
         val commonMain by getting {
             dependencies {
@@ -48,18 +54,19 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
+                implementation("org.kodein.memory:kodein-memory-files:0.4.1")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
             }
         }
 
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
-                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.11.0")
                 val target = when {
                     currentOs.isLinux -> "linux"
                     currentOs.isMacOsX -> "darwin"
                     currentOs.isWindows -> "mingw"
-                    else -> error("UnsupportedmOS $currentOs")
+                    else -> error("Unsupported OS $currentOs")
                 }
                 implementation("fr.acinq.secp256k1:secp256k1-kmp-jni-jvm-$target:$secp256k1KmpVersion")
             }
@@ -67,6 +74,15 @@ kotlin {
 
         all {
             languageSettings.useExperimentalAnnotation("kotlin.RequiresOptIn")
+        }
+    }
+
+    // Configure all compilations of all targets:
+    targets.all {
+        compilations.all {
+            kotlinOptions {
+                allWarningsAsErrors = true
+            }
         }
     }
 }
@@ -169,11 +185,23 @@ if (hasBintray) {
 }
 
 afterEvaluate {
-    tasks.withType<AbstractTestTask>() {
+    tasks.withType<AbstractTestTask> {
         testLogging {
             events("passed", "skipped", "failed", "standard_out", "standard_error")
             showExceptions = true
             showStackTraces = true
         }
+    }
+
+    tasks.withType<KotlinJvmTest> {
+        environment("TEST_RESOURCES_PATH", projectDir.resolve("src/commonTest/resources"))
+    }
+
+    tasks.withType<KotlinNativeHostTest> {
+        environment("TEST_RESOURCES_PATH", projectDir.resolve("src/commonTest/resources"))
+    }
+
+    tasks.withType<KotlinNativeSimulatorTest> {
+        environment("SIMCTL_CHILD_TEST_RESOURCES_PATH", projectDir.resolve("src/commonTest/resources"))
     }
 }

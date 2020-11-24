@@ -16,44 +16,44 @@
 
 package fr.acinq.bitcoin.reference
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import fr.acinq.bitcoin.*
 import fr.acinq.secp256k1.Hex
-import org.junit.Test
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
-class KeyEncodingTestsJvm {
-    val mapper = jacksonObjectMapper()
-
+class KeyEncodingTestsCommon {
     @Test
     fun `valid keys`() {
-        val stream = javaClass.getResourceAsStream("/data/key_io_valid.json")
-        val tests = mapper.readValue<Array<Array<JsonNode>>>(stream)
-        tests.filter { it.size == 3 }.forEach {
-            var encoded: String = it[0].textValue()
-            val hex: String = it[1].textValue()
-            val isPrivkey = it[2]["isPrivkey"].booleanValue()
-            val chain = it[2]["chain"].textValue()
-            val tryCaseFlip = it[2]["tryCaseFlip"]?.booleanValue() ?: false
+        val tests = TransactionTestsCommon.readData("data/key_io_valid.json")
+        tests.jsonArray.filter { it.jsonArray.size == 3 }.map { it.jsonArray }.forEach {
+            var encoded: String = it[0].jsonPrimitive.content
+            val hex: String = it[1].jsonPrimitive.content
+            val isPrivkey = it[2].jsonObject["isPrivkey"]!!.jsonPrimitive.boolean
+            val chain = it[2].jsonObject["chain"]!!.jsonPrimitive.content
+            val tryCaseFlip = it[2].jsonObject["tryCaseFlip"]?.jsonPrimitive?.boolean ?: false
             if (isPrivkey) {
                 val (version, data) = Base58Check.decode(encoded)
-                assert(version == Base58.Prefix.SecretKey || version == Base58.Prefix.SecretKeyTestnet)
-                assert(Hex.encode(data.take(32).toByteArray()) == hex)
-                val isCompressed = it[2]["isCompressed"]?.booleanValue()
-                isCompressed?.let {
-                    when (it) {
-                        false -> assert(data.size == 32)
-                        true -> assert(data.size == 33 && data.last() == 1.toByte())
+                assertTrue(version == Base58.Prefix.SecretKey || version == Base58.Prefix.SecretKeyTestnet)
+                assertEquals(Hex.encode(data.take(32).toByteArray()), hex)
+                val isCompressed = it[2].jsonObject["isCompressed"]?.jsonPrimitive?.boolean
+                isCompressed?.let { flag ->
+                    when (flag) {
+                        false -> assertTrue(data.size == 32)
+                        true -> assertTrue(data.size == 33 && data.last() == 1.toByte())
                     }
                 }
             } else {
                 when (encoded.first()) {
                     '1', 'm', 'n' -> {
                         val (version, data) = Base58Check.decode(encoded)
-                        assert(version == Base58.Prefix.PubkeyAddress || version == Base58.Prefix.PubkeyAddressTestnet)
-                        assert(
-                            Script.parse(hex) == listOf(
+                        assertTrue(version == Base58.Prefix.PubkeyAddress || version == Base58.Prefix.PubkeyAddressTestnet)
+                        assertEquals(
+                            Script.parse(hex), listOf(
                                 OP_DUP,
                                 OP_HASH160,
                                 OP_PUSHDATA(data),
@@ -64,8 +64,8 @@ class KeyEncodingTestsJvm {
                     }
                     '2', '3' -> {
                         val (version, data) = Base58Check.decode(encoded)
-                        assert(version == Base58.Prefix.ScriptAddress || version == Base58.Prefix.ScriptAddressTestnet)
-                        assert(Script.parse(hex) == listOf(OP_HASH160, OP_PUSHDATA(data), OP_EQUAL))
+                        assertTrue(version == Base58.Prefix.ScriptAddress || version == Base58.Prefix.ScriptAddressTestnet)
+                        assertEquals(Script.parse(hex), listOf(OP_HASH160, OP_PUSHDATA(data), OP_EQUAL))
                     }
                     else -> {
                         if (tryCaseFlip) {
@@ -85,7 +85,7 @@ class KeyEncodingTestsJvm {
                         }
                         require(encoded.startsWith(prefix, ignoreCase = true))
                         val (_, tag, program) = Bech32.decodeWitnessAddress(encoded)
-                        assert(Script.parse(hex) == listOf(Script.fromSimpleValue(tag), OP_PUSHDATA(program)))
+                        assertEquals(Script.parse(hex), listOf(Script.fromSimpleValue(tag), OP_PUSHDATA(program)))
                     }
                 }
             }
@@ -94,12 +94,11 @@ class KeyEncodingTestsJvm {
 
     @Test
     fun `invalid keys`() {
-        val stream = javaClass.getResourceAsStream("/data/key_io_invalid.json")
-        val tests = mapper.readValue<Array<Array<String>>>(stream)
-        tests.forEach {
-            val value = it[0]
-            assert(!isValidBase58(value))
-            assert(!isValidBech32(value))
+        val tests = TransactionTestsCommon.readData("data/key_io_invalid.json")
+        tests.jsonArray.forEach {
+            val value = it.jsonArray[0].jsonPrimitive.content
+            assertTrue(!isValidBase58(value))
+            assertTrue(!isValidBech32(value))
         }
     }
 

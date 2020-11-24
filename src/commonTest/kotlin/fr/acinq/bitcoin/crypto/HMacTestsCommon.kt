@@ -18,10 +18,10 @@ package fr.acinq.bitcoin.crypto
 
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.secp256k1.Hex
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class HMacTestsJvm {
+class HMacTestsCommon {
     @Test
     fun `hmac512`() {
         val data = Hex.decode("0x000102030405060708090a0b0c0d0e0f")

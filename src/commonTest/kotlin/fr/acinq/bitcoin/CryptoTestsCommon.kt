@@ -194,11 +194,15 @@ class CryptoTestsCommon {
                     "privkey" -> priv = PrivateKey(ByteVector(rhs).toByteArray())
                     "message" -> message = ByteVector(rhs)
                     "pubkey" -> pub = PublicKey(ByteVector(rhs))
-                    "sig" -> sig = ByteVector(rhs)
+                    "sig" -> sig = run {
+                        val reversed = ByteVector(rhs).take(64)
+                        ByteVector((reversed.take(32).reversed() + reversed.takeRight(32).reversed()).toByteArray())
+                    }
                     "recid" -> {
                         recid = rhs.toInt()
                         assertEquals(priv!!.publicKey(), pub)
                         val sig1 = Crypto.sign(message!!.toByteArray(), priv!!)
+                        assertEquals(sig1, sig)
                         val pub1 = Crypto.recoverPublicKey(sig1, message!!.toByteArray(), recid)
                         assertEquals(pub1, pub)
                     }

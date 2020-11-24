@@ -62,7 +62,6 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
-                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.11.0")
                 val target = when {
                     currentOs.isLinux -> "linux"
                     currentOs.isMacOsX -> "darwin"

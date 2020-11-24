@@ -17,10 +17,10 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.secp256k1.Hex
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class UInt256TestsJvm {
+class UInt256TestsCommon {
     @Test
     fun `init`() {
         val uint256 = UInt256(Hex.decode("c0b91a94a26dc9be07374c2280e43b1de54be568b2509ef3ce1ade5c9cf9e8aa"))

@@ -26,7 +26,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class Base58RerenceTestsJvm {
+class Base58RerenceTestsCommon {
     @Test
     fun `reference encode-decode test`() {
         val tests = TransactionTestsCommon.readData("data/base58_encode_decode.json")

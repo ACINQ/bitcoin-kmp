@@ -104,13 +104,11 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
 
     public fun contentEquals(input: ByteArray): Boolean = contentEquals(input, 0, input.size)
 
-    public fun sha256(): ByteVector32 {
-        return ByteVector32(Crypto.sha256(bytes, offset, size))
-    }
+    public fun<T> map(f: (ByteArray, Int, Int) -> T ): T = f(bytes, offset, size)
 
-    public fun ripemd160(): ByteVector {
-        return ByteVector(Crypto.ripemd160(bytes, offset, size))
-    }
+    public fun sha256() : ByteVector32 = map { bytes, offset, size -> ByteVector32(Crypto.sha256(bytes, offset, size)) }
+
+    public fun ripemd160() : ByteVector = map { bytes, offset, size -> ByteVector(Crypto.ripemd160(bytes, offset, size)) }
 
     public fun toByteArray(): ByteArray = bytes.copyOfRange(offset, offset + size)
 

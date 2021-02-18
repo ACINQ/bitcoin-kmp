@@ -48,6 +48,23 @@ public object DeterministicWallet {
 
         @JvmField
         val publicKey: PublicKey = privateKey.publicKey()
+
+        public companion object {
+            @JvmStatic
+            public fun decode(input: String, parentPath: KeyPath = KeyPath.empty): Pair<Int, ExtendedPrivateKey> {
+                val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
+                val bis = ByteArrayInput(bin)
+                val depth = bis.read()
+                val parent = Pack.int32BE(bis).toLong() and 0xffffffffL
+                val childNumber = Pack.int32BE(bis).toLong() and 0xffffffffL
+                val chaincode = ByteArray(32)
+                bis.read(chaincode, 0)
+                require(bis.read() == 0)
+                val secretkeybytes = ByteArray(32)
+                bis.read(secretkeybytes, 0)
+                return Pair(prefix, ExtendedPrivateKey(secretkeybytes.byteVector32(), chaincode.byteVector32(), depth, parentPath.derive(childNumber), parent))
+            }
+        }
     }
 
     public data class ExtendedPublicKey(
@@ -62,6 +79,22 @@ public object DeterministicWallet {
         }
 
         val publicKey: PublicKey get() = PublicKey(publickeybytes)
+
+        public companion object {
+            @JvmStatic
+            public fun decode(input: String, parentPath: KeyPath = KeyPath.empty): Pair<Int, ExtendedPublicKey> {
+                val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
+                val bis = ByteArrayInput(bin)
+                val depth = bis.read()
+                val parent = Pack.int32BE(bis).toLong() and 0xffffffffL
+                val childNumber = Pack.int32BE(bis).toLong() and 0xffffffffL
+                val chaincode = ByteArray(32)
+                bis.read(chaincode, 0)
+                val publickeybytes = ByteArray(33)
+                bis.read(publickeybytes, 0)
+                return Pair(prefix, ExtendedPublicKey(publickeybytes.byteVector32(), chaincode.byteVector32(), depth, parentPath.derive(childNumber), parent))
+            }
+        }
     }
 
     @JvmStatic

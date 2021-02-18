@@ -92,7 +92,7 @@ public object DeterministicWallet {
                 bis.read(chaincode, 0)
                 val publickeybytes = ByteArray(33)
                 bis.read(publickeybytes, 0)
-                return Pair(prefix, ExtendedPublicKey(publickeybytes.byteVector32(), chaincode.byteVector32(), depth, parentPath.derive(childNumber), parent))
+                return Pair(prefix, ExtendedPublicKey(publickeybytes.byteVector(), chaincode.byteVector32(), depth, parentPath.derive(childNumber), parent))
             }
         }
     }

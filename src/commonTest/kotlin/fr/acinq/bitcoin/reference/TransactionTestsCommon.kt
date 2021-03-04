@@ -31,7 +31,7 @@ class TransactionTestsCommon {
     companion object {
         fun resourcesDir() =
             Environment.findVariable("TEST_RESOURCES_PATH")?.let { Path(it) }
-                ?: FileSystem.currentDirectory.resolve("src/commonTest/resources")
+                ?: FileSystem.workingDir().resolve("src/commonTest/resources")
 
         fun readData(filename: String): JsonElement {
             val file = resourcesDir().resolve(filename)

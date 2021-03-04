@@ -26,7 +26,7 @@ class BIP84TestsCommon {
      * see https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki
      */
     @Test
-    fun `"BIP49 reference tests`() {
+    fun `BIP49 reference tests`() {
         val seed = MnemonicCode.toSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".split(" "), "")
         val master = DeterministicWallet.generate(seed)
         assertEquals(DeterministicWallet.encode(master, DeterministicWallet.zprv), "zprvAWgYBBk7JR8Gjrh4UJQ2uJdG1r3WNRRfURiABBE3RvMXYSrRJL62XuezvGdPvG6GFBZduosCc1YP5wixPox7zhZLfiUm8aunE96BBa4Kei5")

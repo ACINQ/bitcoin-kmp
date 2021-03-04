@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 class Sha512TestsJvm {
     @Test
     fun `very long input`() {
-        val sha512 = Sha512()
+        val sha512 = Digest.sha512()
         val input = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno".encodeToByteArray()
         for (i in 0L until 16_777_216L) sha512.update(input, 0, input.size)
         val output = ByteArray(64)

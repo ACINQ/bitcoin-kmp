@@ -1,22 +1,6 @@
-/*
- * Copyright 2020 ACINQ SAS
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package fr.acinq.bitcoin.crypto
 
-public class Sha1 : Digest {
+internal class Sha1Linux : Digest {
     private var H1 = 0
     private var H2 = 0
     private var H3 = 0
@@ -266,16 +250,6 @@ public class Sha1 : Digest {
 
     public companion object {
         private val DIGEST_LENGTH = 20
-
-        public fun hash(input: ByteArray, offset: Int, len: Int): ByteArray {
-            val sha1 = Sha1()
-            sha1.update(input, offset, len)
-            val output = ByteArray(DIGEST_LENGTH)
-            sha1.doFinal(output, 0)
-            return output
-        }
-
-        public fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
 
         //
         // Additive constants

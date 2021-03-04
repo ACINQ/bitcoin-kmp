@@ -70,4 +70,12 @@ public interface Digest {
     }
 
     public fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
+
+    public companion object
 }
+
+public expect fun Digest.Companion.sha1(): Digest
+public expect fun Digest.Companion.sha256(): Digest
+public expect fun Digest.Companion.sha512(): Digest
+
+public fun Digest.Companion.ripemd160(): Digest = Ripemd160()

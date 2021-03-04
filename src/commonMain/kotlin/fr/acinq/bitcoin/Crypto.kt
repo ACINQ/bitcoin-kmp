@@ -26,11 +26,11 @@ import kotlin.jvm.JvmStatic
 
 public object Crypto {
     public fun sha1(input: ByteVector): ByteArray =
-        Sha1.hash(input.toByteArray())
+        Digest.sha1().hash(input.toByteArray())
 
     @JvmStatic
     public fun sha256(input: ByteArray, offset: Int, len: Int): ByteArray =
-        Sha256.hash(input, offset, len)
+        Digest.sha256().hash(input, offset, len)
 
     @JvmStatic
     public fun sha256(input: ByteArray): ByteArray =
@@ -42,7 +42,7 @@ public object Crypto {
 
     @JvmStatic
     public fun ripemd160(input: ByteArray, offset: Int, len: Int): ByteArray =
-        Ripemd160.hash(input, offset, len)
+        Digest.ripemd160().hash(input, offset, len)
 
     @JvmStatic
     public fun ripemd160(input: ByteArray): ByteArray =
@@ -54,7 +54,7 @@ public object Crypto {
 
     @JvmStatic
     public fun hash256(input: ByteArray, offset: Int, len: Int): ByteArray =
-        Sha256.hash(Sha256.hash(input, offset, len))
+        Digest.sha256().let { it.hash(it.hash(input, offset, len)) }
 
     @JvmStatic
     public fun hash256(input: ByteArray): ByteArray =
@@ -66,7 +66,7 @@ public object Crypto {
 
     @JvmStatic
     public fun hash160(input: ByteArray, offset: Int, len: Int): ByteArray =
-        Ripemd160.hash(Sha256.hash(input, offset, len))
+        Digest.ripemd160().hash(Digest.sha256().hash(input, offset, len))
 
     @JvmStatic
     public fun hash160(input: ByteArray): ByteArray = hash160(input, 0, input.size)
@@ -77,7 +77,7 @@ public object Crypto {
 
     @JvmStatic
     public fun hmac512(key: ByteArray, data: ByteArray): ByteArray {
-        return HMac.hmac(key, data, Sha512(), 128)
+        return Digest.sha512().hmac(key, data, 128)
     }
 
     /**

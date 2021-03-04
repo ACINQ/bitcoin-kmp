@@ -16,7 +16,7 @@
 
 package fr.acinq.bitcoin.crypto
 
-public class Ripemd160 : Digest {
+internal class Ripemd160 : Digest {
 
     private val DIGEST_SIZE = 20
 
@@ -543,18 +543,5 @@ public class Ripemd160 : Digest {
         for (i in X.indices) {
             X[i] = 0
         }
-    }
-
-    public companion object {
-
-        public fun hash(input: ByteArray, offset: Int, len: Int): ByteArray {
-            val ripemd = Ripemd160()
-            ripemd.update(input, offset, len)
-            val out = ByteArray(20)
-            ripemd.doFinal(out, 0)
-            return out
-        }
-
-        public fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
     }
 }

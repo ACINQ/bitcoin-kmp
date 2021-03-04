@@ -16,7 +16,7 @@
 
 package fr.acinq.bitcoin.crypto
 
-public class Sha256 : Digest {
+public class Sha256Linux : Digest {
     private val xBuf = ByteArray(4)
     private var xBufOff = 0
 
@@ -262,16 +262,6 @@ public class Sha256 : Digest {
 
     public companion object {
         private val DIGEST_LENGTH = 32
-
-        public fun hash(input: ByteArray, offset: Int, len: Int): ByteArray {
-            val sha256 = Sha256()
-            sha256.update(input, offset, len)
-            val output = ByteArray(32)
-            sha256.doFinal(output, 0)
-            return output
-        }
-
-        public fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
 
         /* SHA-256 functions */
         private fun Ch(x: Int, y: Int, z: Int): Int {

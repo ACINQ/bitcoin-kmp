@@ -39,7 +39,9 @@ kotlin {
 
     linuxX64("linux")
 
-    ios()
+    ios {
+        compilations["main"].cinterops.create("CoreCrypto")
+    }
 
     sourceSets {
         val secp256k1KmpVersion = "0.4.1"

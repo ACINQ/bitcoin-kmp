@@ -32,7 +32,7 @@ class Sha1TestsCommon {
     fun `reference tests`() {
         testVectors.forEach { (input, expected) ->
             run {
-                val digest = Sha1()
+                val digest = Digest.sha1()
                 val result = ByteArray(20)
                 val bin = input.encodeToByteArray()
                 digest.update(bin, 0, bin.size)

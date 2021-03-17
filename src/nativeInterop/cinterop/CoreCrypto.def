@@ -1,0 +1,24 @@
+package = platform.KCoreCrypto
+
+noStringConversion = KCCKeyDerivationPBKDF
+
+---
+
+#import <CommonCrypto/CommonKeyDerivation.h>
+
+int
+KCCKeyDerivationPBKDF(
+    CCPBKDFAlgorithm algorithm,
+    const char *password, size_t passwordLen,
+    const uint8_t *salt, size_t saltLen,
+    CCPseudoRandomAlgorithm prf, uint rounds,
+    uint8_t *derivedKey, size_t derivedKeyLen
+) {
+    return CCKeyDerivationPBKDF(
+        algorithm,
+        password, passwordLen,
+        salt, saltLen,
+        prf, rounds,
+        derivedKey, derivedKeyLen
+    );
+}

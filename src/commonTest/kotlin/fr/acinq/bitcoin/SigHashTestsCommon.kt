@@ -25,7 +25,7 @@ class SighashSpec {
     fun MilliBtc(value: Long) = Satoshi(value * 100000)
 
     @Test
-    fun `"SIGHASH_ANYONECANPAY lets you add inputs`() {
+    fun `SIGHASH_ANYONECANPAY lets you add inputs`() {
         val privateKeys = listOf(
             PrivateKey.fromBase58("cV7LGVeY2VPuCyCSarqEqFCUNig2NzwiAEBTTA89vNRQ4Vqjfurs", Base58.Prefix.SecretKeyTestnet).first,
             PrivateKey.fromBase58("cV5oyXUgySSMcUvKNdKtuYg4t4NTaxkwYrrocgsJZuYac2ogEdZX", Base58.Prefix.SecretKeyTestnet).first

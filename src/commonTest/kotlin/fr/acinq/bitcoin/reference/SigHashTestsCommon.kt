@@ -26,13 +26,14 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.kodein.memory.file.openReadableFile
 import org.kodein.memory.file.resolve
 import org.kodein.memory.text.readString
+import org.kodein.memory.use
 import kotlin.test.Test
 
 class SigHashTestsCommon {
     @Test
     fun `reference client sighash test`() {
         val file = TransactionTestsCommon.resourcesDir().resolve("data/sighash.json")
-        val raw = file.openReadableFile().readString()
+        val raw = file.openReadableFile().use { it.readString() }
         val format = Json { ignoreUnknownKeys = true }
         val json = format.parseToJsonElement(raw)
         // 	["raw_transaction, script, input_index, hashType, signature_hash (result)"],

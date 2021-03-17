@@ -32,7 +32,7 @@ class Sha256Spec {
     fun `reference tests`() {
         testVectors.forEach { (input, expected) ->
             run {
-                val digest = Sha256()
+                val digest = Digest.sha256()
                 val result = ByteArray(32)
                 val bin = input.encodeToByteArray()
                 digest.update(bin, 0, bin.size)

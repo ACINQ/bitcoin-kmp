@@ -107,7 +107,7 @@ public object MnemonicCode {
     public fun toSeed(mnemonics: List<String>, passphrase: String): ByteArray {
         val password = mnemonics.joinToString(" ").encodeToByteArray()
         val salt = ("mnemonic" + passphrase).encodeToByteArray()
-        val key = Pbkdf2.generate(salt, 2048, 64, Pbkdf2.Hmac512(password))
+        val key = Pbkdf2.withHmacSha512(password, salt, 2048, 64)
         return key
     }
 

@@ -16,48 +16,12 @@
 
 package fr.acinq.bitcoin.crypto
 
-import kotlin.experimental.xor
+import kotlin.jvm.JvmStatic
 
-public object Pbkdf2 {
-    public interface Prf {
-        public fun outputLen(): Int
-        public fun process(input: ByteArray): ByteArray
-    }
 
-    public class Hmac512(public val password: ByteArray) : Prf {
-        public val digest: Sha512 = Sha512()
+public expect object Pbkdf2 {
 
-        override fun outputLen(): Int = 64
+    @JvmStatic
+    public fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray
 
-        override fun process(input: ByteArray): ByteArray = HMac.hmac(password, input, digest, 128)
-    }
-
-    public fun generate(salt: ByteArray, count: Int, dkLen: Int, prf: Prf): ByteArray {
-        val hLen = prf.outputLen()
-        val l = kotlin.math.ceil(dkLen.toFloat() / hLen).toInt()
-        val r = dkLen - (l - 1) * hLen
-
-        fun xor(a: ByteArray, b: ByteArray) {
-            require(a.size == b.size)
-            for (i in a.indices) {
-                a[i] = a[i] xor b[i]
-            }
-        }
-
-        fun f(index: Int): ByteArray {
-            var u = prf.process(salt + Pack.writeInt32BE(index))
-            val output = u.copyOf()
-            for (i in 1 until count) {
-                u = prf.process(u)
-                xor(output, u)
-            }
-            return output
-        }
-
-        var t = f(1)
-        for (i in 2 until l) {
-            t += if (i == l - 1) f(i).take(r).toByteArray() else f(i)
-        }
-        return t
-    }
 }

@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "1.4.10"
+    kotlin("multiplatform") version "1.4.31"
     `maven-publish`
 }
 
@@ -24,14 +24,14 @@ repositories {
     maven("https://dl.bintray.com/kotlin/kotlinx")
     maven("https://dl.bintray.com/acinq/libs")
     maven("https://dl.bintray.com/kotlin/ktor")
-    maven("https://dl.bintray.com/kodein-framework/Kodein-Memory")
-    jcenter()
+    mavenCentral()
 }
 
 kotlin {
     explicitApi()
 
     jvm {
+        withJava()
         compilations.all {
             kotlinOptions.jvmTarget = "1.8"
         }
@@ -39,11 +39,13 @@ kotlin {
 
     linuxX64("linux")
 
-    ios()
+    ios {
+        compilations["main"].cinterops.create("CoreCrypto")
+    }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.4.1"
-        val serializationVersion = "1.0.0"
+        val secp256k1KmpVersion = "0.5.0"
+        val serializationVersion = "1.1.0"
 
         val commonMain by getting {
             dependencies {
@@ -54,7 +56,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.kodein.memory:kodein-memory-files:0.4.1")
+                implementation("org.kodein.memory:kodein-memory-files:0.7.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
             }
         }
@@ -86,6 +88,13 @@ kotlin {
         }
     }
 }
+
+configurations.forEach {
+    if (it.name.contains("testCompileClasspath")) {
+        it.attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class.java, "java-runtime"))
+    }
+}
+
 
 // Disable cross compilation
 plugins.withId("org.jetbrains.kotlin.multiplatform") {

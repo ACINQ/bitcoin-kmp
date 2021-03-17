@@ -31,6 +31,7 @@ kotlin {
     explicitApi()
 
     jvm {
+        withJava()
         compilations.all {
             kotlinOptions.jvmTarget = "1.8"
         }
@@ -87,6 +88,13 @@ kotlin {
         }
     }
 }
+
+configurations.forEach {
+    if (it.name.contains("testCompileClasspath")) {
+        it.attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class.java, "java-runtime"))
+    }
+}
+
 
 // Disable cross compilation
 plugins.withId("org.jetbrains.kotlin.multiplatform") {

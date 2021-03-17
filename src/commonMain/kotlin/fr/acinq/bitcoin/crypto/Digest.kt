@@ -16,6 +16,8 @@
 
 package fr.acinq.bitcoin.crypto
 
+import kotlin.jvm.JvmStatic
+
 public interface Digest {
     /**
      * return the algorithm name
@@ -71,11 +73,14 @@ public interface Digest {
 
     public fun hash(input: ByteArray): ByteArray = hash(input, 0, input.size)
 
-    public companion object
+    public companion object {
+        @JvmStatic public fun sha1(): Digest = Sha1()
+        @JvmStatic public fun sha256(): Digest = Sha256()
+        @JvmStatic public fun sha512(): Digest = Sha512()
+        @JvmStatic public fun ripemd160(): Digest = Ripemd160()
+    }
 }
 
-public expect fun Digest.Companion.sha1(): Digest
-public expect fun Digest.Companion.sha256(): Digest
-public expect fun Digest.Companion.sha512(): Digest
-
-public fun Digest.Companion.ripemd160(): Digest = Ripemd160()
+internal expect fun Sha1(): Digest
+internal expect fun Sha256(): Digest
+internal expect fun Sha512(): Digest

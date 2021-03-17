@@ -1,6 +1,6 @@
 package fr.acinq.bitcoin.crypto
 
 
-public actual fun Digest.Companion.sha1(): Digest = Sha1Linux()
-public actual fun Digest.Companion.sha256(): Digest = Sha256Linux()
-public actual fun Digest.Companion.sha512(): Digest = Sha512Linux()
+internal actual fun Sha1(): Digest = Sha1Linux()
+internal actual fun Sha256(): Digest = Sha256Linux()
+internal actual fun Sha512(): Digest = Sha512Linux()

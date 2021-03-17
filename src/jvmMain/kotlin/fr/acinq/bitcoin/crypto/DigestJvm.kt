@@ -20,6 +20,6 @@ internal class DigestJvm(algorithmName: String) : Digest {
     override fun reset(): Unit = digest.reset()
 }
 
-public actual fun Digest.Companion.sha1(): Digest = DigestJvm("SHA-1")
-public actual fun Digest.Companion.sha256(): Digest = DigestJvm("SHA-256")
-public actual fun Digest.Companion.sha512(): Digest = DigestJvm("SHA-512")
+internal actual fun Sha1(): Digest = DigestJvm("SHA-1")
+internal actual fun Sha256(): Digest = DigestJvm("SHA-256")
+internal actual fun Sha512(): Digest = DigestJvm("SHA-512")

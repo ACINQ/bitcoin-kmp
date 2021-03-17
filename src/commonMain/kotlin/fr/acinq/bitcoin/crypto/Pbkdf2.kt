@@ -16,5 +16,12 @@
 
 package fr.acinq.bitcoin.crypto
 
+import kotlin.jvm.JvmStatic
 
-public expect fun pbkdf2HmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray
+
+public expect object Pbkdf2 {
+
+    @JvmStatic
+    public fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray
+
+}

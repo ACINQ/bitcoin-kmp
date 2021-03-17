@@ -55,11 +55,11 @@ internal class DigestIos<C : CVariable>(
 
 }
 
-public actual fun Digest.Companion.sha1(): Digest =
+internal actual fun Sha1(): Digest =
     DigestIos("SHA-1", CC_SHA1_DIGEST_LENGTH, ::CC_SHA1_Init, ::CC_SHA1_Update, ::CC_SHA1_Final) { nativeHeap.alloc() }
 
-public actual fun Digest.Companion.sha256(): Digest =
+internal actual fun Sha256(): Digest =
     DigestIos("SHA-256", CC_SHA256_DIGEST_LENGTH, ::CC_SHA256_Init, ::CC_SHA256_Update, ::CC_SHA256_Final) { nativeHeap.alloc() }
 
-public actual fun Digest.Companion.sha512(): Digest =
+internal actual fun Sha512(): Digest =
     DigestIos("SHA-512", CC_SHA512_DIGEST_LENGTH, ::CC_SHA512_Init, ::CC_SHA512_Update, ::CC_SHA512_Final) { nativeHeap.alloc() }

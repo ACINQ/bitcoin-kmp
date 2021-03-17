@@ -3,13 +3,14 @@ package fr.acinq.bitcoin.crypto
 import kotlin.experimental.xor
 
 
-private object Pbkdf2Linux {
-    interface Prf {
+public actual object Pbkdf2 {
+
+    private interface Prf {
         fun outputLen(): Int
         fun process(input: ByteArray): ByteArray
     }
 
-    class Hmac512(public val password: ByteArray) : Prf {
+    private class Hmac512(public val password: ByteArray) : Prf {
         val digest: Digest = Digest.sha512()
 
         override fun outputLen(): Int = 64
@@ -17,7 +18,7 @@ private object Pbkdf2Linux {
         override fun process(input: ByteArray): ByteArray = digest.hmac(password, input, 128)
     }
 
-    fun generate(salt: ByteArray, count: Int, dkLen: Int, prf: Prf): ByteArray {
+    private fun generate(salt: ByteArray, count: Int, dkLen: Int, prf: Prf): ByteArray {
         val hLen = prf.outputLen()
         val l = kotlin.math.ceil(dkLen.toFloat() / hLen).toInt()
         val r = dkLen - (l - 1) * hLen
@@ -45,7 +46,7 @@ private object Pbkdf2Linux {
         }
         return t
     }
-}
 
-public actual fun pbkdf2HmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray =
-    Pbkdf2Linux.generate(salt, count, dkLen, Pbkdf2Linux.Hmac512(password))
+    public actual fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray =
+        generate(salt, count, dkLen, Hmac512(password))
+}

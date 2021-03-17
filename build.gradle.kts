@@ -1,22 +1,18 @@
-import org.gradle.internal.impldep.org.apache.http.auth.UsernamePasswordCredentials
-import org.gradle.internal.impldep.org.apache.http.client.methods.HttpPost
-import org.gradle.internal.impldep.org.apache.http.entity.ContentType
-import org.gradle.internal.impldep.org.apache.http.impl.client.HttpClients
-import org.gradle.internal.impldep.org.apache.http.entity.StringEntity
-import org.gradle.internal.impldep.org.apache.http.impl.auth.BasicScheme
+import org.jetbrains.dokka.Platform
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
     kotlin("multiplatform") version "1.4.31"
+    id("org.jetbrains.dokka") version "1.4.30"
     `maven-publish`
 }
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "snapshot"
+version = "0.7.0"
 
 repositories {
     mavenLocal()
@@ -122,39 +118,77 @@ plugins.withId("org.jetbrains.kotlin.multiplatform") {
     }
 }
 
-val snapshotNumber: String? by project
-val gitRef: String? by project
-val eapBranch = gitRef?.split("/")?.last() ?: "dev"
-val bintrayVersion = if (snapshotNumber != null) "${project.version}-$eapBranch-$snapshotNumber" else project.version.toString()
-val bintrayRepo = if (snapshotNumber != null) "snapshots" else "libs"
+//val snapshotNumber: String? by project
+//val gitRef: String? by project
+//val eapBranch = gitRef?.split("/")?.last() ?: "dev"
+//val bintrayVersion = if (snapshotNumber != null) "${project.version}-$eapBranch-$snapshotNumber" else project.version.toString()
+//val bintrayRepo = if (snapshotNumber != null) "snapshots" else "libs"
+//
+//val bintrayUsername: String? = (properties["bintrayUsername"] as String?) ?: System.getenv("BINTRAY_USER")
+//val bintrayApiKey: String? = (properties["bintrayApiKey"] as String?) ?: System.getenv("BINTRAY_APIKEY")
+//val hasBintray = bintrayUsername != null && bintrayApiKey != null
+//if (!hasBintray) logger.warn("Skipping bintray configuration as bintrayUsername or bintrayApiKey is not defined")
 
-val bintrayUsername: String? = (properties["bintrayUsername"] as String?) ?: System.getenv("BINTRAY_USER")
-val bintrayApiKey: String? = (properties["bintrayApiKey"] as String?) ?: System.getenv("BINTRAY_APIKEY")
-val hasBintray = bintrayUsername != null && bintrayApiKey != null
-if (!hasBintray) logger.warn("Skipping bintray configuration as bintrayUsername or bintrayApiKey is not defined")
 
-publishing {
-    if (hasBintray) {
-        repositories {
-            maven {
-                name = "bintray"
-                setUrl("https://api.bintray.com/maven/acinq/$bintrayRepo/${rootProject.name}/;publish=0")
-                credentials {
-                    username = bintrayUsername
-                    password = bintrayApiKey
-                }
+val dokkaOutputDir = buildDir.resolve("dokka")
+
+tasks.dokkaHtml {
+    outputDirectory.set(file(dokkaOutputDir))
+    dokkaSourceSets {
+        configureEach {
+            val platformName = when (platform.get()) {
+                Platform.jvm -> "jvm"
+                Platform.js -> "js"
+                Platform.native -> "native"
+                Platform.common -> "common"
+            }
+            displayName.set(platformName)
+
+            perPackageOption {
+                matchingRegex.set(".*\\.internal.*") // will match all .internal packages and sub-packages
+                suppress.set(true)
             }
         }
     }
+}
 
+val deleteDokkaOutputDir by tasks.register<Delete>("deleteDokkaOutputDirectory") {
+    delete(dokkaOutputDir)
+}
+
+
+val javadocJar = tasks.create<Jar>("javadocJar") {
+    archiveClassifier.set("javadoc")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    dependsOn(deleteDokkaOutputDir, tasks.dokkaHtml)
+    from(dokkaOutputDir)
+}
+
+publishing {
+//    if (hasBintray) {
+//        repositories {
+//            maven {
+//                name = "bintray"
+//                setUrl("https://api.bintray.com/maven/acinq/$bintrayRepo/${rootProject.name}/;publish=0")
+//                credentials {
+//                    username = bintrayUsername
+//                    password = bintrayApiKey
+//                }
+//            }
+//        }
+//    }
     publications.withType<MavenPublication>().configureEach {
-        version = bintrayVersion
+        version = project.version.toString()
+        artifact(javadocJar)
         pom {
+            name.set("Kotlin Multiplatform Bitcoin Library")
             description.set("A simple Kotlin Multiplatform library which implements most of the bitcoin protocol")
             url.set("https://github.com/ACINQ/bitcoin-kmp")
             licenses {
-                name.set("Apache License v2.0")
-                url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                license {
+                    name.set("Apache License v2.0")
+                    url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                }
             }
             issueManagement {
                 system.set("Github")
@@ -162,36 +196,43 @@ publishing {
             }
             scm {
                 connection.set("https://github.com/ACINQ/bitcoin-kmp.git")
+                url.set("https://github.com/ACINQ/bitcoin-kmp")
+            }
+            developers {
+                developer {
+                    name.set("ACINQ")
+                    email.set("hello@acinq.co")
+                }
             }
         }
     }
 }
 
-if (hasBintray) {
-    val postBintrayPublish by tasks.creating {
-        doLast {
-            HttpClients.createDefault().use { client ->
-                val post = HttpPost("https://api.bintray.com/content/acinq/$bintrayRepo/${rootProject.name}/$bintrayVersion/publish").apply {
-                    entity = StringEntity("{}", ContentType.APPLICATION_JSON)
-                    addHeader(BasicScheme().authenticate(UsernamePasswordCredentials(bintrayUsername, bintrayApiKey), this, null))
-                }
-                client.execute(post)
-            }
-        }
-    }
-
-    val postBintrayDiscard by tasks.creating {
-        doLast {
-            HttpClients.createDefault().use { client ->
-                val post = HttpPost("https://api.bintray.com/content/acinq/$bintrayRepo/${rootProject.name}/$bintrayVersion/publish").apply {
-                    entity = StringEntity("{ \"discard\": true }", ContentType.APPLICATION_JSON)
-                    addHeader(BasicScheme().authenticate(UsernamePasswordCredentials(bintrayUsername, bintrayApiKey), this, null))
-                }
-                client.execute(post)
-            }
-        }
-    }
-}
+//if (hasBintray) {
+//    val postBintrayPublish by tasks.creating {
+//        doLast {
+//            HttpClients.createDefault().use { client ->
+//                val post = HttpPost("https://api.bintray.com/content/acinq/$bintrayRepo/${rootProject.name}/$bintrayVersion/publish").apply {
+//                    entity = StringEntity("{}", ContentType.APPLICATION_JSON)
+//                    addHeader(BasicScheme().authenticate(UsernamePasswordCredentials(bintrayUsername, bintrayApiKey), this, null))
+//                }
+//                client.execute(post)
+//            }
+//        }
+//    }
+//
+//    val postBintrayDiscard by tasks.creating {
+//        doLast {
+//            HttpClients.createDefault().use { client ->
+//                val post = HttpPost("https://api.bintray.com/content/acinq/$bintrayRepo/${rootProject.name}/$bintrayVersion/publish").apply {
+//                    entity = StringEntity("{ \"discard\": true }", ContentType.APPLICATION_JSON)
+//                    addHeader(BasicScheme().authenticate(UsernamePasswordCredentials(bintrayUsername, bintrayApiKey), this, null))
+//                }
+//                client.execute(post)
+//            }
+//        }
+//    }
+//}
 
 afterEvaluate {
     tasks.withType<AbstractTestTask> {

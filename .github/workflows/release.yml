@@ -35,14 +35,22 @@ jobs:
           java-version: 11
       - name: Check
         run: ./gradlew check
-      - name: Publish
-        env:
-          BINTRAY_USER: ${{ secrets.bintray_user }}
-          BINTRAY_APIKEY: ${{ secrets.bintray_apikey }}
-        run: ./gradlew publish
-      - name: Discard
-        if: ${{ failure() || cancelled() }}
-        env:
-          BINTRAY_USER: ${{ secrets.bintray_user }}
-          BINTRAY_APIKEY: ${{ secrets.bintray_apikey }}
-        run: ./gradlew postBintrayDiscard
+      - name: Publish Linux
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: ./gradlew publishLinuxPublicationToMavenLocal
+      - name: Publish MacOS
+        if: matrix.os == 'macOS-latest'
+        shell: bash
+        run: ./gradlew publishToMavenLocal
+      - name: Copy artifact files
+        run: |
+          mkdir -p maven-local/release
+          cp -r ~/.m2/repository/* maven-local/release
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: release
+          path: |
+            maven-local
+            !maven-local/**/maven-metadata-local.xml

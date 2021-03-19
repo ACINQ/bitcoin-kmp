@@ -118,18 +118,6 @@ plugins.withId("org.jetbrains.kotlin.multiplatform") {
     }
 }
 
-//val snapshotNumber: String? by project
-//val gitRef: String? by project
-//val eapBranch = gitRef?.split("/")?.last() ?: "dev"
-//val bintrayVersion = if (snapshotNumber != null) "${project.version}-$eapBranch-$snapshotNumber" else project.version.toString()
-//val bintrayRepo = if (snapshotNumber != null) "snapshots" else "libs"
-//
-//val bintrayUsername: String? = (properties["bintrayUsername"] as String?) ?: System.getenv("BINTRAY_USER")
-//val bintrayApiKey: String? = (properties["bintrayApiKey"] as String?) ?: System.getenv("BINTRAY_APIKEY")
-//val hasBintray = bintrayUsername != null && bintrayApiKey != null
-//if (!hasBintray) logger.warn("Skipping bintray configuration as bintrayUsername or bintrayApiKey is not defined")
-
-
 val dokkaOutputDir = buildDir.resolve("dokka")
 
 tasks.dokkaHtml {
@@ -165,18 +153,6 @@ val javadocJar = tasks.create<Jar>("javadocJar") {
 }
 
 publishing {
-//    if (hasBintray) {
-//        repositories {
-//            maven {
-//                name = "bintray"
-//                setUrl("https://api.bintray.com/maven/acinq/$bintrayRepo/${rootProject.name}/;publish=0")
-//                credentials {
-//                    username = bintrayUsername
-//                    password = bintrayApiKey
-//                }
-//            }
-//        }
-//    }
     publications.withType<MavenPublication>().configureEach {
         version = project.version.toString()
         artifact(javadocJar)
@@ -207,32 +183,6 @@ publishing {
         }
     }
 }
-
-//if (hasBintray) {
-//    val postBintrayPublish by tasks.creating {
-//        doLast {
-//            HttpClients.createDefault().use { client ->
-//                val post = HttpPost("https://api.bintray.com/content/acinq/$bintrayRepo/${rootProject.name}/$bintrayVersion/publish").apply {
-//                    entity = StringEntity("{}", ContentType.APPLICATION_JSON)
-//                    addHeader(BasicScheme().authenticate(UsernamePasswordCredentials(bintrayUsername, bintrayApiKey), this, null))
-//                }
-//                client.execute(post)
-//            }
-//        }
-//    }
-//
-//    val postBintrayDiscard by tasks.creating {
-//        doLast {
-//            HttpClients.createDefault().use { client ->
-//                val post = HttpPost("https://api.bintray.com/content/acinq/$bintrayRepo/${rootProject.name}/$bintrayVersion/publish").apply {
-//                    entity = StringEntity("{ \"discard\": true }", ContentType.APPLICATION_JSON)
-//                    addHeader(BasicScheme().authenticate(UsernamePasswordCredentials(bintrayUsername, bintrayApiKey), this, null))
-//                }
-//                client.execute(post)
-//            }
-//        }
-//    }
-//}
 
 afterEvaluate {
     tasks.withType<AbstractTestTask> {

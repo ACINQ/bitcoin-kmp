@@ -54,15 +54,3 @@ jobs:
           path: |
             maven-local
             !maven-local/**/maven-metadata-local.xml
-
-#      - name: Publish
-#        env:
-#          BINTRAY_USER: ${{ secrets.bintray_user }}
-#          BINTRAY_APIKEY: ${{ secrets.bintray_apikey }}
-#        run: ./gradlew publish
-#      - name: Discard
-#        if: ${{ failure() || cancelled() }}
-#        env:
-#          BINTRAY_USER: ${{ secrets.bintray_user }}
-#          BINTRAY_APIKEY: ${{ secrets.bintray_apikey }}
-#        run: ./gradlew postBintrayDiscard

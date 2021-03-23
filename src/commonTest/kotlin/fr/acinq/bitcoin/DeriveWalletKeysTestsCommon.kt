@@ -1,5 +1,8 @@
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.Bitcoin.computeBIP44Address
+import fr.acinq.bitcoin.Bitcoin.computeBIP49Address
+import fr.acinq.bitcoin.Bitcoin.computeBIP84Address
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

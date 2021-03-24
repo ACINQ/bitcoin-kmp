@@ -18,7 +18,6 @@ repositories {
     mavenLocal()
     google()
     maven("https://dl.bintray.com/kotlin/kotlinx")
-    maven("https://dl.bintray.com/acinq/libs")
     maven("https://dl.bintray.com/kotlin/ktor")
     mavenCentral()
 }
@@ -40,7 +39,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.5.0"
+        val secp256k1KmpVersion = "0.5.1"
         val serializationVersion = "1.1.0"
 
         val commonMain by getting {

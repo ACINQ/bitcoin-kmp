@@ -17,8 +17,6 @@ version = "0.7.0-SNAPSHOT"
 repositories {
     mavenLocal()
     google()
-    maven("https://dl.bintray.com/kotlin/kotlinx")
-    maven("https://dl.bintray.com/kotlin/ktor")
     mavenCentral()
 }
 

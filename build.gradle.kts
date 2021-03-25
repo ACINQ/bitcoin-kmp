@@ -18,6 +18,7 @@ repositories {
     mavenLocal()
     google()
     mavenCentral()
+    jcenter()
 }
 
 kotlin {

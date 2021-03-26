@@ -25,18 +25,12 @@ public data class PublicKey(@JvmField val value: ByteVector) {
     public constructor(data: ByteArray) : this(ByteVector(data))
 
     public operator fun plus(that: PublicKey): PublicKey {
-        val pub = Secp256k1.pubKeyAdd(
-            value.toByteArray(),
-            that.value.toByteArray()
-        )
+        val pub = Secp256k1.pubKeyAdd(value.toByteArray(), that.value.toByteArray())
         return PublicKey(compress(pub))
     }
 
     public operator fun times(that: PrivateKey): PublicKey {
-        val pub = Secp256k1.pubKeyTweakMul(
-            value.toByteArray(),
-            that.value.toByteArray()
-        )
+        val pub = Secp256k1.pubKeyTweakMul(value.toByteArray(), that.value.toByteArray())
         return PublicKey(compress(pub))
     }
 

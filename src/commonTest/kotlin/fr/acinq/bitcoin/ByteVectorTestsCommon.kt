@@ -32,20 +32,12 @@ class ByteVectorTestsCommon {
 
     @Test
     fun `bad sized vectors`() {
-        assertFailsWith<IllegalArgumentException> { ByteVector32("0123456789ABCDEF") }.let {
-            assertEquals("offset (0) + size (32) must be <= buffer size (8)", it.message)
-        }
+        assertEquals("offset (0) + size (32) must be <= buffer size (8)", assertFailsWith<IllegalArgumentException> { ByteVector32("0123456789ABCDEF") }.message)
 
-        assertFailsWith<IllegalArgumentException> { ByteVector32(Hex.decode("0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"), 8) }.let {
-            assertEquals("offset (8) + size (32) must be <= buffer size (32)", it.message)
-        }
+        assertEquals("offset (8) + size (32) must be <= buffer size (32)", assertFailsWith<IllegalArgumentException> { ByteVector32(Hex.decode("0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"), 8) }.message)
 
-        assertFailsWith<IllegalArgumentException> { ByteVector64("0123456789ABCDEF0123456789ABCDEF") }.let {
-            assertEquals("offset (0) + size (64) must be <= buffer size (16)", it.message)
-        }
+        assertEquals("offset (0) + size (64) must be <= buffer size (16)", assertFailsWith<IllegalArgumentException> { ByteVector64("0123456789ABCDEF0123456789ABCDEF") }.message)
 
-        assertFailsWith<IllegalArgumentException> { ByteVector64(Hex.decode("FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210"), 16) }.let {
-            assertEquals("offset (16) + size (64) must be <= buffer size (64)", it.message)
-        }
+        assertEquals("offset (16) + size (64) must be <= buffer size (64)", assertFailsWith<IllegalArgumentException> { ByteVector64(Hex.decode("FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210"), 16) }.message)
     }
 }

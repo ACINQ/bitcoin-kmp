@@ -81,10 +81,7 @@ class TransactionTestsCommon {
                                 val index = it.jsonArray[1].jsonPrimitive.long
                                 val scriptPubKey = it.jsonArray[2].jsonPrimitive.content
                                 val prevoutScript = ScriptTestsCommon.parseFromText(scriptPubKey)
-                                prevoutMap.put(
-                                    OutPoint(ByteVector32(hash).reversed(), index),
-                                    prevoutScript.byteVector()
-                                )
+                                prevoutMap[OutPoint(ByteVector32(hash).reversed(), index)] = prevoutScript.byteVector()
                                 val amount = it.jsonArray[3].jsonPrimitive.long.toSatoshi()
                                 prevamountMap.put(OutPoint(ByteVector32(hash).reversed(), index), amount)
                             }
@@ -99,7 +96,7 @@ class TransactionTestsCommon {
                         for (i in 0..tx.txIn.lastIndex) {
                             if (tx.txIn[i].outPoint.isCoinbase) continue
                             val prevOutputScript = prevoutMap.getValue(tx.txIn[i].outPoint)
-                            val amount = prevamountMap.get(tx.txIn[i].outPoint) ?: 0L.toSatoshi()
+                            val amount = prevamountMap[tx.txIn[i].outPoint] ?: 0L.toSatoshi()
                             val ctx = Script.Context(tx, i, amount)
                             val runner = Script.Runner(ctx, ScriptTestsCommon.parseScriptFlags(verifyFlags))
                             if (!runner.verifyScripts(

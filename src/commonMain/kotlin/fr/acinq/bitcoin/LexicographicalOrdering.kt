@@ -23,12 +23,14 @@ import kotlin.jvm.JvmStatic
  * see https://github.com/bitcoin/bips/blob/master/bip-0069.mediawiki
  */
 public object LexicographicalOrdering {
-    public tailrec fun isLessThanInternal(a: ByteArray, b: ByteArray): Boolean {
-        return if (a.isEmpty() && b.isEmpty()) false
-        else if (a.isEmpty()) true
-        else if (b.isEmpty()) false
-        else if (a.first() == b.first()) isLessThanInternal(a.drop(1).toByteArray(), b.drop(1).toByteArray())
-        else (a.first().toInt() and 0xff) < (b.first().toInt() and 0xff)
+    private tailrec fun isLessThanInternal(a: ByteArray, b: ByteArray): Boolean {
+        return when {
+            a.isEmpty() && b.isEmpty() -> false
+            a.isEmpty() -> true
+            b.isEmpty() -> false
+            a.first() == b.first() -> isLessThanInternal(a.drop(1).toByteArray(), b.drop(1).toByteArray())
+            else -> (a.first().toInt() and 0xff) < (b.first().toInt() and 0xff)
+        }
     }
 
     @JvmStatic
@@ -72,7 +74,7 @@ public object LexicographicalOrdering {
      */
     @JvmStatic
     public fun sort(tx: Transaction): Transaction = tx.copy(
-        txIn = tx.txIn.sortedWith(Comparator { a, b -> compare(a, b) }),
-        txOut = tx.txOut.sortedWith(Comparator { a, b -> compare(a, b) })
+        txIn = tx.txIn.sortedWith { a, b -> compare(a, b) },
+        txOut = tx.txOut.sortedWith { a, b -> compare(a, b) }
     )
 }

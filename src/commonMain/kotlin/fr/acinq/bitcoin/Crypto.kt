@@ -264,11 +264,13 @@ public object Crypto {
     public fun checkSignatureEncoding(sig: ByteArray, flags: Int): Boolean {
         // Empty signature. Not strictly DER encoded, but allowed to provide a
         // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
-        return if (sig.isEmpty()) true
-        else if ((flags and (SCRIPT_VERIFY_DERSIG or SCRIPT_VERIFY_LOW_S or SCRIPT_VERIFY_STRICTENC)) != 0 && !isDERSignature(sig)) false
-        else if ((flags and SCRIPT_VERIFY_LOW_S) != 0 && !isLowDERSignature(sig.dropLast(1).toByteArray())) false // drop the sighash byte
-        else if ((flags and SCRIPT_VERIFY_STRICTENC) != 0 && !isDefinedHashtypeSignature(sig)) false
-        else true
+        return when {
+            sig.isEmpty() -> true
+            (flags and (SCRIPT_VERIFY_DERSIG or SCRIPT_VERIFY_LOW_S or SCRIPT_VERIFY_STRICTENC)) != 0 && !isDERSignature(sig) -> false
+            (flags and SCRIPT_VERIFY_LOW_S) != 0 && !isLowDERSignature(sig.dropLast(1).toByteArray()) -> false // drop the sighash byte
+            (flags and SCRIPT_VERIFY_STRICTENC) != 0 && !isDefinedHashtypeSignature(sig) -> false
+            else -> true
+        }
     }
 
     /**
@@ -323,7 +325,7 @@ public object Crypto {
     /**
      * Recover public keys from a signature and the message that was signed. This method will return 2 public keys, and the signature
      * can be verified with both, but only one of them matches that private key that was used to generate the signature.
-     * @param t signature
+     * @param sig signature
      * @param message message that was signed
      * @return a (pub1, pub2) tuple where pub1 and pub2 are candidates public keys. If you have the recovery id  then use
      *         pub1 if the recovery id is even and pub2 if it is odd

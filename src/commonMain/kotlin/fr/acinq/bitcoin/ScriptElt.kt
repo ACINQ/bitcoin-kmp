@@ -162,20 +162,11 @@ public object OP_INVALIDOPCODE : ScriptElt()
 public data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val code: Int) : ScriptElt() {
     public constructor(data: ByteArray, code: Int) : this(data.byteVector(), code)
 
-    public constructor(data: ByteArray) : this(
-        data,
-        codeFromDataLength(data.count())
-    )
+    public constructor(data: ByteArray) : this(data, codeFromDataLength(data.count()))
 
-    public constructor(data: ByteVector) : this(
-        data,
-        codeFromDataLength(data.size())
-    )
+    public constructor(data: ByteVector) : this(data, codeFromDataLength(data.size()))
 
-    public constructor(data: ByteVector32) : this(
-        data,
-        codeFromDataLength(data.size())
-    )
+    public constructor(data: ByteVector32) : this(data, codeFromDataLength(data.size()))
 
     public constructor(publicKey: PublicKey) : this(publicKey.value)
 
@@ -341,9 +332,5 @@ public object ScriptEltMapping {
         return name1
     }
 
-    public val name2code: Map<String, Int> = elt2code.map { it ->
-        name(
-            it.key
-        ) to it.value
-    }.toMap() + mapOf<String, Int>("NOP2" to 0xb1, "NOP3" to 0xb2)
+    public val name2code: Map<String, Int> = elt2code.map { name(it.key) to it.value }.toMap() + mapOf<String, Int>("NOP2" to 0xb1, "NOP3" to 0xb2)
 }

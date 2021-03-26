@@ -157,13 +157,7 @@ public object DeterministicWallet {
      */
     @JvmStatic
     public fun publicKey(input: ExtendedPrivateKey): ExtendedPublicKey {
-        return ExtendedPublicKey(
-            input.publicKey.value,
-            input.chaincode,
-            depth = input.depth,
-            path = input.path,
-            parent = input.parent
-        )
+        return ExtendedPublicKey(input.publicKey.value, input.chaincode, depth = input.depth, path = input.path, parent = input.parent)
     }
 
     /**
@@ -172,11 +166,7 @@ public object DeterministicWallet {
      * @return the fingerprint for this public key
      */
     @JvmStatic
-    public fun fingerprint(input: ExtendedPublicKey): Long = Pack.int32LE(
-        ByteArrayInput(
-            Crypto.hash160(input.publickeybytes).take(4).reversed().toByteArray()
-        )
-    ).toLong()
+    public fun fingerprint(input: ExtendedPublicKey): Long = Pack.int32LE(ByteArrayInput(Crypto.hash160(input.publickeybytes).take(4).reversed().toByteArray())).toLong()
 
     /**
      *
@@ -320,7 +310,7 @@ public data class KeyPath(@JvmField val path: List<Long>) {
         return KeyPath(path + that.path)
     }
 
-    override fun toString(): String = path.map { KeyPath.childNumberToString(it) }.fold("m") { a, b -> "$a/$b" }
+    override fun toString(): String = path.map { childNumberToString(it) }.fold("m") { a, b -> "$a/$b" }
 
     public companion object {
         public val empty: KeyPath = KeyPath(listOf())

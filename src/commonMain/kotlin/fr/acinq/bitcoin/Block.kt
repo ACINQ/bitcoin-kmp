@@ -105,7 +105,7 @@ public data class BlockHeader(
         @JvmStatic
         @OptIn(ExperimentalUnsignedTypes::class)
         public fun getDifficulty(header: BlockHeader): UInt256 {
-            val (diff, neg, _) = UInt256.decodeCompact(header.bits.toLong())
+            val (diff, neg, _) = UInt256.decodeCompact(header.bits)
             return if (neg) -diff else diff
         }
 
@@ -128,7 +128,7 @@ public data class BlockHeader(
         }
 
         @JvmStatic
-        public fun blockProof(header: BlockHeader): UInt256 = blockProof(header.bits.toLong())
+        public fun blockProof(header: BlockHeader): UInt256 = blockProof(header.bits)
 
         /**
          * Proof of work: hash(header) <= target difficulty
@@ -138,19 +138,19 @@ public data class BlockHeader(
          */
         @JvmStatic
         public fun checkProofOfWork(header: BlockHeader): Boolean {
-            val (target, _, _) = UInt256.decodeCompact(header.bits.toLong())
+            val (target, _, _) = UInt256.decodeCompact(header.bits)
             val hash = UInt256(header.blockId.toByteArray())
             return hash <= target
         }
 
         @JvmStatic
         public fun calculateNextWorkRequired(lastHeader: BlockHeader, lastRetargetTime: Long): Long {
-            var actualTimespan = lastHeader.time.toLong() - lastRetargetTime
+            var actualTimespan = lastHeader.time - lastRetargetTime
             val targetTimespan = 14 * 24 * 60 * 60L // two weeks
             if (actualTimespan < targetTimespan / 4) actualTimespan = targetTimespan / 4
             if (actualTimespan > targetTimespan * 4) actualTimespan = targetTimespan * 4
 
-            var (target, isnegative, overflow) = UInt256.decodeCompact(lastHeader.bits.toLong())
+            var (target, isnegative, overflow) = UInt256.decodeCompact(lastHeader.bits)
             require(!isnegative)
             require(!overflow)
             target *= UInt256(actualTimespan)
@@ -224,9 +224,8 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
         @JvmStatic
         override fun validate(message: Block) {
             BlockHeader.validate(message.header)
-            require(message.header.hashMerkleRoot == MerkleTree.computeRoot(message.tx.map { it -> it.hash })) { "invalid block:  merkle root mismatch" }
-            require(message.tx.map { it.hash }
-                .toSet().size == message.tx.size) { "invalid block: duplicate transactions" }
+            require(message.header.hashMerkleRoot == MerkleTree.computeRoot(message.tx.map { it.hash })) { "invalid block:  merkle root mismatch" }
+            require(message.tx.map { it.hash }.toSet().size == message.tx.size) { "invalid block: duplicate transactions" }
             message.tx.map { Transaction.validate(it) }
         }
 
@@ -240,7 +239,7 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
 
         // genesis blocks
         @JvmField
-        public val LivenetGenesisBlock: Block = {
+        public val LivenetGenesisBlock: Block = run {
             val script = listOf(
                 OP_PUSHDATA(writeUInt32(486604799u)),
                 OP_PUSHDATA(ByteVector("04")),
@@ -268,7 +267,7 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
                     )
                 )
             )
-        }.invoke()
+        }
 
         @JvmField
         public val TestnetGenesisBlock: Block =

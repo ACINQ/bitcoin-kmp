@@ -26,11 +26,11 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class Base58RerenceTestsCommon {
+class Base58ReferenceTestsCommon {
     @Test
     fun `reference encode-decode test`() {
         val tests = TransactionTestsCommon.readData("data/base58_encode_decode.json")
-        tests.jsonArray.filter { it -> it.jsonArray.size == 2 }.map { it.jsonArray }.forEach {
+        tests.jsonArray.filter { it.jsonArray.size == 2 }.map { it.jsonArray }.forEach {
             val hex = it[0].jsonPrimitive.content
             val expected = it[1].jsonPrimitive.content
             assertEquals(Base58.encode(Hex.decode(hex)), expected)

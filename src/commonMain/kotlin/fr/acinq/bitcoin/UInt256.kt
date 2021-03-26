@@ -171,12 +171,11 @@ public class UInt256() : Comparable<UInt256> {
 
     public fun endodeCompact(fNegative: Boolean): Long {
         var nSize = (bits() + 7) / 8
-        var nCompact: Long
-        if (nSize <= 3) {
-            nCompact = getLow64() shl 8 * (3 - nSize)
+        var nCompact: Long = if (nSize <= 3) {
+            getLow64() shl 8 * (3 - nSize)
         } else {
             val bn = UInt256(this) shr 8 * (nSize - 3)
-            nCompact = bn.getLow64()
+            bn.getLow64()
         }
         // The 0x00800000 bit denotes the sign.
         // Thus, if it is already set, divide the mantissa by 256 and increase the exponent.
@@ -246,9 +245,7 @@ public class UInt256() : Comparable<UInt256> {
                 result = result.shl(8 * (nSize - 3))
             }
             val pfNegative = nWord != 0L && (nCompact and 0x00800000L) != 0L
-            val pfOverflow = nWord != 0L && ((nSize > 34) ||
-                    (nWord > 0xff && nSize > 33) ||
-                    (nWord > 0xffff && nSize > 32))
+            val pfOverflow = nWord != 0L && ((nSize > 34) || (nWord > 0xff && nSize > 33) || (nWord > 0xffff && nSize > 32))
             return Triple(result, pfNegative, pfOverflow)
         }
     }

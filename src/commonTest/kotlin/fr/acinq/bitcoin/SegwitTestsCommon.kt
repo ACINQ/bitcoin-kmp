@@ -33,7 +33,7 @@ class SegwitTestsCommon {
         val tx = Transaction.read(bin, Protocol.PROTOCOL_VERSION)
 
         assertEquals(
-            tx.txIn.map { it -> it.witness },
+            tx.txIn.map { it.witness },
             listOf(
                 ScriptWitness.empty,
                 ScriptWitness(
@@ -97,11 +97,11 @@ class SegwitTestsCommon {
             pversion
         )
         assertTrue(tx1.hasWitness)
-        assertTrue(tx1.txIn.find { it -> it.signatureScript.size() > 0 } == null)
+        assertTrue(tx1.txIn.find { it.signatureScript.size() > 0 } == null)
         //assert(tx1.txIn.find(!_.signatureScript.isEmpty).isEmpty)
         val tx2 = tx1.updateWitnesses(listOf(ScriptWitness.empty))
         assertTrue(tx2 != tx1)
-        assertTrue(tx2.txid == tx1.txid)
+        assertEquals(tx2.txid, tx1.txid)
     }
 
     @Test
@@ -135,7 +135,7 @@ class SegwitTestsCommon {
         )
 
         // now let's create a simple tx that spends tx1 and send 0.39 BTC to P2WPK output
-        val tx2 = {
+        val tx2 = run {
             val tmp = Transaction(
                 version = 1,
                 txIn = listOf(TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL)),
@@ -152,14 +152,14 @@ class SegwitTestsCommon {
                 priv1
             )
             tmp.updateSigScript(0, listOf(OP_PUSHDATA(sig), OP_PUSHDATA(pub1)))
-        }.invoke()
+        }
 
         Transaction.correctlySpends(tx2, listOf(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-        assertTrue(tx2.txid == ByteVector32("3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e"))
+        assertEquals(tx2.txid, ByteVector32("3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e"))
         // this tx was published on segnet as 3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e
 
         // and now we create a segwit tx that spends the P2WPK output
-        val tx3 = {
+        val tx3 = run {
             val tmp: Transaction = Transaction(
                 version = 1,
                 txIn = listOf(TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL)),
@@ -185,10 +185,10 @@ class SegwitTestsCommon {
             )
             val witness = ScriptWitness(listOf(sig.byteVector(), pub1.value))
             tmp.updateWitness(0, witness)
-        }.invoke()
+        }
 
         Transaction.correctlySpends(tx3, listOf(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-        assertTrue(tx3.txid == ByteVector32("a474219df20b95210b8dac45bb5ed49f0979f8d9b6c17420f3e50f6abc071af8"))
+        assertEquals(tx3.txid, ByteVector32("a474219df20b95210b8dac45bb5ed49f0979f8d9b6c17420f3e50f6abc071af8"))
         // this tx was published on segnet as a474219df20b95210b8dac45bb5ed49f0979f8d9b6c17420f3e50f6abc071af8
     }
 
@@ -222,7 +222,7 @@ class SegwitTestsCommon {
         )
 
         // now let's create a simple tx that spends tx1 and send 0.5 BTC to a P2WSH output
-        val tx2 = {
+        val tx2 = run {
             // our script is a 2-of-2 multisig script
             val redeemScript = Script.createMultiSigMofN(2, listOf(pub2, pub3))
             val tmp = Transaction(
@@ -241,13 +241,13 @@ class SegwitTestsCommon {
                 priv1
             )
             tmp.updateSigScript(0, listOf(OP_PUSHDATA(sig), OP_PUSHDATA(pub1)))
-        }.invoke()
+        }
         Transaction.correctlySpends(tx2, listOf(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-        assertTrue(tx2.txid == ByteVector32("9d896b6d2b8fc9665da72f5b1942f924a37c5c714f31f40ee2a6c945f74dd355"))
+        assertEquals(tx2.txid, ByteVector32("9d896b6d2b8fc9665da72f5b1942f924a37c5c714f31f40ee2a6c945f74dd355"))
         // this tx was published on segnet as 9d896b6d2b8fc9665da72f5b1942f924a37c5c714f31f40ee2a6c945f74dd355
 
         // and now we create a segwit tx that spends the P2WSH output
-        val tx3 = {
+        val tx3 = run {
             val tmp: Transaction = Transaction(
                 version = 1,
                 txIn = listOf(TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL)),
@@ -273,13 +273,12 @@ class SegwitTestsCommon {
                 SigVersion.SIGVERSION_WITNESS_V0,
                 priv3
             )
-            val witness =
-                ScriptWitness(listOf(ByteVector.empty, sig2.byteVector(), sig3.byteVector(), pubKeyScript.byteVector()))
+            val witness = ScriptWitness(listOf(ByteVector.empty, sig2.byteVector(), sig3.byteVector(), pubKeyScript.byteVector()))
             tmp.updateWitness(0, witness)
-        }.invoke()
+        }
 
         Transaction.correctlySpends(tx3, listOf(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-        assertTrue(tx3.txid == ByteVector32("943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb"))
+        assertEquals(tx3.txid, ByteVector32("943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb"))
         // this tx was published on segnet as 943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb
     }
 
@@ -306,7 +305,7 @@ class SegwitTestsCommon {
 
         // let's spend it:
 
-        val tx1 = {
+        val tx1 = run {
             val tmp: Transaction = Transaction(
                 version = 1,
                 txIn = listOf(TxIn(OutPoint(tx.hash, 1), sequence = 0xffffffffL)),
@@ -325,10 +324,10 @@ class SegwitTestsCommon {
             )
             val witness = ScriptWitness(listOf(sig.byteVector(), pub1.value))
             tmp.updateSigScript(0, listOf(OP_PUSHDATA(script))).updateWitness(0, witness)
-        }.invoke()
+        }
 
         Transaction.correctlySpends(tx1, listOf(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-        assertTrue(tx1.txid == ByteVector32("98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5"))
+        assertEquals(tx1.txid, ByteVector32("98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5"))
         // this tx was published on segnet as 98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5
     }
 }

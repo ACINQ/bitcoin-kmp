@@ -87,7 +87,7 @@ class ScriptTestsCommon {
         )
 
         fun parseScriptFlags(strFlags: String): Int =
-            if (strFlags.isEmpty()) 0 else strFlags.split(",").map { it -> mapFlagNames.getValue(it) }
+            if (strFlags.isEmpty()) 0 else strFlags.split(",").map { mapFlagNames.getValue(it) }
                 .fold(0) { a, b -> a or b }
 
         fun parseFromText(input: String): ByteArray {
@@ -141,7 +141,7 @@ class ScriptTestsCommon {
 
             try {
                 val tokens =
-                    input.split(' ').filterNot { it -> it.isEmpty() }.map { it -> it.removePrefix("OP_") }.toList()
+                    input.split(' ').filterNot { it.isEmpty() }.map { it.removePrefix("OP_") }.toList()
                 val bytes = parseInternal(tokens)
                 return bytes
 
@@ -184,7 +184,7 @@ class ScriptTestsCommon {
             comments: String?,
             expectedText: String
         ): Unit {
-            val witness = ScriptWitness(witnessText.map { it -> ByteVector(it) })
+            val witness = ScriptWitness(witnessText.map { ByteVector(it) })
             val scriptPubKey = parseFromText(scriptPubKeyText)
             val scriptSig = parseFromText(scriptSigText)
             val tx = spendingTx(scriptSig, creditTx(scriptPubKey, amount)).updateWitness(0, witness)
@@ -212,7 +212,7 @@ class ScriptTestsCommon {
                     runTest(listOf(), scriptSig, scriptPubKey, flags, null, expected)
                 }
                 testCase.size == 5 && testCase[0] is JsonArray -> {
-                    val elements = testCase[0].jsonArray.asSequence().toList()
+                    val elements = testCase[0].jsonArray.toList()
                     val strings = elements.dropLast(1).map { it.jsonPrimitive.content }
                     val amount = (elements.last().jsonPrimitive.double * 100_000_000).toLong().toSatoshi()
                     val scriptSig = testCase[1].jsonPrimitive.content
@@ -231,7 +231,7 @@ class ScriptTestsCommon {
                     runTest(listOf(), scriptSig, scriptPubKey, flags, comments, expected)
                 }
                 testCase.size == 6 && testCase[0] is JsonArray -> {
-                    val elements = testCase[0].jsonArray.asSequence().toList()
+                    val elements = testCase[0].jsonArray.toList()
                     val strings = elements.dropLast(1).map { it.jsonPrimitive.content }
                     val amount = (elements.last().jsonPrimitive.double * 100_000_000).toLong().toSatoshi()
                     val scriptSig = testCase[1].jsonPrimitive.content

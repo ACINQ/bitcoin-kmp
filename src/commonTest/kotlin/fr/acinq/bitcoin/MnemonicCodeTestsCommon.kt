@@ -75,7 +75,7 @@ class MnemonicCodeTestsCommon {
             "gravity machine north sort system female filter attitude volume fold club stay feature office ecology stable narrow fog fog", // one extra word
             "gravity machine north sort system female filter attitude volume fold club stay feature office ecology stable narrow fig" // wrong word
         )
-        invalidMnemonics.map { it ->
+        invalidMnemonics.map {
             assertFails {
                 MnemonicCode.validate(it)
             }

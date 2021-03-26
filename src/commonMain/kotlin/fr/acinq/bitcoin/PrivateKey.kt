@@ -33,29 +33,13 @@ public data class PrivateKey(@JvmField val value: ByteVector32) {
     public constructor(data: ByteVector) : this(data.toByteArray())
 
     public operator fun plus(that: PrivateKey): PrivateKey =
-        PrivateKey(
-            Secp256k1.privKeyTweakAdd(
-                value.toByteArray(),
-                that.value.toByteArray()
-            )
-        )
+        PrivateKey(Secp256k1.privKeyTweakAdd(value.toByteArray(), that.value.toByteArray()))
 
     public operator fun minus(that: PrivateKey): PrivateKey =
-        plus(
-            PrivateKey(
-                Secp256k1.privKeyNegate(
-                    that.value.toByteArray()
-                )
-            )
-        )
+        plus(PrivateKey(Secp256k1.privKeyNegate(that.value.toByteArray())))
 
     public operator fun times(that: PrivateKey): PrivateKey =
-        PrivateKey(
-            Secp256k1.privKeyTweakMul(
-                value.toByteArray(),
-                that.value.toByteArray()
-            )
-        )
+        PrivateKey(Secp256k1.privKeyTweakMul(value.toByteArray(), that.value.toByteArray()))
 
     public fun publicKey(): PublicKey {
         val pub = Secp256k1.pubkeyCreate(value.toByteArray())
@@ -79,10 +63,7 @@ public data class PrivateKey(@JvmField val value: ByteVector32) {
             require(setOf(Base58.Prefix.SecretKey, Base58.Prefix.SecretKeyTestnet, Base58.Prefix.SecretKeySegnet).contains(prefix)) { "invalid base 58 prefix for a private key" }
             val (prefix1, data) = Base58Check.decode(value)
             require(prefix1 == prefix) { "prefix $prefix1 does not match expected prefix $prefix" }
-            return Pair(
-                PrivateKey(data),
-                isCompressed(data)
-            )
+            return Pair(PrivateKey(data), isCompressed(data))
         }
 
         @JvmStatic

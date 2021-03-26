@@ -1,6 +1,9 @@
-# Kotlin Multiplatform Bitcoin Library
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.4.31-blue.svg?style=flat&logo=kotlin)](http://kotlinlang.org)
+[![Maven Central](https://img.shields.io/maven-central/v/fr.acinq.bitcoin/bitcoin-kmp)](https://search.maven.org/search?q=g:fr.acinq.bitcoin%20a:bitcoin-kmp*)
+![Github Actions](https://github.com/ACINQ/bitcoin-kmp/actions/workflows/test.yml/badge.svg)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/ACINQ/bitcoin-kmp/blob/master/LICENSE)
 
- [ ![Download](https://api.bintray.com/packages/acinq/libs/bitcoin-kmp/images/download.svg) ](https://bintray.com/acinq/libs/bitcoin-kmp/_latestVersion)
+# Kotlin Multiplatform Bitcoin Library
 
 ## Overview
 
@@ -36,14 +39,7 @@ Our runtime targets are:
 
 ## Install
 
-First, add the ACINQ libraries repository:
-
-```kotlin
-// build.gradle.kts
-repositories {
-    maven(url = "https://dl.bintray.com/acinq/libs")
-}
-```
+`bitcoin-kmp` is avaialble on [maven central](https://search.maven.org/search?q=g:fr.acinq.bitcoin%20a:bitcoin-kmp*)
 
 - **Multiplatform**: Add the `fr.acinq.bitcoin-kmp:bitcoin-kmp` dependency to your common source set dependencies (You need Gradle 5.0 minimum).
 - **JVM**: Add the `fr.acinq.bitcoin-kmp:bitcoin-kmp-jvm` dependency to your project.

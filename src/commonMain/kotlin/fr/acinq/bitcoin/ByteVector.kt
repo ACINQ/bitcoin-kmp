@@ -86,11 +86,11 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
         return ByteVector(toByteArray() + ByteArray(length - size))
     }
 
-    public fun concat(other: ByteArray): ByteVector {
-        return ByteVector(toByteArray() + other)
-    }
+    public fun concat(other: ByteArray): ByteVector = ByteVector(toByteArray() + other)
 
     public fun concat(other: ByteVector): ByteVector = concat(other.toByteArray())
+
+    public fun concat(others: List<ByteVector>): ByteVector = others.fold(this) { current, next -> current.concat(next) }
 
     public open fun reversed(): ByteVector = ByteVector(toByteArray().reversedArray())
 
@@ -104,11 +104,11 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
 
     public fun contentEquals(input: ByteArray): Boolean = contentEquals(input, 0, input.size)
 
-    public fun<T> map(f: (ByteArray, Int, Int) -> T ): T = f(bytes, offset, size)
+    public fun <T> map(f: (ByteArray, Int, Int) -> T): T = f(bytes, offset, size)
 
-    public fun sha256() : ByteVector32 = map { bytes, offset, size -> ByteVector32(Crypto.sha256(bytes, offset, size)) }
+    public fun sha256(): ByteVector32 = map { bytes, offset, size -> ByteVector32(Crypto.sha256(bytes, offset, size)) }
 
-    public fun ripemd160() : ByteVector = map { bytes, offset, size -> ByteVector(Crypto.ripemd160(bytes, offset, size)) }
+    public fun ripemd160(): ByteVector = map { bytes, offset, size -> ByteVector(Crypto.ripemd160(bytes, offset, size)) }
 
     public fun toByteArray(): ByteArray = bytes.copyOfRange(offset, offset + size)
 

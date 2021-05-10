@@ -50,7 +50,7 @@ public object Script {
             code in 1 until 0x4c -> parse(input, stack + OP_PUSHDATA(BtcSerializer.bytes(input, code), code))
             code == 0x4c -> parse(input, stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint8(input).toInt()), 0x4c))
             code == 0x4d -> parse(input, stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint16(input).toInt()), 0x4d))
-            code == 0x4e -> parse(input, stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint32(input).toInt()), 0x4e))
+            code == 0x4e -> parse(input, stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint32(input).toLong()), 0x4e))
             ScriptEltMapping.code2elt.containsKey(code) -> parse(input, stack + ScriptEltMapping.code2elt.getValue(code))
             else -> parse(input, stack + OP_INVALID(code))
         }
@@ -66,7 +66,7 @@ public object Script {
     @JvmStatic
     public fun parse(hex: String): List<ScriptElt> = parse(Hex.decode(hex))
 
-    public tailrec fun write(script: List<ScriptElt>, out: Output): Unit {
+    public tailrec fun write(script: List<ScriptElt>, out: Output) {
         if (script.isEmpty()) return
         else {
             val head = script.first()

@@ -169,10 +169,11 @@ public abstract class BtcSerializer<T> {
 
         @JvmStatic
         public fun bytes(input: Input, size: Int): ByteArray {
+            // NB: we make that check before allocating a byte array, otherwise an attacker can exhaust our heap space.
+            require(size <= input.availableBytes) { "cannot read $size bytes from a stream that has ${input.availableBytes} bytes left" }
             val blob = ByteArray(size)
             if (size > 0) {
-                val count = input.read(blob, 0, size)
-                require(count >= size){"cannot read $size bytes from a stream that has $count bytes left"}
+                input.read(blob, 0, size)
             }
             return blob
         }

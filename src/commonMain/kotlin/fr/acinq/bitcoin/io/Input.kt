@@ -7,3 +7,4 @@ public interface Input {
 }
 
 public fun Input.readNBytes(n: Int): ByteArray = ByteArray(n).also { read(it, 0, n) }
+public fun Input.readNBytesStrict(n: Int): ByteArray? = if (availableBytes < n) null else readNBytes(n)

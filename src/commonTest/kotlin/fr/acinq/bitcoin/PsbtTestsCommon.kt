@@ -17,9 +17,14 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.SigHash.SIGHASH_ALL
+import fr.acinq.bitcoin.SigHash.SIGHASH_ANYONECANPAY
+import fr.acinq.bitcoin.SigHash.SIGHASH_NONE
+import fr.acinq.secp256k1.Hex
 import kotlin.test.*
 
 class PsbtTestsCommon {
+
+    private val masterPrivKey = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPd9TeAdPADNnSyH9SSUUbTVeFszDE23Ki6TBB5nCefAdHkK8Fm3qMQR6sHwA56zqRmKmxnHk37JkiFzvncDqoKmPWubu7hDF").second
 
     @Test
     fun `invalid psbts`() {
@@ -135,6 +140,67 @@ class PsbtTestsCommon {
     }
 
     @Test
+    fun `invalids psbts (non-witness input utxos don't match tx)`() {
+        val inputTx1 = Transaction(
+            version = 2,
+            txIn = listOf(TxIn(OutPoint(ByteVector32("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858"), 1), ByteVector("00208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903"), 0)),
+            txOut = listOf(
+                TxOut(500.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d")),
+                TxOut(750.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d"))
+            ),
+            lockTime = 0
+        )
+        val inputTx2 = Transaction(
+            version = 2,
+            txIn = listOf(TxIn(OutPoint(ByteVector32("1dea7cd05979072a3578cab271c02244ea8a090bbb46aa680a65ecd027048d83"), 0), ByteVector("00208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903"), 0)),
+            txOut = listOf(
+                TxOut(800.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d")),
+                TxOut(600.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d"))
+            ),
+            lockTime = 0
+        )
+        val tx = Transaction(
+            version = 2,
+            txIn = listOf(
+                TxIn(OutPoint(inputTx1, 1), listOf(), 0),
+                TxIn(OutPoint(inputTx2, 0), listOf(), 6)
+            ),
+            txOut = listOf(
+                TxOut(300.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d")),
+                TxOut(1000.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d"))
+            ),
+            lockTime = 3
+        )
+        val psbt = Psbt(tx)
+        val updated = psbt.update(inputTx1, 1, redeemScript = listOf(OP_RETURN)).map { it.update(inputTx2, 0, redeemScript = listOf(OP_RETURN)) }
+        assertTrue(updated is Psbt.Companion.UpdateResult.Success)
+
+        val outputIndexMismatch = updated.psbt.copy(
+            global = updated.psbt.global.copy(
+                tx = Transaction(
+                    version = 2,
+                    txIn = listOf(TxIn(OutPoint(inputTx1, 3), listOf(), 0), TxIn(OutPoint(inputTx2, 0), listOf(), 6)),
+                    txOut = listOf(TxOut(300.toSatoshi(), listOf()), TxOut(1000.toSatoshi(), listOf())),
+                    lockTime = 3
+                )
+            )
+        )
+        assertEquals(Psbt.read(Psbt.write(outputIndexMismatch)), Psbt.Companion.ParsePsbtResult.Failure.InvalidTxInput("non-witness utxo does not match psbt outpoint"))
+
+        val txIdMismatch = updated.psbt.copy(
+            global = updated.psbt.global.copy(
+                tx = Transaction(
+                    version = 2,
+                    txIn = listOf(TxIn(OutPoint(inputTx2, 1), listOf(), 0), TxIn(OutPoint(inputTx2, 0), listOf(), 6)),
+                    txOut = listOf(TxOut(300.toSatoshi(), listOf()), TxOut(1000.toSatoshi(), listOf())),
+                    lockTime = 3
+                )
+            )
+        )
+        assertEquals(Psbt.read(Psbt.write(txIdMismatch)), Psbt.Companion.ParsePsbtResult.Failure.InvalidTxInput("non-witness utxo does not match psbt outpoint"))
+    }
+
+    @Test
     fun `valid psbts (official test vectors)`() {
         run {
             // PSBT with one P2PKH input. Outputs are empty
@@ -208,7 +274,7 @@ class PsbtTestsCommon {
             psbt.outputs.forEach { assertTrue(it.derivationPaths.isNotEmpty()) }
             assertEquals(
                 psbt.outputs.flatMap { it.derivationPaths.keys }.toSet(),
-                setOf(PublicKey(ByteVector("02ead596687ca806043edc3de116cdf29d5e9257c196cd055cf698c8d02bf24e99")), PublicKey(ByteVector("0394f62be9df19952c5587768aeb7698061ad2c4a25c894f47d8c162b4d7213d05")))
+                setOf(PublicKey.fromHex("02ead596687ca806043edc3de116cdf29d5e9257c196cd055cf698c8d02bf24e99"), PublicKey.fromHex("0394f62be9df19952c5587768aeb7698061ad2c4a25c894f47d8c162b4d7213d05"))
             )
             assertEquals(psbt.outputs.flatMap { output -> output.derivationPaths.values.map { it.masterKeyFingerprint } }.toSet(), setOf(3030825575L))
             assertEquals(Psbt.write(psbt), bin)
@@ -223,8 +289,8 @@ class PsbtTestsCommon {
             val psbt = result.psbt
             verifyNoUnknown(psbt)
             assertEquals(psbt.inputs.size, 1)
-            val pk1 = PublicKey(ByteVector("03b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd46"))
-            val pk2 = PublicKey(ByteVector("03de55d1e1dac805e3f8a58c1fbf9b94c02f3dbaafe127fefca4995f26f82083bd"))
+            val pk1 = PublicKey.fromHex("03b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd46")
+            val pk2 = PublicKey.fromHex("03de55d1e1dac805e3f8a58c1fbf9b94c02f3dbaafe127fefca4995f26f82083bd")
             assertEquals(psbt.inputs[0].derivationPaths.keys, setOf(pk1, pk2))
             assertEquals(psbt.inputs[0].partialSigs.keys, setOf(pk1))
             assertEquals(psbt.inputs[0].witnessScript, Script.createMultiSigMofN(2, listOf(pk1, pk2)))
@@ -246,11 +312,11 @@ class PsbtTestsCommon {
             verifyNoUnknown(psbt)
             assertEquals(
                 psbt.global.extendedPublicKeys.map { it.extendedPublicKey.publicKey }.toSet(),
-                setOf(PublicKey(ByteVector("03d30a5e97c8adbc557dac2ad9a7e39c1722ebac69e668b6f2667cc1d671c83cab")), PublicKey(ByteVector("0351b743887ee1d40dc32a6043724f2d6459b3b5a4d73daec8fbae0472f3bc43e2")))
+                setOf(PublicKey.fromHex("03d30a5e97c8adbc557dac2ad9a7e39c1722ebac69e668b6f2667cc1d671c83cab"), PublicKey.fromHex("0351b743887ee1d40dc32a6043724f2d6459b3b5a4d73daec8fbae0472f3bc43e2"))
             )
             assertEquals(psbt.inputs.size, 1)
-            val pk1 = PublicKey(ByteVector("029da12cdb5b235692b91536afefe5c91c3ab9473d8e43b533836ab456299c8871"))
-            val pk2 = PublicKey(ByteVector("03372b34234ed7cf9c1fea5d05d441557927be9542b162eb02e1ab2ce80224c00b"))
+            val pk1 = PublicKey.fromHex("029da12cdb5b235692b91536afefe5c91c3ab9473d8e43b533836ab456299c8871")
+            val pk2 = PublicKey.fromHex("03372b34234ed7cf9c1fea5d05d441557927be9542b162eb02e1ab2ce80224c00b")
             assertNull(psbt.inputs[0].nonWitnessUtxo)
             assertNull(psbt.inputs[0].redeemScript)
             assertEquals(psbt.inputs[0].derivationPaths.keys, setOf(pk1, pk2))
@@ -260,7 +326,7 @@ class PsbtTestsCommon {
             assertEquals(psbt.outputs.size, 1)
             assertNull(psbt.outputs[0].redeemScript)
             assertNull(psbt.outputs[0].witnessScript)
-            assertEquals(psbt.outputs[0].derivationPaths.keys, setOf(PublicKey(ByteVector("039eff1f547a1d5f92dfa2ba7af6ac971a4bd03ba4a734b03156a256b8ad3a1ef9"))))
+            assertEquals(psbt.outputs[0].derivationPaths.keys, setOf(PublicKey.fromHex("039eff1f547a1d5f92dfa2ba7af6ac971a4bd03ba4a734b03156a256b8ad3a1ef9")))
             // NB: we don't fully compare the encoded values because in this particular test vector, the BIP doesn't sort public keys lexicographically
             // so our result differs in the `derivationPaths` section.
             assertEquals(Psbt.write(psbt).size(), bin.size())
@@ -287,7 +353,7 @@ class PsbtTestsCommon {
             assertTrue(result is Psbt.Companion.ParsePsbtResult.Success)
             val psbt = result.psbt
             verifyNoUnknown(psbt)
-            assertEquals(psbt.global.extendedPublicKeys.map { it.extendedPublicKey.publicKey }, listOf(PublicKey(ByteVector("02f230584b155d1c7f1cd45120a653c48d650b431b67c5b2c13f27d7142037c169"))))
+            assertEquals(psbt.global.extendedPublicKeys.map { it.extendedPublicKey.publicKey }, listOf(PublicKey.fromHex("02f230584b155d1c7f1cd45120a653c48d650b431b67c5b2c13f27d7142037c169")))
             assertEquals(psbt.inputs.size, 2)
             psbt.inputs.forEach { input ->
                 assertEquals(input.partialSigs.size, 1)
@@ -295,7 +361,7 @@ class PsbtTestsCommon {
             }
             assertEquals(psbt.outputs.size, 2)
             verifyEmptyOutput(psbt.outputs[0])
-            assertEquals(psbt.outputs[1].derivationPaths, mapOf(PublicKey(ByteVector("02d20ca502ee289686d21815bd43a80637b0698e1fbcdbe4caed445f6c1a0a90ef")) to Psbt.Companion.KeyPathWithMaster(659987536, KeyPath("m/49'/0'/0'/0/4"))))
+            assertEquals(psbt.outputs[1].derivationPaths, mapOf(PublicKey.fromHex("02d20ca502ee289686d21815bd43a80637b0698e1fbcdbe4caed445f6c1a0a90ef") to Psbt.Companion.KeyPathWithMaster(659987536, KeyPath("m/49'/0'/0'/0/4"))))
             assertEquals(Psbt.write(psbt), bin)
         }
         run {
@@ -322,6 +388,366 @@ class PsbtTestsCommon {
             psbt.outputs.forEach { verifyEmptyOutput(it) }
             assertEquals(Psbt.write(psbt), bin)
         }
+    }
+
+    @Test
+    fun `fails signer checks (official test vectors)`() {
+        class TestCase(val hex: String, val inputIndex: Int, val expected: Psbt.Companion.UpdateResult.Failure)
+
+        val testCases = listOf(
+            // A witness UTXO is provided for a non-witness input
+            TestCase(
+                "70736274ff0100a00200000002ab0949a08c5af7c49b8212f417e2f15ab3f5c33dcf153821a8139f877a5b7be40000000000feffffffab0949a08c5af7c49b8212f417e2f15ab3f5c33dcf153821a8139f877a5b7be40100000000feffffff02603bea0b000000001976a914768a40bbd740cbe81d988e71de2a4d5c71396b1d88ac8e240000000000001976a9146f4620b553fa095e721b9ee0efe9fa039cca459788ac0000000000010122d3dff505000000001976a914d48ed3110b94014cb114bd32d6f4d066dc74256b88ac0001012000e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc787010416001485d13537f2e265405a34dbafa9e3dda01fb8230800220202ead596687ca806043edc3de116cdf29d5e9257c196cd055cf698c8d02bf24e9910b4a6ba670000008000000080020000800022020394f62be9df19952c5587768aeb7698061ad2c4a25c894f47d8c162b4d7213d0510b4a6ba6700000080010000800200008000",
+                0,
+                Psbt.Companion.UpdateResult.Failure.InvalidWitnessUtxo("witness utxo must use native witness program or P2SH witness program")
+            ),
+            // redeemScript with non-witness UTXO does not match the scriptPubKey
+            TestCase(
+                "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000220202dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752af2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8872202023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d2010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000",
+                0,
+                Psbt.Companion.UpdateResult.Failure.InvalidNonWitnessUtxo("redeem script does not match non-witness utxo scriptPubKey")
+            ),
+            // redeemScript with witness UTXO does not match the scriptPubKey
+            TestCase(
+                "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000220202dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8872202023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d2010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028900010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000",
+                1,
+                Psbt.Companion.UpdateResult.Failure.InvalidWitnessUtxo("redeem script does not match witness utxo scriptPubKey")
+            ),
+            // witnessScript with witness UTXO does not match the redeemScript
+            TestCase(
+                "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000220202dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8872202023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d2010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ad2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000",
+                1,
+                Psbt.Companion.UpdateResult.Failure.InvalidWitnessUtxo("witness script does not match redeemScript or scriptPubKey")
+            )
+        )
+        testCases.forEach {
+            val result = Psbt.read(Hex.decode(it.hex))
+            assertTrue(result is Psbt.Companion.ParsePsbtResult.Success)
+            val signed = result.psbt.sign(masterPrivKey.privateKey, it.inputIndex)
+            assertEquals(signed, it.expected)
+        }
+    }
+
+    @Test
+    fun `create PSBT (official test vectors)`() {
+        val unsignedTx = Transaction(
+            version = 2,
+            txIn = listOf(
+                TxIn(OutPoint(ByteVector32("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858").reversed(), 0), listOf(), TxIn.SEQUENCE_FINAL),
+                TxIn(OutPoint(ByteVector32("1dea7cd05979072a3578cab271c02244ea8a090bbb46aa680a65ecd027048d83").reversed(), 1), listOf(), TxIn.SEQUENCE_FINAL)
+            ),
+            txOut = listOf(
+                TxOut(149_990_000.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d")),
+                TxOut(100_000_000.toSatoshi(), ByteVector("001400aea9a2e5f0f876a588df5546e8742d1d87008f"))
+            ),
+            lockTime = 0
+        )
+        val psbt = Psbt(unsignedTx)
+        assertEquals(
+            Psbt.write(psbt),
+            ByteVector("70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000")
+        )
+    }
+
+    @Test
+    fun `update PSBT (official test vectors)`() {
+        // Updated PSBT from the previous step.
+        val psbt = readValidPsbt(
+            "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000"
+        )
+        // Update input 1 with a non-witness multi-sig utxo:
+        val updated = psbt.update(
+            Transaction.read("0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000"),
+            0,
+            Script.parse("5221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae"),
+            derivationPaths = mapOf(
+                PublicKey.fromHex("029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/0'")),
+                PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/1'"))
+            )
+        ).map {
+            // Update input 2 with a witness multi-sig utxo:
+            it.update(
+                Transaction.read("0200000000010158e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7501000000171600145f275f436b09a8cc9a2eb2a2f528485c68a56323feffffff02d8231f1b0100000017a914aed962d6654f9a2b36608eb9d64d2b260db4f1118700c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88702483045022100a22edcc6e5bc511af4cc4ae0de0fcd75c7e04d8c1c3a8aa9d820ed4b967384ec02200642963597b9b1bc22c75e9f3e117284a962188bf5e8a74c895089046a20ad770121035509a48eb623e10aace8bfd0212fdb8a8e5af3c94b0b133b95e114cab89e4f7965000000"),
+                1,
+                Script.parse("00208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903"),
+                Script.parse("522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae"),
+                derivationPaths = mapOf(
+                    PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/2'")),
+                    PublicKey.fromHex("023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/3'"))
+                )
+            )
+        }.map {
+            // Update outputs with known derivation paths:
+            Psbt.Companion.UpdateResult.Success(
+                it.copy(
+                    outputs = listOf(
+                        psbt.outputs[0].copy(
+                            derivationPaths = mapOf(
+                                PublicKey.fromHex("03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/4'"))
+                            )
+                        ),
+                        psbt.outputs[1].copy(
+                            derivationPaths = mapOf(
+                                PublicKey.fromHex("027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/5'"))
+                            )
+                        )
+                    )
+                )
+            )
+        }
+        assertTrue(updated is Psbt.Companion.UpdateResult.Success)
+
+        // We differ from the official test vector because we include both witnessUtxo and nonWitnessUtxo, because of https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#cite_note-8
+        assertEquals(
+            Psbt.write(updated.psbt),
+            ByteVector(
+                "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f000000800000008001000080000100f80200000000010158e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7501000000171600145f275f436b09a8cc9a2eb2a2f528485c68a56323feffffff02d8231f1b0100000017a914aed962d6654f9a2b36608eb9d64d2b260db4f1118700c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88702483045022100a22edcc6e5bc511af4cc4ae0de0fcd75c7e04d8c1c3a8aa9d820ed4b967384ec02200642963597b9b1bc22c75e9f3e117284a962188bf5e8a74c895089046a20ad770121035509a48eb623e10aace8bfd0212fdb8a8e5af3c94b0b133b95e114cab89e4f796500000001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88701042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+            )
+        )
+        // But if we remove the nonWitnessUtxo in the second input, we match the official test vector:
+        val withOnlyWitnessUtxo = updated.psbt.copy(inputs = listOf(updated.psbt.inputs[0], updated.psbt.inputs[1].copy(nonWitnessUtxo = null)))
+        assertEquals(
+            Psbt.write(withOnlyWitnessUtxo),
+            ByteVector(
+                "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88701042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+            )
+        )
+        // Update inputs to use SIGHASH_ALL:
+        val withSighash = withOnlyWitnessUtxo.copy(inputs = withOnlyWitnessUtxo.inputs.map { it.copy(sighashType = SIGHASH_ALL) })
+        assertEquals(
+            Psbt.write(withSighash),
+            ByteVector(
+                "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8870103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+            )
+        )
+    }
+
+    @Test
+    fun `sign PSBT (official test vectors)`() {
+        // Updated PSBT from the previous steps.
+        val psbt = readValidPsbt(
+            "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8870103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+        )
+
+        run {
+            // First signer.
+            val inputKeys = mapOf(
+                0 to DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/0'")),
+                1 to DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/2'"))
+            )
+            assertEquals(inputKeys.values.map { it.privateKey.toBase58(Base58.Prefix.SecretKeyTestnet) }.toSet(), setOf("cP53pDbR5WtAD8dYAW9hhTjuvvTVaEiQBdrz9XPrgLBeRFiyCbQr", "cR6SXDoyfQrcp4piaiHE97Rsgta9mNhGTen9XeonVgwsh4iSgw6d"))
+            val signed = psbt.sign(inputKeys.getValue(0).privateKey, 0).map { it.sign(inputKeys.getValue(1).privateKey, 1) }
+            assertTrue(signed is Psbt.Companion.UpdateResult.Success)
+            assertEquals(
+                Psbt.write(signed.psbt),
+                ByteVector(
+                    "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000002202029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e887220203089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+                )
+            )
+        }
+        run {
+            // Second signer.
+            val inputKeys = mapOf(
+                0 to DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/1'")),
+                1 to DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/3'"))
+            )
+            assertEquals(inputKeys.values.map { it.privateKey.toBase58(Base58.Prefix.SecretKeyTestnet) }.toSet(), setOf("cT7J9YpCwY3AVRFSjN6ukeEeWY6mhpbJPxRaDaP5QTdygQRxP9Au", "cNBc3SWUip9PPm1GjRoLEJT6T41iNzCYtD7qro84FMnM5zEqeJsE"))
+            val signed = psbt.sign(inputKeys.getValue(0).privateKey, 0).map { it.sign(inputKeys.getValue(1).privateKey, 1) }
+            assertTrue(signed is Psbt.Companion.UpdateResult.Success)
+            assertEquals(
+                Psbt.write(signed.psbt),
+                ByteVector(
+                    "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000220202dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8872202023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d2010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+                )
+            )
+        }
+    }
+
+    @Test
+    fun `combine PSBTs (official test vectors)`() {
+        val psbt1 = readValidPsbt(
+            "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000002202029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e887220203089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+        )
+        val psbt2 = readValidPsbt(
+            "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000220202dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8872202023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d2010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+        )
+        val combined = Psbt.combine(psbt1, psbt2)
+        assertTrue(combined is Psbt.Companion.UpdateResult.Success)
+        // NB: the official test vector doesn't order partial signatures with lexicographic ordering, so we disagree on the order but the content is ok.
+        val expectedHex =
+            "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000002202029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01220202dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e887220203089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f012202023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d2010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+        assertEquals(Psbt.write(combined.psbt).size(), ByteVector(expectedHex).size())
+        val expectedPsbt = readValidPsbt(expectedHex)
+        for (i in 0..1) {
+            assertEquals(combined.psbt.inputs[i].partialSigs.keys, expectedPsbt.inputs[i].partialSigs.keys)
+            assertEquals(combined.psbt.inputs[i].partialSigs.values.toSet(), expectedPsbt.inputs[i].partialSigs.values.toSet())
+        }
+    }
+
+    @Test
+    fun `combine PSBTs with unknown keys (official test vectors)`() {
+        val psbt1 = readValidPsbt(
+            "70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a0100000000000af00102030405060708090f0102030405060708090a0b0c0d0e0f000af00102030405060708090f0102030405060708090a0b0c0d0e0f000af00102030405060708090f0102030405060708090a0b0c0d0e0f00"
+        )
+        val psbt2 = readValidPsbt(
+            "70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a0100000000000af00102030405060708100f0102030405060708090a0b0c0d0e0f000af00102030405060708100f0102030405060708090a0b0c0d0e0f000af00102030405060708100f0102030405060708090a0b0c0d0e0f00"
+        )
+        val combined = Psbt.combine(psbt1, psbt2)
+        assertTrue(combined is Psbt.Companion.UpdateResult.Success)
+        val expected = ByteVector(
+            "70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a0100000000000af00102030405060708090f0102030405060708090a0b0c0d0e0f0af00102030405060708100f0102030405060708090a0b0c0d0e0f000af00102030405060708090f0102030405060708090a0b0c0d0e0f0af00102030405060708100f0102030405060708090a0b0c0d0e0f000af00102030405060708090f0102030405060708090a0b0c0d0e0f0af00102030405060708100f0102030405060708090a0b0c0d0e0f00"
+        )
+        assertEquals(Psbt.write(combined.psbt), expected)
+    }
+
+    @Test
+    fun `finalize PSBT (official test vectors)`() {
+        val psbt = readValidPsbt(
+            "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000002202029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01220202dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e887220203089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f012202023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d2010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+        )
+        val finalized0 = run {
+            // The first input is a non-witness 2-of-2 multisig:
+            val sig1 = psbt.inputs[0].partialSigs.getValue(PublicKey.fromHex("029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f"))
+            val sig2 = psbt.inputs[0].partialSigs.getValue(PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7"))
+            val redeemScript = Script.write(psbt.inputs[0].redeemScript!!)
+            val scriptSig = listOf(OP_0, OP_PUSHDATA(sig1), OP_PUSHDATA(sig2), OP_PUSHDATA(redeemScript))
+            val finalized = psbt.finalize(0, scriptSig)
+            assertTrue(finalized is Psbt.Companion.UpdateResult.Success)
+            finalized.psbt
+        }
+        val finalized1 = run {
+            // The second input is a P2SH witness program of a 2-of-2 multisig:
+            val sig1 = psbt.inputs[1].partialSigs.getValue(PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc"))
+            val sig2 = psbt.inputs[1].partialSigs.getValue(PublicKey.fromHex("023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73"))
+            val witnessScript = Script.write(psbt.inputs[1].witnessScript!!)
+            val scriptWitness = ScriptWitness(listOf(ByteVector.empty, sig1, sig2, ByteVector(witnessScript)))
+            val finalized = finalized0.finalize(1, scriptWitness)
+            assertTrue(finalized is Psbt.Companion.UpdateResult.Success)
+            finalized.psbt
+        }
+        val expected = ByteVector(
+            "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000000107da00473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae0001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8870107232200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b20289030108da0400473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f01473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d20147522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae00220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+        )
+        assertEquals(Psbt.write(finalized1), expected)
+    }
+
+    @Test
+    fun `extract transaction (official test vectors)`() {
+        val psbt = readValidPsbt(
+            "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000000107da00473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae0001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8870107232200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b20289030108da0400473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f01473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d20147522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae00220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
+        )
+        val extracted = psbt.extract()
+        assertTrue(extracted is Psbt.Companion.ExtractResult.Success)
+        val expected = ByteVector(
+            "0200000000010258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7500000000da00473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752aeffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d01000000232200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000400473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f01473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d20147522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae00000000"
+        )
+        assertEquals(ByteVector(Transaction.write(extracted.tx)), expected)
+    }
+
+    @Test
+    fun `join PSBTs`() {
+        val input1 = TxIn(OutPoint(ByteVector32("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 0), ByteVector("2a"), 42)
+        val output1 = TxOut(500.toSatoshi(), ByteVector("2a2a"))
+        val psbt1 = Psbt(Transaction(2, listOf(input1), listOf(output1), 0))
+
+        val input2 = TxIn(OutPoint(ByteVector32("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 3), ByteVector("2a2a2a"), 0)
+        val psbt2 = Psbt(Transaction(2, listOf(input2), listOf(), 0))
+
+        val output2 = TxOut(1200.toSatoshi(), ByteVector("2a2a2a2a2a"))
+        val psbt3 = Psbt(Transaction(2, listOf(), listOf(output2), 0))
+
+        val joined = Psbt.join(psbt1, psbt2, psbt3)
+        assertTrue(joined is Psbt.Companion.UpdateResult.Success)
+        assertEquals(joined.psbt.inputs.size, 2)
+        assertEquals(joined.psbt.outputs.size, 2)
+        assertEquals(
+            joined.psbt.global.tx, Transaction(
+                version = 2,
+                txIn = listOf(
+                    TxIn(OutPoint(ByteVector32("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 0), listOf(), 42),
+                    TxIn(OutPoint(ByteVector32("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 3), listOf(), 0)
+                ),
+                txOut = listOf(output1, output2),
+                lockTime = 0
+            )
+        )
+
+        assertEquals(Psbt.join(), Psbt.Companion.UpdateResult.Failure.CannotJoin("no psbt provided"))
+        assertEquals(Psbt.join(joined.psbt, psbt1), Psbt.Companion.UpdateResult.Failure.CannotJoin("cannot join psbts that spend the same input"))
+        assertEquals(Psbt.join(psbt1, psbt2.copy(global = psbt2.global.copy(version = 3))), Psbt.Companion.UpdateResult.Failure.CannotJoin("cannot join psbts with different versions"))
+        assertEquals(Psbt.join(psbt1, Psbt(psbt2.global.tx.copy(version = 1))), Psbt.Companion.UpdateResult.Failure.CannotJoin("cannot join psbts with different tx versions"))
+        assertEquals(Psbt.join(psbt1, Psbt(psbt2.global.tx.copy(lockTime = 1))), Psbt.Companion.UpdateResult.Failure.CannotJoin("cannot join psbts with different tx lockTime"))
+    }
+
+    @Test
+    fun `compute fees`() {
+        val inputTx1 = Transaction(2, listOf(), listOf(TxOut(500.toSatoshi(), listOf()), TxOut(750.toSatoshi(), listOf())), 0)
+        val inputTx2 = Transaction(2, listOf(), listOf(TxOut(800.toSatoshi(), listOf()), TxOut(600.toSatoshi(), listOf())), 0)
+        val psbt = Psbt(
+            Transaction(
+                version = 2,
+                txIn = listOf(TxIn(OutPoint(inputTx1, 1), listOf(), 0), TxIn(OutPoint(inputTx2, 0), listOf(), 6)),
+                txOut = listOf(TxOut(300.toSatoshi(), listOf()), TxOut(1000.toSatoshi(), listOf())),
+                lockTime = 3
+            )
+        )
+
+        assertNull(psbt.computeFees()) // inputs have not been updated yet
+        val oneInput = psbt.update(inputTx1, 1, witnessScript = listOf(OP_RETURN))
+        assertTrue(oneInput is Psbt.Companion.UpdateResult.Success)
+        assertNull(oneInput.psbt.computeFees()) // second input has not been updated yet
+        val bothInputs = oneInput.psbt.update(inputTx2, 0, redeemScript = listOf(OP_RETURN))
+        assertTrue(bothInputs is Psbt.Companion.UpdateResult.Success)
+        assertEquals(bothInputs.psbt.computeFees(), 250.toSatoshi())
+    }
+
+    @Test
+    fun `bump lightning commit tx fee from cold wallet`() {
+        fun anchorScript(fundingPubKey: PublicKey): List<ScriptElt> = listOf(
+            // @formatter:off
+            OP_PUSHDATA(fundingPubKey), OP_CHECKSIG, OP_IFDUP,
+            OP_NOTIF,
+                OP_16, OP_CHECKSEQUENCEVERIFY,
+            OP_ENDIF
+            // @formatter:on
+        )
+
+        // A lightning node prepares a PSBT that spends the anchor output of a commitment transaction.
+        val (fundingPubKey, lightningPsbt) = run {
+            val fundingPrivKey = PrivateKey(ByteVector32("0101010101010101010101010101010101010101010101010101010101010101"))
+            val anchorScript = anchorScript(fundingPrivKey.publicKey())
+            val txToBump = Transaction(2, listOf(), listOf(TxOut(330.toSatoshi(), Script.pay2wsh(anchorScript))), 0)
+            val lightningPsbt = Psbt(Transaction(2, listOf(TxIn(OutPoint(txToBump, 0), 0)), listOf(), 0))
+                .update(txToBump, 0, null, anchorScript, SIGHASH_NONE or SIGHASH_ANYONECANPAY)
+                .map { it.sign(fundingPrivKey, 0) }
+            assertTrue(lightningPsbt is Psbt.Companion.UpdateResult.Success)
+            Pair(fundingPrivKey.publicKey(), lightningPsbt.psbt)
+        }
+
+        // A cold wallet adds inputs and finalizes a transaction that bumps the fees of the commitment transaction.
+        val walletPrivKey = PrivateKey(ByteVector32("0202020202020202020202020202020202020202020202020202020202020202"))
+        val confirmedTx = Transaction(2, listOf(), listOf(TxOut(100_000.toSatoshi(), Script.pay2wpkh(walletPrivKey.publicKey()))), 0)
+        val walletPsbt = Psbt.join(
+            lightningPsbt,
+            Psbt(Transaction(2, listOf(TxIn(OutPoint(confirmedTx, 0), 0)), listOf(TxOut(75_000.toSatoshi(), Script.pay2wpkh(walletPrivKey.publicKey()))), 0))
+        ).map {
+            it.update(confirmedTx, 0, null, Script.pay2pkh(walletPrivKey.publicKey()))
+        }.map {
+            it.sign(walletPrivKey, 1)
+        }.map {
+            it.finalize(0, ScriptWitness(listOf(it.inputs[0].partialSigs.getValue(fundingPubKey), ByteVector(Script.write(anchorScript(fundingPubKey))))))
+        }.map {
+            it.finalize(1, Script.witnessPay2wpkh(walletPrivKey.publicKey(), it.inputs[1].partialSigs.getValue(walletPrivKey.publicKey())))
+        }
+        assertTrue(walletPsbt is Psbt.Companion.UpdateResult.Success)
+        val extracted = walletPsbt.psbt.extract()
+        assertTrue(extracted is Psbt.Companion.ExtractResult.Success)
+    }
+
+    private fun readValidPsbt(hex: String): Psbt {
+        val result = Psbt.read(ByteVector(hex))
+        assertTrue(result is Psbt.Companion.ParsePsbtResult.Success)
+        return result.psbt
     }
 
     private fun verifyNoUnknown(psbt: Psbt) {

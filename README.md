@@ -18,31 +18,35 @@ This is a simple Kotlin Multiplatform library which implements most of the bitco
 * BIP 32 (deterministic wallets)
 * BIP 39 (mnemonic code for generating deterministic keys)
 * BIP 173 (Base32 address format for native v0-16 witness outputs)
+* BIP 174 (Partially Signed Bitcoin Transaction Format v0)
 
 ## Objectives
 
-Our goal is not to re-implement a full Bitcoin node but to build a library that implements all the primitives that you need to create bitcoin applications: building and signing transactions, verifying transactions, working with custom bitcoin scripts, parsing blocks, headers, transactions, building BIP39 wallets, ... 
+Our goal is not to re-implement a full Bitcoin node but to build a library that implements all the primitives that you need to create bitcoin applications: building and signing transactions, verifying transactions, working with custom bitcoin scripts, parsing blocks, headers, transactions, building BIP39 wallets...
 
 Our runtime targets are:
-- JVM
-- Android
-- iOS
-- Linux 64 bits (for testing/prototyping only ! just use the JVM for production applications)
+
+* JVM
+* Android
+* iOS
+* Linux 64 bits (for testing/prototyping only, you should use the JVM for production applications)
 
 ## Status
-- [X] Message parsing (blocks, transactions, inv, ...)
-- [X] Building transactions (P2PK, P2PKH, P2SH, P2WPK, P2WSH)
-- [X] Signing transactions
-- [X] Verifying signatures
-- [X] Passing core reference tests (scripts & transactions)
-- [X] Passing core reference segwit tests
+
+* [X] Message parsing (blocks, transactions, inv, ...)
+* [X] Building transactions (P2PK, P2PKH, P2SH, P2WPK, P2WSH)
+* [X] Signing transactions
+* [X] Verifying signatures
+* [X] Passing core reference tests (scripts & transactions)
+* [X] Passing core reference segwit tests
+* [X] Passing core reference psbt v0 tests
 
 ## Install
 
-`bitcoin-kmp` is avaialble on [maven central](https://search.maven.org/search?q=g:fr.acinq.bitcoin%20a:bitcoin-kmp*)
+`bitcoin-kmp` is available on [maven central](https://search.maven.org/search?q=g:fr.acinq.bitcoin%20a:bitcoin-kmp*)
 
-- **Multiplatform**: Add the `fr.acinq.bitcoin-kmp:bitcoin-kmp` dependency to your common source set dependencies (You need Gradle 5.0 minimum).
-- **JVM**: Add the `fr.acinq.bitcoin-kmp:bitcoin-kmp-jvm` dependency to your project.
+* **Multiplatform**: Add the `fr.acinq.bitcoin-kmp:bitcoin-kmp` dependency to your common source set dependencies (you need Gradle 5.0 minimum).
+* **JVM**: Add the `fr.acinq.bitcoin-kmp:bitcoin-kmp-jvm` dependency to your project.
 
 ## libscp256k1 support
 

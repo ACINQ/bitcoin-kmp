@@ -1,6 +1,5 @@
 package fr.acinq.bitcoin
 
-
 public data class Satoshi(val sat: Long) : Comparable<Satoshi> {
     // @formatter:off
     public operator fun plus(other: Satoshi): Satoshi = Satoshi(sat + other.sat)
@@ -24,3 +23,4 @@ public data class Satoshi(val sat: Long) : Comparable<Satoshi> {
 }
 
 public fun Long.toSatoshi(): Satoshi = Satoshi(this)
+public fun Int.toSatoshi(): Satoshi = Satoshi(this.toLong())

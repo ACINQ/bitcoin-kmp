@@ -29,6 +29,251 @@ import fr.acinq.bitcoin.io.*
 @OptIn(ExperimentalUnsignedTypes::class)
 public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput>, val outputs: List<PartiallySignedOutput>) {
 
+    init {
+        require(global.tx.txIn.size == inputs.size) { "there must be one partially signed input per input of the unsigned tx" }
+        require(global.tx.txOut.size == outputs.size) { "there must be one partially signed output per output of the unsigned tx" }
+    }
+
+    /**
+     * Implements the PSBT creator role; initializes a PSBT for the given unsigned transaction.
+     *
+     * @param tx unsigned transaction skeleton.
+     * @return the psbt with empty inputs and outputs.
+     */
+    public constructor(tx: Transaction) : this(
+        Global(Version, tx.copy(txIn = tx.txIn.map { it.copy(signatureScript = ByteVector.empty, witness = ScriptWitness.empty) }), listOf(), listOf()),
+        tx.txIn.map { PartiallySignedInput.empty },
+        tx.txOut.map { PartiallySignedOutput.empty }
+    )
+
+    /**
+     * Implements the PSBT updater role; adds information about a given UTXO.
+     * Note that we always fill the nonWitnessUtxo (see https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#cite_note-7).
+     *
+     * @param inputTx transaction containing the UTXO.
+     * @param outputIndex index of the UTXO in the inputTx.
+     * @param redeemScript redeem script if known and applicable.
+     * @param witnessScript witness script if known and applicable.
+     * @param sighashType sighash type if one should be specified.
+     * @param derivationPaths derivation paths for keys used by this UTXO.
+     * @return psbt with the matching input updated.
+     */
+    public fun update(
+        inputTx: Transaction,
+        outputIndex: Int,
+        redeemScript: List<ScriptElt>? = null,
+        witnessScript: List<ScriptElt>? = null,
+        sighashType: Int? = null,
+        derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
+    ): UpdateResult {
+        if (outputIndex >= inputTx.txOut.size) return UpdateResult.Failure.InvalidInput("output index must exist in the input tx")
+        val outpoint = OutPoint(inputTx, outputIndex.toLong())
+        val inputIndex = global.tx.txIn.indexOfFirst { it.outPoint == outpoint }
+        if (inputIndex < 0) return UpdateResult.Failure.InvalidInput("psbt transaction does not spend the provided outpoint")
+        val input = inputs[inputIndex]
+        val updated = when {
+            witnessScript != null -> input.copy(
+                witnessUtxo = inputTx.txOut[outputIndex],
+                witnessScript = witnessScript,
+                nonWitnessUtxo = inputTx,
+                redeemScript = redeemScript ?: input.redeemScript,
+                sighashType = sighashType ?: input.sighashType,
+                derivationPaths = input.derivationPaths + derivationPaths
+            )
+            else -> input.copy(
+                nonWitnessUtxo = inputTx,
+                redeemScript = redeemScript ?: input.redeemScript,
+                sighashType = sighashType ?: input.sighashType,
+                derivationPaths = input.derivationPaths + derivationPaths
+            )
+        }
+        return UpdateResult.Success(this.copy(inputs = inputs.updated(inputIndex, updated)))
+    }
+
+    /**
+     * Implements the PSBT signer role: sign a given input.
+     * The caller needs to carefully verify that it wants to spend that input, and that the unsigned transaction matches
+     * what it expects.
+     *
+     * @param priv private key used to sign the input.
+     * @param inputIndex index of the input that should be signed.
+     * @return the psbt with a partial signature added (other inputs will not be modified).
+     */
+    public fun sign(priv: PrivateKey, inputIndex: Int): UpdateResult {
+        if (inputIndex >= inputs.size) return UpdateResult.Failure.InvalidInput("input index must exist in the input tx")
+        val input = inputs[inputIndex]
+        val txIn = global.tx.txIn[inputIndex]
+        return when {
+            input.nonWitnessUtxo != null && input.nonWitnessUtxo.txid != txIn.outPoint.txid -> UpdateResult.Failure.InvalidNonWitnessUtxo("non-witness utxo does not match unsigned tx input")
+            input.nonWitnessUtxo != null && input.nonWitnessUtxo.txOut.size <= txIn.outPoint.index -> UpdateResult.Failure.InvalidNonWitnessUtxo("non-witness utxo index out of bounds")
+            input.witnessUtxo != null && !Script.isNativeWitnessScript(input.witnessUtxo.publicKeyScript) && !Script.isPayToScript(input.witnessUtxo.publicKeyScript.bytes) -> UpdateResult.Failure.InvalidWitnessUtxo("witness utxo must use native witness program or P2SH witness program")
+            input.witnessUtxo != null -> {
+                val utxo = input.witnessUtxo
+                val redeemScript = when {
+                    input.redeemScript != null -> {
+                        // If a redeem script is provided in the partially signed input, the utxo must be a p2sh for that script.
+                        val p2sh = Script.write(Script.pay2sh(input.redeemScript))
+                        if (!utxo.publicKeyScript.contentEquals(p2sh)) {
+                            return UpdateResult.Failure.InvalidWitnessUtxo("redeem script does not match witness utxo scriptPubKey")
+                        }
+                        input.redeemScript
+                    }
+                    else -> Script.parseSafe(utxo.publicKeyScript) ?: return UpdateResult.Failure.InvalidWitnessUtxo("failed to parse redeem script")
+                }
+                val sig = when {
+                    input.witnessScript != null && !Script.isPay2wpkh(redeemScript) && redeemScript != Script.pay2wsh(input.witnessScript) -> return UpdateResult.Failure.InvalidWitnessUtxo("witness script does not match redeemScript or scriptPubKey")
+                    input.witnessScript != null -> Transaction.signInput(global.tx, inputIndex, input.witnessScript, input.sighashType ?: SigHash.SIGHASH_ALL, utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv)
+                    else -> Transaction.signInput(global.tx, inputIndex, redeemScript, input.sighashType ?: SigHash.SIGHASH_ALL, utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv)
+                }
+                UpdateResult.Success(this.copy(inputs = this.inputs.updated(inputIndex, input.copy(partialSigs = input.partialSigs + (priv.publicKey() to ByteVector(sig))))))
+            }
+            input.nonWitnessUtxo != null -> {
+                val utxo = input.nonWitnessUtxo
+                val redeemScript = when {
+                    input.redeemScript != null -> {
+                        // If a redeem script is provided in the partially signed input, the utxo must be a p2sh for that script.
+                        val p2sh = Script.write(Script.pay2sh(input.redeemScript))
+                        if (!utxo.txOut[txIn.outPoint.index.toInt()].publicKeyScript.contentEquals(p2sh)) {
+                            return UpdateResult.Failure.InvalidNonWitnessUtxo("redeem script does not match non-witness utxo scriptPubKey")
+                        }
+                        input.redeemScript
+                    }
+                    else -> Script.parseSafe(utxo.txOut[txIn.outPoint.index.toInt()].publicKeyScript) ?: return UpdateResult.Failure.InvalidNonWitnessUtxo("failed to parse redeem script")
+                }
+                val amount = utxo.txOut[txIn.outPoint.index.toInt()].amount
+                val sig = Transaction.signInput(global.tx, inputIndex, redeemScript, input.sighashType ?: SigHash.SIGHASH_ALL, amount, SigVersion.SIGVERSION_BASE, priv)
+                UpdateResult.Success(this.copy(inputs = this.inputs.updated(inputIndex, input.copy(partialSigs = input.partialSigs + (priv.publicKey() to ByteVector(sig))))))
+            }
+            else -> UpdateResult.Success(this) // nothing to sign
+        }
+    }
+
+    /**
+     * Implements the PSBT finalizer role: finalizes a given non-witness input.
+     * This will clear all fields from the input except the utxo, scriptSig and unknown entries.
+     *
+     * @param inputIndex index of the input that should be finalized.
+     * @param scriptSig signature script.
+     * @return a psbt with the given input finalized.
+     */
+    public fun finalize(inputIndex: Int, scriptSig: List<ScriptElt>): UpdateResult {
+        return when {
+            inputIndex >= inputs.size -> UpdateResult.Failure.InvalidInput("input index must exist in the input tx")
+            inputs[inputIndex].nonWitnessUtxo == null -> UpdateResult.Failure.CannotFinalizeInput(inputIndex, "non-witness utxo is missing")
+            else -> {
+                val finalizedInput = inputs[inputIndex].copy(
+                    sighashType = null,
+                    partialSigs = mapOf(),
+                    derivationPaths = mapOf(),
+                    redeemScript = null,
+                    witnessScript = null,
+                    ripemd160 = setOf(),
+                    sha256 = setOf(),
+                    hash160 = setOf(),
+                    hash256 = setOf(),
+                    scriptSig = scriptSig
+                )
+                UpdateResult.Success(this.copy(inputs = this.inputs.updated(inputIndex, finalizedInput)))
+            }
+        }
+    }
+
+    /**
+     * Implements the PSBT finalizer role: finalizes a given witness input.
+     * This will clear all fields from the input except the utxo, scriptSig, scriptWitness and unknown entries.
+     *
+     * @param inputIndex index of the input that should be finalized.
+     * @param scriptWitness witness script.
+     * @return a psbt with the given input finalized.
+     */
+    public fun finalize(inputIndex: Int, scriptWitness: ScriptWitness): UpdateResult {
+        return when {
+            inputIndex >= inputs.size -> UpdateResult.Failure.InvalidInput("input index must exist in the input tx")
+            inputs[inputIndex].witnessUtxo == null -> UpdateResult.Failure.CannotFinalizeInput(inputIndex, "witness utxo is missing")
+            else -> {
+                val input = inputs[inputIndex]
+                val scriptSig = input.redeemScript?.let { listOf(OP_PUSHDATA(Script.write(it))) }
+                val finalizedInput = input.copy(
+                    sighashType = null,
+                    partialSigs = mapOf(),
+                    derivationPaths = mapOf(),
+                    redeemScript = null,
+                    witnessScript = null,
+                    ripemd160 = setOf(),
+                    sha256 = setOf(),
+                    hash160 = setOf(),
+                    hash256 = setOf(),
+                    scriptSig = scriptSig,
+                    scriptWitness = scriptWitness
+                )
+                UpdateResult.Success(this.copy(inputs = this.inputs.updated(inputIndex, finalizedInput)))
+            }
+        }
+    }
+
+    /**
+     * Implements the PSBT extractor role: extracts a valid transaction from the psbt data.
+     *
+     * @return a fully signed, ready-to-broadcast transaction.
+     */
+    public fun extract(): ExtractResult {
+        val (finalTxsIn, utxos) = global.tx.txIn.zip(inputs).map { (txIn, input) ->
+            if (!isFinal(input)) {
+                return ExtractResult.Failure("some inputs are not finalized")
+            }
+            val finalTxIn = txIn.copy(
+                witness = input.scriptWitness ?: ScriptWitness.empty,
+                signatureScript = input.scriptSig?.let { ByteVector(Script.write(it)) } ?: ByteVector.empty
+            )
+            val utxo = when {
+                input.nonWitnessUtxo != null && input.nonWitnessUtxo.txid != txIn.outPoint.txid -> return ExtractResult.Failure("non-witness utxo does not match unsigned tx input")
+                input.nonWitnessUtxo != null && input.nonWitnessUtxo.txOut.size <= txIn.outPoint.index -> return ExtractResult.Failure("non-witness utxo index out of bounds")
+                input.nonWitnessUtxo != null -> input.nonWitnessUtxo.txOut[txIn.outPoint.index.toInt()]
+                input.witnessUtxo != null -> input.witnessUtxo
+                else -> return ExtractResult.Failure("some utxos are missing")
+            }
+            Pair(finalTxIn, txIn.outPoint to utxo)
+        }.unzip()
+        val finalTx = global.tx.copy(txIn = finalTxsIn)
+        return try {
+            Transaction.correctlySpends(finalTx, utxos.toMap(), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+            ExtractResult.Success(finalTx)
+        } catch (_: Exception) {
+            ExtractResult.Failure("extracted transaction doesn't pass standard script validation")
+        }
+    }
+
+    private fun isFinal(input: PartiallySignedInput): Boolean {
+        // Everything except the utxo, the scriptSigs and unknown keys must be empty.
+        val emptied = input.redeemScript == null && input.witnessScript == null && input.partialSigs.isEmpty() && input.derivationPaths.isEmpty() && input.sighashType == null
+        // And we must have complete scriptSig for either a witness or non-witness utxo.
+        val hasWitnessData = input.witnessUtxo != null && input.scriptWitness != null
+        val hasNonWitnessData = input.nonWitnessUtxo != null && input.scriptSig != null
+        return emptied && (hasWitnessData || hasNonWitnessData)
+    }
+
+    /**
+     * Compute the fees paid by the PSBT.
+     * Note that if some inputs have not been updated yet, the fee cannot be computed.
+     */
+    public fun computeFees(): Satoshi? {
+        val inputAmounts = inputs.zip(global.tx.txIn).map { (input, txIn) ->
+            when {
+                input.witnessUtxo != null -> input.witnessUtxo.amount
+                input.nonWitnessUtxo != null -> input.nonWitnessUtxo.txOut[txIn.outPoint.index.toInt()].amount
+                else -> null
+            }
+        }
+        return when {
+            inputAmounts.any { it == null } -> null
+            else -> {
+                val amountOut = global.tx.txOut.sumOf { it.amount.sat }.toSatoshi()
+                val amountIn = inputAmounts.filterNotNull().sumOf { it.sat }.toSatoshi()
+                amountIn - amountOut
+            }
+        }
+    }
+
     public companion object {
 
         /** Only version 0 is supported for now. */
@@ -87,14 +332,14 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
             val witnessScript: List<ScriptElt>?,
             val scriptSig: List<ScriptElt>?,
             val scriptWitness: ScriptWitness?,
-            val ripemd160: List<ByteVector>,
-            val sha256: List<ByteVector>,
-            val hash160: List<ByteVector>,
-            val hash256: List<ByteVector>,
+            val ripemd160: Set<ByteVector>,
+            val sha256: Set<ByteVector>,
+            val hash160: Set<ByteVector>,
+            val hash256: Set<ByteVector>,
             val unknown: List<DataEntry>
         ) {
             public companion object {
-                public val empty: PartiallySignedInput = PartiallySignedInput(null, null, null, mapOf(), mapOf(), null, null, null, null, listOf(), listOf(), listOf(), listOf(), listOf())
+                public val empty: PartiallySignedInput = PartiallySignedInput(null, null, null, mapOf(), mapOf(), null, null, null, null, setOf(), setOf(), setOf(), setOf(), listOf())
             }
         }
 
@@ -114,6 +359,115 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
         ) {
             public companion object {
                 public val empty: PartiallySignedOutput = PartiallySignedOutput(null, null, mapOf(), listOf())
+            }
+        }
+
+        public sealed class UpdateResult {
+            public data class Success(val psbt: Psbt) : UpdateResult()
+            public sealed class Failure : UpdateResult() {
+                public data class InvalidInput(val reason: String) : Failure()
+                public data class InvalidNonWitnessUtxo(val reason: String) : Failure()
+                public data class InvalidWitnessUtxo(val reason: String) : Failure()
+                public data class CannotCombine(val reason: String) : Failure()
+                public data class CannotJoin(val reason: String) : Failure()
+                public data class CannotFinalizeInput(val index: Int, val reason: String) : Failure()
+            }
+
+            public fun map(f: (Psbt) -> UpdateResult): UpdateResult = when (this) {
+                is Success -> f(this.psbt)
+                is Failure -> this
+            }
+        }
+
+        public sealed class ExtractResult {
+            public data class Success(val tx: Transaction) : ExtractResult()
+            public data class Failure(val reason: String) : ExtractResult()
+        }
+
+        /**
+         * Implements the PSBT combiner role: combines multiple psbts for the same unsigned transaction.
+         *
+         * @param psbts partially signed bitcoin transactions to combine.
+         * @return a psbt that contains data from all the input psbts.
+         */
+        public fun combine(vararg psbts: Psbt): UpdateResult {
+            return when {
+                psbts.map { it.global.tx.txid }.toSet().size != 1 -> UpdateResult.Failure.CannotCombine("cannot combine psbts for distinct transactions")
+                psbts.map { it.inputs.size }.toSet() != setOf(psbts[0].global.tx.txIn.size) -> UpdateResult.Failure.CannotCombine("some psbts have an invalid number of inputs")
+                psbts.map { it.outputs.size }.toSet() != setOf(psbts[0].global.tx.txOut.size) -> UpdateResult.Failure.CannotCombine("some psbts have an invalid number of outputs")
+                else -> {
+                    val global = psbts[0].global.copy(
+                        unknown = combineUnknown(psbts.map { it.global.unknown }),
+                        extendedPublicKeys = combineExtendedPublicKeys(psbts.map { it.global.extendedPublicKeys })
+                    )
+                    val combined = Psbt(
+                        global,
+                        global.tx.txIn.indices.map { i -> combineInput(psbts.map { it.inputs[i] }) },
+                        global.tx.txOut.indices.map { i -> combineOutput(psbts.map { it.outputs[i] }) }
+                    )
+                    UpdateResult.Success(combined)
+                }
+            }
+        }
+
+        private fun combineUnknown(unknowns: List<List<DataEntry>>): List<DataEntry> = unknowns.flatten().associateBy { it.key }.values.toList()
+
+        private fun combineExtendedPublicKeys(keys: List<List<ExtendedPublicKeyWithMaster>>): List<ExtendedPublicKeyWithMaster> = keys.flatten().associateBy { it.extendedPublicKey }.values.toList()
+
+        private fun combineInput(inputs: List<PartiallySignedInput>): PartiallySignedInput = PartiallySignedInput(
+            inputs.mapNotNull { it.nonWitnessUtxo }.firstOrNull(),
+            inputs.mapNotNull { it.witnessUtxo }.firstOrNull(),
+            inputs.mapNotNull { it.sighashType }.firstOrNull(),
+            inputs.flatMap { it.partialSigs.toList() }.toMap(),
+            inputs.flatMap { it.derivationPaths.toList() }.toMap(),
+            inputs.mapNotNull { it.redeemScript }.firstOrNull(),
+            inputs.mapNotNull { it.witnessScript }.firstOrNull(),
+            inputs.mapNotNull { it.scriptSig }.firstOrNull(),
+            inputs.mapNotNull { it.scriptWitness }.firstOrNull(),
+            inputs.flatMap { it.ripemd160 }.toSet(),
+            inputs.flatMap { it.sha256 }.toSet(),
+            inputs.flatMap { it.hash160 }.toSet(),
+            inputs.flatMap { it.hash256 }.toSet(),
+            combineUnknown(inputs.map { it.unknown })
+        )
+
+        private fun combineOutput(outputs: List<PartiallySignedOutput>): PartiallySignedOutput = PartiallySignedOutput(
+            outputs.mapNotNull { it.redeemScript }.firstOrNull(),
+            outputs.mapNotNull { it.witnessScript }.firstOrNull(),
+            outputs.flatMap { it.derivationPaths.toList() }.toMap(),
+            combineUnknown(outputs.map { it.unknown })
+        )
+
+        /**
+         * Joins multiple distinct PSBTs with different inputs and outputs into one PSBT with inputs and outputs from all of
+         * the PSBTs. No input in any of the PSBTs can be in more than one of the PSBTs.
+         *
+         * @param psbts partially signed bitcoin transactions to join.
+         * @return a psbt that contains data from all the input psbts.
+         */
+        public fun join(vararg psbts: Psbt): UpdateResult {
+            return when {
+                psbts.isEmpty() -> UpdateResult.Failure.CannotJoin("no psbt provided")
+                psbts.map { it.global.version }.toSet().size != 1 -> UpdateResult.Failure.CannotJoin("cannot join psbts with different versions")
+                psbts.map { it.global.tx.version }.toSet().size != 1 -> UpdateResult.Failure.CannotJoin("cannot join psbts with different tx versions")
+                psbts.map { it.global.tx.lockTime }.toSet().size != 1 -> UpdateResult.Failure.CannotJoin("cannot join psbts with different tx lockTime")
+                psbts.any { it.global.tx.txIn.size != it.inputs.size || it.global.tx.txOut.size != it.outputs.size } -> UpdateResult.Failure.CannotJoin("some psbts have an invalid number of inputs/outputs")
+                psbts.flatMap { it.global.tx.txIn.map { txIn -> txIn.outPoint } }.toSet().size != psbts.sumOf { it.global.tx.txIn.size } -> UpdateResult.Failure.CannotJoin("cannot join psbts that spend the same input")
+                else -> {
+                    val global = psbts[0].global.copy(
+                        tx = psbts[0].global.tx.copy(
+                            txIn = psbts.flatMap { it.global.tx.txIn },
+                            txOut = psbts.flatMap { it.global.tx.txOut }
+                        ),
+                        extendedPublicKeys = psbts.flatMap { it.global.extendedPublicKeys }.distinct(),
+                        unknown = psbts.flatMap { it.global.unknown }.distinct()
+                    )
+                    UpdateResult.Success(psbts[0].copy(
+                        global = global,
+                        inputs = psbts.flatMap { it.inputs },
+                        outputs = psbts.flatMap { it.outputs }
+                    ))
+                }
             }
         }
 
@@ -345,21 +699,13 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                 val redeemScript = known.find { it.key[0] == 0x04.toByte() }?.let {
                     when {
                         it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("redeem script key must contain exactly 1 byte")
-                        else -> try {
-                            Script.parse(it.value)
-                        } catch (e: Exception) {
-                            return ParsePsbtResult.Failure.InvalidTxInput(e.message ?: "failed to parse redeem script")
-                        }
+                        else -> Script.parseSafe(it.value) ?: return ParsePsbtResult.Failure.InvalidTxInput("failed to parse redeem script")
                     }
                 }
                 val witnessScript = known.find { it.key[0] == 0x05.toByte() }?.let {
                     when {
                         it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("witness script key must contain exactly 1 byte")
-                        else -> try {
-                            Script.parse(it.value)
-                        } catch (e: Exception) {
-                            return ParsePsbtResult.Failure.InvalidTxInput(e.message ?: "failed to parse witness script")
-                        }
+                        else -> Script.parseSafe(it.value) ?: return ParsePsbtResult.Failure.InvalidTxInput("failed to parse witness script")
                     }
                 }
                 val derivationPaths = known.filter { it.key[0] == 0x06.toByte() }.map {
@@ -378,11 +724,7 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                 val scriptSig = known.find { it.key[0] == 0x07.toByte() }?.let {
                     when {
                         it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("script sig key must contain exactly 1 byte")
-                        else -> try {
-                            Script.parse(it.value)
-                        } catch (e: Exception) {
-                            return ParsePsbtResult.Failure.InvalidTxInput(e.message ?: "failed to parse script sig")
-                        }
+                        else -> Script.parseSafe(it.value) ?: return ParsePsbtResult.Failure.InvalidTxInput("failed to parse script sig")
                     }
                 }
                 val scriptWitness = known.find { it.key[0] == 0x08.toByte() }?.let {
@@ -401,28 +743,28 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                         !it.key.drop(1).contentEquals(Crypto.ripemd160(it.value)) -> return ParsePsbtResult.Failure.InvalidTxInput("invalid ripemd160 preimage")
                         else -> it.value
                     }
-                }
+                }.toSet()
                 val sha256Preimages = known.filter { it.key[0] == 0x0b.toByte() }.map {
                     when {
                         it.key.size() != 33 -> return ParsePsbtResult.Failure.InvalidTxInput("sha256 hash must contain exactly 32 bytes")
                         !it.key.drop(1).contentEquals(Crypto.sha256(it.value)) -> return ParsePsbtResult.Failure.InvalidTxInput("invalid sha256 preimage")
                         else -> it.value
                     }
-                }
+                }.toSet()
                 val hash160Preimages = known.filter { it.key[0] == 0x0c.toByte() }.map {
                     when {
                         it.key.size() != 21 -> return ParsePsbtResult.Failure.InvalidTxInput("hash160 hash must contain exactly 20 bytes")
                         !it.key.drop(1).contentEquals(Crypto.hash160(it.value)) -> return ParsePsbtResult.Failure.InvalidTxInput("invalid hash160 preimage")
                         else -> it.value
                     }
-                }
+                }.toSet()
                 val hash256Preimages = known.filter { it.key[0] == 0x0d.toByte() }.map {
                     when {
                         it.key.size() != 33 -> return ParsePsbtResult.Failure.InvalidTxInput("hash256 hash must contain exactly 32 bytes")
                         !it.key.drop(1).contentEquals(Crypto.hash256(it.value)) -> return ParsePsbtResult.Failure.InvalidTxInput("invalid hash256 preimage")
                         else -> it.value
                     }
-                }
+                }.toSet()
                 PartiallySignedInput(
                     nonWitnessUtxo,
                     witnessUtxo,
@@ -453,21 +795,13 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                 val redeemScript = known.find { it.key[0] == 0x00.toByte() }?.let {
                     when {
                         it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxOutput("redeem script key must contain exactly 1 byte")
-                        else -> try {
-                            Script.parse(it.value)
-                        } catch (e: Exception) {
-                            return ParsePsbtResult.Failure.InvalidTxOutput(e.message ?: "failed to parse redeem script")
-                        }
+                        else -> Script.parseSafe(it.value) ?: return ParsePsbtResult.Failure.InvalidTxOutput("failed to parse redeem script")
                     }
                 }
                 val witnessScript = known.find { it.key[0] == 0x01.toByte() }?.let {
                     when {
                         it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxOutput("witness script key must contain exactly 1 byte")
-                        else -> try {
-                            Script.parse(it.value)
-                        } catch (e: Exception) {
-                            return ParsePsbtResult.Failure.InvalidTxOutput(e.message ?: "failed to parse witness script")
-                        }
+                        else -> Script.parseSafe(it.value) ?: return ParsePsbtResult.Failure.InvalidTxOutput("failed to parse witness script")
                     }
                 }
                 val derivationPaths = known.filter { it.key[0] == 0x02.toByte() }.map {

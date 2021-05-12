@@ -702,6 +702,22 @@ class PsbtTestsCommon {
     }
 
     @Test
+    fun `preimage challenges`() {
+        val psbt = readValidPsbt(
+            "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000"
+        )
+        val withPreimageChallenges = psbt.copy(
+            inputs = listOf(
+                psbt.inputs[0].copy(ripemd160 = setOf(ByteVector("01020304"), ByteVector("0102")), hash160 = setOf(ByteVector("123456")), hash256 = setOf(ByteVector("abcdef"), ByteVector("00000000"))),
+                psbt.inputs[1].copy(ripemd160 = setOf(ByteVector("0102")), sha256 = setOf(ByteVector("123456"), ByteVector("11")), hash256 = setOf(ByteVector("abcdef"), ByteVector("00000000"))),
+            )
+        )
+        val decoded = Psbt.read(Psbt.write(withPreimageChallenges))
+        assertTrue(decoded is Psbt.Companion.ParsePsbtResult.Success)
+        assertEquals(decoded.psbt, withPreimageChallenges)
+    }
+
+    @Test
     fun `bump lightning commit tx fee from cold wallet`() {
         fun anchorScript(fundingPubKey: PublicKey): List<ScriptElt> = listOf(
             // @formatter:off

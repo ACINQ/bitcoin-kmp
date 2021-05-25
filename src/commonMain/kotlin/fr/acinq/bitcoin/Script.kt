@@ -66,16 +66,6 @@ public object Script {
     @JvmStatic
     public fun parse(hex: String): List<ScriptElt> = parse(Hex.decode(hex))
 
-    @JvmStatic
-    public fun parseSafe(blob: ByteArray): List<ScriptElt>? = try {
-        parse(blob)
-    } catch (_: Exception) {
-        null
-    }
-
-    @JvmStatic
-    public fun parseSafe(blob: ByteVector): List<ScriptElt>? = parseSafe(blob.toByteArray())
-
     public tailrec fun write(script: List<ScriptElt>, out: Output) {
         if (script.isEmpty()) return
         else {
@@ -276,7 +266,7 @@ public object Script {
     }
 
     @JvmStatic
-    public fun isNativeWitnessScript(script: ByteVector): Boolean = parseSafe(script)?.let { isNativeWitnessScript(it) } ?: false
+    public fun isNativeWitnessScript(script: ByteVector): Boolean = runCatching { parse(script) }.map { isNativeWitnessScript(it) }.getOrDefault(false)
 
     /**
      * Creates a m-of-n multisig script.

@@ -118,7 +118,7 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                         }
                         input.redeemScript
                     }
-                    else -> Script.parseSafe(utxo.publicKeyScript) ?: return UpdateResult.Failure.InvalidWitnessUtxo("failed to parse redeem script")
+                    else -> runCatching { Script.parse(utxo.publicKeyScript) }.getOrElse { return UpdateResult.Failure.InvalidWitnessUtxo("failed to parse redeem script") }
                 }
                 val sig = when {
                     input.witnessScript != null && !Script.isPay2wpkh(redeemScript) && redeemScript != Script.pay2wsh(input.witnessScript) -> return UpdateResult.Failure.InvalidWitnessUtxo("witness script does not match redeemScript or scriptPubKey")
@@ -138,7 +138,7 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                         }
                         input.redeemScript
                     }
-                    else -> Script.parseSafe(utxo.txOut[txIn.outPoint.index.toInt()].publicKeyScript) ?: return UpdateResult.Failure.InvalidNonWitnessUtxo("failed to parse redeem script")
+                    else -> runCatching { Script.parse(utxo.txOut[txIn.outPoint.index.toInt()].publicKeyScript) }.getOrElse { return UpdateResult.Failure.InvalidNonWitnessUtxo("failed to parse redeem script") }
                 }
                 val amount = utxo.txOut[txIn.outPoint.index.toInt()].amount
                 val sig = Transaction.signInput(global.tx, inputIndex, redeemScript, input.sighashType ?: SigHash.SIGHASH_ALL, amount, SigVersion.SIGVERSION_BASE, priv)
@@ -699,13 +699,13 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                 val redeemScript = known.find { it.key[0] == 0x04.toByte() }?.let {
                     when {
                         it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("redeem script key must contain exactly 1 byte")
-                        else -> Script.parseSafe(it.value) ?: return ParsePsbtResult.Failure.InvalidTxInput("failed to parse redeem script")
+                        else -> runCatching { Script.parse(it.value) }.getOrElse { return ParsePsbtResult.Failure.InvalidTxInput("failed to parse redeem script") }
                     }
                 }
                 val witnessScript = known.find { it.key[0] == 0x05.toByte() }?.let {
                     when {
                         it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("witness script key must contain exactly 1 byte")
-                        else -> Script.parseSafe(it.value) ?: return ParsePsbtResult.Failure.InvalidTxInput("failed to parse witness script")
+                        else -> runCatching { Script.parse(it.value) }.getOrElse { return ParsePsbtResult.Failure.InvalidTxInput("failed to parse witness script") }
                     }
                 }
                 val derivationPaths = known.filter { it.key[0] == 0x06.toByte() }.map {
@@ -724,7 +724,7 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                 val scriptSig = known.find { it.key[0] == 0x07.toByte() }?.let {
                     when {
                         it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("script sig key must contain exactly 1 byte")
-                        else -> Script.parseSafe(it.value) ?: return ParsePsbtResult.Failure.InvalidTxInput("failed to parse script sig")
+                        else -> runCatching { Script.parse(it.value) }.getOrElse { return ParsePsbtResult.Failure.InvalidTxInput("failed to parse script sig") }
                     }
                 }
                 val scriptWitness = known.find { it.key[0] == 0x08.toByte() }?.let {
@@ -795,13 +795,13 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                 val redeemScript = known.find { it.key[0] == 0x00.toByte() }?.let {
                     when {
                         it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxOutput("redeem script key must contain exactly 1 byte")
-                        else -> Script.parseSafe(it.value) ?: return ParsePsbtResult.Failure.InvalidTxOutput("failed to parse redeem script")
+                        else -> runCatching { Script.parse(it.value) }.getOrElse { return ParsePsbtResult.Failure.InvalidTxOutput("failed to parse redeem script") }
                     }
                 }
                 val witnessScript = known.find { it.key[0] == 0x01.toByte() }?.let {
                     when {
                         it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxOutput("witness script key must contain exactly 1 byte")
-                        else -> Script.parseSafe(it.value) ?: return ParsePsbtResult.Failure.InvalidTxOutput("failed to parse witness script")
+                        else -> runCatching { Script.parse(it.value) }.getOrElse { return ParsePsbtResult.Failure.InvalidTxOutput("failed to parse witness script") }
                     }
                 }
                 val derivationPaths = known.filter { it.key[0] == 0x02.toByte() }.map {

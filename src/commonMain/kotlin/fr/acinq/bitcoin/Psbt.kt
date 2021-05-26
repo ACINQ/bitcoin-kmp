@@ -18,6 +18,8 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.*
+import fr.acinq.bitcoin.utils.Either
+import fr.acinq.bitcoin.utils.getOrElse
 
 /**
  * A partially signed bitcoin transaction: see https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki.
@@ -65,11 +67,11 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
         witnessScript: List<ScriptElt>? = null,
         sighashType: Int? = null,
         derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
-    ): UpdateResult {
-        if (outputIndex >= inputTx.txOut.size) return UpdateResult.Failure.InvalidInput("output index must exist in the input tx")
+    ): Either<UpdateFailure, Psbt> {
+        if (outputIndex >= inputTx.txOut.size) return Either.Left(UpdateFailure.InvalidInput("output index must exist in the input tx"))
         val outpoint = OutPoint(inputTx, outputIndex.toLong())
         val inputIndex = global.tx.txIn.indexOfFirst { it.outPoint == outpoint }
-        if (inputIndex < 0) return UpdateResult.Failure.InvalidInput("psbt transaction does not spend the provided outpoint")
+        if (inputIndex < 0) return Either.Left(UpdateFailure.InvalidInput("psbt transaction does not spend the provided outpoint"))
         val input = inputs[inputIndex]
         val updated = when {
             witnessScript != null -> input.copy(
@@ -87,7 +89,7 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                 derivationPaths = input.derivationPaths + derivationPaths
             )
         }
-        return UpdateResult.Success(this.copy(inputs = inputs.updated(inputIndex, updated)))
+        return Either.Right(this.copy(inputs = inputs.updated(inputIndex, updated)))
     }
 
     /**
@@ -99,14 +101,14 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
      * @param inputIndex index of the input that should be signed.
      * @return the psbt with a partial signature added (other inputs will not be modified).
      */
-    public fun sign(priv: PrivateKey, inputIndex: Int): UpdateResult {
-        if (inputIndex >= inputs.size) return UpdateResult.Failure.InvalidInput("input index must exist in the input tx")
+    public fun sign(priv: PrivateKey, inputIndex: Int): Either<UpdateFailure, Psbt> {
+        if (inputIndex >= inputs.size) return Either.Left(UpdateFailure.InvalidInput("input index must exist in the input tx"))
         val input = inputs[inputIndex]
         val txIn = global.tx.txIn[inputIndex]
         return when {
-            input.nonWitnessUtxo != null && input.nonWitnessUtxo.txid != txIn.outPoint.txid -> UpdateResult.Failure.InvalidNonWitnessUtxo("non-witness utxo does not match unsigned tx input")
-            input.nonWitnessUtxo != null && input.nonWitnessUtxo.txOut.size <= txIn.outPoint.index -> UpdateResult.Failure.InvalidNonWitnessUtxo("non-witness utxo index out of bounds")
-            input.witnessUtxo != null && !Script.isNativeWitnessScript(input.witnessUtxo.publicKeyScript) && !Script.isPayToScript(input.witnessUtxo.publicKeyScript.bytes) -> UpdateResult.Failure.InvalidWitnessUtxo("witness utxo must use native witness program or P2SH witness program")
+            input.nonWitnessUtxo != null && input.nonWitnessUtxo.txid != txIn.outPoint.txid -> Either.Left(UpdateFailure.InvalidNonWitnessUtxo("non-witness utxo does not match unsigned tx input"))
+            input.nonWitnessUtxo != null && input.nonWitnessUtxo.txOut.size <= txIn.outPoint.index -> Either.Left(UpdateFailure.InvalidNonWitnessUtxo("non-witness utxo index out of bounds"))
+            input.witnessUtxo != null && !Script.isNativeWitnessScript(input.witnessUtxo.publicKeyScript) && !Script.isPayToScript(input.witnessUtxo.publicKeyScript.bytes) -> Either.Left(UpdateFailure.InvalidWitnessUtxo("witness utxo must use native witness program or P2SH witness program"))
             input.witnessUtxo != null -> {
                 val utxo = input.witnessUtxo
                 val redeemScript = when {
@@ -114,18 +116,18 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                         // If a redeem script is provided in the partially signed input, the utxo must be a p2sh for that script.
                         val p2sh = Script.write(Script.pay2sh(input.redeemScript))
                         if (!utxo.publicKeyScript.contentEquals(p2sh)) {
-                            return UpdateResult.Failure.InvalidWitnessUtxo("redeem script does not match witness utxo scriptPubKey")
+                            return Either.Left(UpdateFailure.InvalidWitnessUtxo("redeem script does not match witness utxo scriptPubKey"))
                         }
                         input.redeemScript
                     }
-                    else -> runCatching { Script.parse(utxo.publicKeyScript) }.getOrElse { return UpdateResult.Failure.InvalidWitnessUtxo("failed to parse redeem script") }
+                    else -> runCatching { Script.parse(utxo.publicKeyScript) }.getOrElse { return Either.Left(UpdateFailure.InvalidWitnessUtxo("failed to parse redeem script")) }
                 }
                 val sig = when {
-                    input.witnessScript != null && !Script.isPay2wpkh(redeemScript) && redeemScript != Script.pay2wsh(input.witnessScript) -> return UpdateResult.Failure.InvalidWitnessUtxo("witness script does not match redeemScript or scriptPubKey")
+                    input.witnessScript != null && !Script.isPay2wpkh(redeemScript) && redeemScript != Script.pay2wsh(input.witnessScript) -> return Either.Left(UpdateFailure.InvalidWitnessUtxo("witness script does not match redeemScript or scriptPubKey"))
                     input.witnessScript != null -> Transaction.signInput(global.tx, inputIndex, input.witnessScript, input.sighashType ?: SigHash.SIGHASH_ALL, utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv)
                     else -> Transaction.signInput(global.tx, inputIndex, redeemScript, input.sighashType ?: SigHash.SIGHASH_ALL, utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv)
                 }
-                UpdateResult.Success(this.copy(inputs = this.inputs.updated(inputIndex, input.copy(partialSigs = input.partialSigs + (priv.publicKey() to ByteVector(sig))))))
+                Either.Right(this.copy(inputs = this.inputs.updated(inputIndex, input.copy(partialSigs = input.partialSigs + (priv.publicKey() to ByteVector(sig))))))
             }
             input.nonWitnessUtxo != null -> {
                 val utxo = input.nonWitnessUtxo
@@ -134,17 +136,17 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                         // If a redeem script is provided in the partially signed input, the utxo must be a p2sh for that script.
                         val p2sh = Script.write(Script.pay2sh(input.redeemScript))
                         if (!utxo.txOut[txIn.outPoint.index.toInt()].publicKeyScript.contentEquals(p2sh)) {
-                            return UpdateResult.Failure.InvalidNonWitnessUtxo("redeem script does not match non-witness utxo scriptPubKey")
+                            return Either.Left(UpdateFailure.InvalidNonWitnessUtxo("redeem script does not match non-witness utxo scriptPubKey"))
                         }
                         input.redeemScript
                     }
-                    else -> runCatching { Script.parse(utxo.txOut[txIn.outPoint.index.toInt()].publicKeyScript) }.getOrElse { return UpdateResult.Failure.InvalidNonWitnessUtxo("failed to parse redeem script") }
+                    else -> runCatching { Script.parse(utxo.txOut[txIn.outPoint.index.toInt()].publicKeyScript) }.getOrElse { return Either.Left(UpdateFailure.InvalidNonWitnessUtxo("failed to parse redeem script")) }
                 }
                 val amount = utxo.txOut[txIn.outPoint.index.toInt()].amount
                 val sig = Transaction.signInput(global.tx, inputIndex, redeemScript, input.sighashType ?: SigHash.SIGHASH_ALL, amount, SigVersion.SIGVERSION_BASE, priv)
-                UpdateResult.Success(this.copy(inputs = this.inputs.updated(inputIndex, input.copy(partialSigs = input.partialSigs + (priv.publicKey() to ByteVector(sig))))))
+                Either.Right(this.copy(inputs = this.inputs.updated(inputIndex, input.copy(partialSigs = input.partialSigs + (priv.publicKey() to ByteVector(sig))))))
             }
-            else -> UpdateResult.Success(this) // nothing to sign
+            else -> Either.Right(this) // nothing to sign
         }
     }
 
@@ -156,10 +158,10 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
      * @param scriptSig signature script.
      * @return a psbt with the given input finalized.
      */
-    public fun finalize(inputIndex: Int, scriptSig: List<ScriptElt>): UpdateResult {
+    public fun finalize(inputIndex: Int, scriptSig: List<ScriptElt>): Either<UpdateFailure, Psbt> {
         return when {
-            inputIndex >= inputs.size -> UpdateResult.Failure.InvalidInput("input index must exist in the input tx")
-            inputs[inputIndex].nonWitnessUtxo == null -> UpdateResult.Failure.CannotFinalizeInput(inputIndex, "non-witness utxo is missing")
+            inputIndex >= inputs.size -> Either.Left(UpdateFailure.InvalidInput("input index must exist in the input tx"))
+            inputs[inputIndex].nonWitnessUtxo == null -> Either.Left(UpdateFailure.CannotFinalizeInput(inputIndex, "non-witness utxo is missing"))
             else -> {
                 val finalizedInput = inputs[inputIndex].copy(
                     sighashType = null,
@@ -173,7 +175,7 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                     hash256 = setOf(),
                     scriptSig = scriptSig
                 )
-                UpdateResult.Success(this.copy(inputs = this.inputs.updated(inputIndex, finalizedInput)))
+                Either.Right(this.copy(inputs = this.inputs.updated(inputIndex, finalizedInput)))
             }
         }
     }
@@ -186,10 +188,10 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
      * @param scriptWitness witness script.
      * @return a psbt with the given input finalized.
      */
-    public fun finalize(inputIndex: Int, scriptWitness: ScriptWitness): UpdateResult {
+    public fun finalize(inputIndex: Int, scriptWitness: ScriptWitness): Either<UpdateFailure, Psbt> {
         return when {
-            inputIndex >= inputs.size -> UpdateResult.Failure.InvalidInput("input index must exist in the input tx")
-            inputs[inputIndex].witnessUtxo == null -> UpdateResult.Failure.CannotFinalizeInput(inputIndex, "witness utxo is missing")
+            inputIndex >= inputs.size -> Either.Left(UpdateFailure.InvalidInput("input index must exist in the input tx"))
+            inputs[inputIndex].witnessUtxo == null -> Either.Left(UpdateFailure.CannotFinalizeInput(inputIndex, "witness utxo is missing"))
             else -> {
                 val input = inputs[inputIndex]
                 val scriptSig = input.redeemScript?.let { listOf(OP_PUSHDATA(Script.write(it))) }
@@ -206,7 +208,7 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                     scriptSig = scriptSig,
                     scriptWitness = scriptWitness
                 )
-                UpdateResult.Success(this.copy(inputs = this.inputs.updated(inputIndex, finalizedInput)))
+                Either.Right(this.copy(inputs = this.inputs.updated(inputIndex, finalizedInput)))
             }
         }
     }
@@ -216,30 +218,30 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
      *
      * @return a fully signed, ready-to-broadcast transaction.
      */
-    public fun extract(): ExtractResult {
+    public fun extract(): Either<UpdateFailure, Transaction> {
         val (finalTxsIn, utxos) = global.tx.txIn.zip(inputs).map { (txIn, input) ->
             if (!isFinal(input)) {
-                return ExtractResult.Failure("some inputs are not finalized")
+                return Either.Left(UpdateFailure.CannotExtractTx("some inputs are not finalized"))
             }
             val finalTxIn = txIn.copy(
                 witness = input.scriptWitness ?: ScriptWitness.empty,
                 signatureScript = input.scriptSig?.let { ByteVector(Script.write(it)) } ?: ByteVector.empty
             )
             val utxo = when {
-                input.nonWitnessUtxo != null && input.nonWitnessUtxo.txid != txIn.outPoint.txid -> return ExtractResult.Failure("non-witness utxo does not match unsigned tx input")
-                input.nonWitnessUtxo != null && input.nonWitnessUtxo.txOut.size <= txIn.outPoint.index -> return ExtractResult.Failure("non-witness utxo index out of bounds")
+                input.nonWitnessUtxo != null && input.nonWitnessUtxo.txid != txIn.outPoint.txid -> return Either.Left(UpdateFailure.CannotExtractTx("non-witness utxo does not match unsigned tx input"))
+                input.nonWitnessUtxo != null && input.nonWitnessUtxo.txOut.size <= txIn.outPoint.index -> return Either.Left(UpdateFailure.CannotExtractTx("non-witness utxo index out of bounds"))
                 input.nonWitnessUtxo != null -> input.nonWitnessUtxo.txOut[txIn.outPoint.index.toInt()]
                 input.witnessUtxo != null -> input.witnessUtxo
-                else -> return ExtractResult.Failure("some utxos are missing")
+                else -> return Either.Left(UpdateFailure.CannotExtractTx("some utxos are missing"))
             }
             Pair(finalTxIn, txIn.outPoint to utxo)
         }.unzip()
         val finalTx = global.tx.copy(txIn = finalTxsIn)
         return try {
             Transaction.correctlySpends(finalTx, utxos.toMap(), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-            ExtractResult.Success(finalTx)
+            Either.Right(finalTx)
         } catch (_: Exception) {
-            ExtractResult.Failure("extracted transaction doesn't pass standard script validation")
+            Either.Left(UpdateFailure.CannotExtractTx("extracted transaction doesn't pass standard script validation"))
         }
     }
 
@@ -362,26 +364,14 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
             }
         }
 
-        public sealed class UpdateResult {
-            public data class Success(val psbt: Psbt) : UpdateResult()
-            public sealed class Failure : UpdateResult() {
-                public data class InvalidInput(val reason: String) : Failure()
-                public data class InvalidNonWitnessUtxo(val reason: String) : Failure()
-                public data class InvalidWitnessUtxo(val reason: String) : Failure()
-                public data class CannotCombine(val reason: String) : Failure()
-                public data class CannotJoin(val reason: String) : Failure()
-                public data class CannotFinalizeInput(val index: Int, val reason: String) : Failure()
-            }
-
-            public fun map(f: (Psbt) -> UpdateResult): UpdateResult = when (this) {
-                is Success -> f(this.psbt)
-                is Failure -> this
-            }
-        }
-
-        public sealed class ExtractResult {
-            public data class Success(val tx: Transaction) : ExtractResult()
-            public data class Failure(val reason: String) : ExtractResult()
+        public sealed class UpdateFailure {
+            public data class InvalidInput(val reason: String) : UpdateFailure()
+            public data class InvalidNonWitnessUtxo(val reason: String) : UpdateFailure()
+            public data class InvalidWitnessUtxo(val reason: String) : UpdateFailure()
+            public data class CannotCombine(val reason: String) : UpdateFailure()
+            public data class CannotJoin(val reason: String) : UpdateFailure()
+            public data class CannotFinalizeInput(val index: Int, val reason: String) : UpdateFailure()
+            public data class CannotExtractTx(val reason: String) : UpdateFailure()
         }
 
         /**
@@ -390,11 +380,11 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
          * @param psbts partially signed bitcoin transactions to combine.
          * @return a psbt that contains data from all the input psbts.
          */
-        public fun combine(vararg psbts: Psbt): UpdateResult {
+        public fun combine(vararg psbts: Psbt): Either<UpdateFailure, Psbt> {
             return when {
-                psbts.map { it.global.tx.txid }.toSet().size != 1 -> UpdateResult.Failure.CannotCombine("cannot combine psbts for distinct transactions")
-                psbts.map { it.inputs.size }.toSet() != setOf(psbts[0].global.tx.txIn.size) -> UpdateResult.Failure.CannotCombine("some psbts have an invalid number of inputs")
-                psbts.map { it.outputs.size }.toSet() != setOf(psbts[0].global.tx.txOut.size) -> UpdateResult.Failure.CannotCombine("some psbts have an invalid number of outputs")
+                psbts.map { it.global.tx.txid }.toSet().size != 1 -> Either.Left(UpdateFailure.CannotCombine("cannot combine psbts for distinct transactions"))
+                psbts.map { it.inputs.size }.toSet() != setOf(psbts[0].global.tx.txIn.size) -> Either.Left(UpdateFailure.CannotCombine("some psbts have an invalid number of inputs"))
+                psbts.map { it.outputs.size }.toSet() != setOf(psbts[0].global.tx.txOut.size) -> Either.Left(UpdateFailure.CannotCombine("some psbts have an invalid number of outputs"))
                 else -> {
                     val global = psbts[0].global.copy(
                         unknown = combineUnknown(psbts.map { it.global.unknown }),
@@ -405,7 +395,7 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                         global.tx.txIn.indices.map { i -> combineInput(psbts.map { it.inputs[i] }) },
                         global.tx.txOut.indices.map { i -> combineOutput(psbts.map { it.outputs[i] }) }
                     )
-                    UpdateResult.Success(combined)
+                    Either.Right(combined)
                 }
             }
         }
@@ -445,14 +435,14 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
          * @param psbts partially signed bitcoin transactions to join.
          * @return a psbt that contains data from all the input psbts.
          */
-        public fun join(vararg psbts: Psbt): UpdateResult {
+        public fun join(vararg psbts: Psbt): Either<UpdateFailure, Psbt> {
             return when {
-                psbts.isEmpty() -> UpdateResult.Failure.CannotJoin("no psbt provided")
-                psbts.map { it.global.version }.toSet().size != 1 -> UpdateResult.Failure.CannotJoin("cannot join psbts with different versions")
-                psbts.map { it.global.tx.version }.toSet().size != 1 -> UpdateResult.Failure.CannotJoin("cannot join psbts with different tx versions")
-                psbts.map { it.global.tx.lockTime }.toSet().size != 1 -> UpdateResult.Failure.CannotJoin("cannot join psbts with different tx lockTime")
-                psbts.any { it.global.tx.txIn.size != it.inputs.size || it.global.tx.txOut.size != it.outputs.size } -> UpdateResult.Failure.CannotJoin("some psbts have an invalid number of inputs/outputs")
-                psbts.flatMap { it.global.tx.txIn.map { txIn -> txIn.outPoint } }.toSet().size != psbts.sumOf { it.global.tx.txIn.size } -> UpdateResult.Failure.CannotJoin("cannot join psbts that spend the same input")
+                psbts.isEmpty() -> Either.Left(UpdateFailure.CannotJoin("no psbt provided"))
+                psbts.map { it.global.version }.toSet().size != 1 -> Either.Left(UpdateFailure.CannotJoin("cannot join psbts with different versions"))
+                psbts.map { it.global.tx.version }.toSet().size != 1 -> Either.Left(UpdateFailure.CannotJoin("cannot join psbts with different tx versions"))
+                psbts.map { it.global.tx.lockTime }.toSet().size != 1 -> Either.Left(UpdateFailure.CannotJoin("cannot join psbts with different tx lockTime"))
+                psbts.any { it.global.tx.txIn.size != it.inputs.size || it.global.tx.txOut.size != it.outputs.size } -> Either.Left(UpdateFailure.CannotJoin("some psbts have an invalid number of inputs/outputs"))
+                psbts.flatMap { it.global.tx.txIn.map { txIn -> txIn.outPoint } }.toSet().size != psbts.sumOf { it.global.tx.txIn.size } -> Either.Left(UpdateFailure.CannotJoin("cannot join psbts that spend the same input"))
                 else -> {
                     val global = psbts[0].global.copy(
                         tx = psbts[0].global.tx.copy(
@@ -462,7 +452,7 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                         extendedPublicKeys = psbts.flatMap { it.global.extendedPublicKeys }.distinct(),
                         unknown = psbts.flatMap { it.global.unknown }.distinct()
                     )
-                    UpdateResult.Success(psbts[0].copy(
+                    Either.Right(psbts[0].copy(
                         global = global,
                         inputs = psbts.flatMap { it.inputs },
                         outputs = psbts.flatMap { it.outputs }
@@ -552,51 +542,49 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
             output.write(entry.value.bytes)
         }
 
-        public sealed class ParsePsbtResult {
-            public data class Success(val psbt: Psbt) : ParsePsbtResult()
-            public sealed class Failure : ParsePsbtResult() {
-                public object InvalidMagicBytes : ParsePsbtResult()
-                public object InvalidSeparator : ParsePsbtResult()
-                public object DuplicateKeys : ParsePsbtResult()
-                public data class InvalidPsbtVersion(val reason: String) : ParsePsbtResult()
-                public data class UnsupportedPsbtVersion(val version: Long) : ParsePsbtResult()
-                public data class InvalidGlobalTx(val reason: String) : ParsePsbtResult()
-                public object GlobalTxMissing : ParsePsbtResult()
-                public data class InvalidExtendedPublicKey(val reason: String) : ParsePsbtResult()
-                public data class InvalidTxInput(val reason: String) : ParsePsbtResult()
-                public data class InvalidTxOutput(val reason: String) : ParsePsbtResult()
-                public object InvalidContent : ParsePsbtResult()
-            }
+        public sealed class ParseFailure {
+            public object InvalidMagicBytes : ParseFailure()
+            public object InvalidSeparator : ParseFailure()
+            public object DuplicateKeys : ParseFailure()
+            public data class InvalidPsbtVersion(val reason: String) : ParseFailure()
+            public data class UnsupportedPsbtVersion(val version: Long) : ParseFailure()
+            public data class InvalidGlobalTx(val reason: String) : ParseFailure()
+            public object GlobalTxMissing : ParseFailure()
+            public data class InvalidExtendedPublicKey(val reason: String) : ParseFailure()
+            public data class InvalidTxInput(val reason: String) : ParseFailure()
+            public data class InvalidTxOutput(val reason: String) : ParseFailure()
+            public object InvalidContent : ParseFailure()
         }
 
-        public fun read(input: ByteVector): ParsePsbtResult = read(ByteArrayInput(input.toByteArray()))
-        public fun read(input: ByteArray): ParsePsbtResult = read(ByteArrayInput(input))
-        public fun read(input: Input): ParsePsbtResult {
+        public fun read(input: ByteVector): Either<ParseFailure, Psbt> = read(ByteArrayInput(input.toByteArray()))
+        public fun read(input: ByteArray): Either<ParseFailure, Psbt> = read(ByteArrayInput(input))
+        public fun read(input: Input): Either<ParseFailure, Psbt> {
             /********** Magic header **********/
             if (input.read() != 0x70 || input.read() != 0x73 || input.read() != 0x62 || input.read() != 0x74) {
-                return ParsePsbtResult.Failure.InvalidMagicBytes
+                return Either.Left(ParseFailure.InvalidMagicBytes)
             }
             if (input.read() != 0xff) {
-                return ParsePsbtResult.Failure.InvalidSeparator
+                return Either.Left(ParseFailure.InvalidSeparator)
             }
 
             /********** Global types **********/
             val global = run {
-                val globalMap = when (val result = readDataMap(input)) {
-                    ReadDataMapResult.DuplicateKeys -> return ParsePsbtResult.Failure.DuplicateKeys
-                    ReadDataMapResult.InvalidData -> return ParsePsbtResult.Failure.InvalidContent
-                    is ReadDataMapResult.Success -> result.entries
+                val globalMap = readDataMap(input).getOrElse {
+                    return when (it) {
+                        is ReadEntryFailure.DuplicateKeys -> Either.Left(ParseFailure.DuplicateKeys)
+                        else -> Either.Left(ParseFailure.InvalidContent)
+                    }
                 }
                 val keyTypes = setOf(0x00.toByte(), 0x01.toByte(), 0xfb.toByte())
                 val (known, unknown) = globalMap.partition { keyTypes.contains(it.key[0]) }
                 val version = known.find { it.key[0] == 0xfb.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidPsbtVersion("version key must contain exactly 1 byte")
-                        it.value.size() != 4 -> return ParsePsbtResult.Failure.InvalidPsbtVersion("version must contain exactly 4 bytes")
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidPsbtVersion("version key must contain exactly 1 byte"))
+                        it.value.size() != 4 -> return Either.Left(ParseFailure.InvalidPsbtVersion("version must contain exactly 4 bytes"))
                         else -> {
                             val v = Pack.int32LE(it.value.bytes).toUInt().toLong()
                             when {
-                                v > Version -> return ParsePsbtResult.Failure.UnsupportedPsbtVersion(v)
+                                v > Version -> return Either.Left(ParseFailure.UnsupportedPsbtVersion(v))
                                 else -> v
                             }
                         }
@@ -604,23 +592,23 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                 } ?: 0L
                 val tx = known.find { it.key[0] == 0x00.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidGlobalTx("global tx key must contain exactly 1 byte")
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidGlobalTx("global tx key must contain exactly 1 byte"))
                         else -> {
                             val tx = try {
                                 Transaction.read(it.value.bytes, Protocol.PROTOCOL_VERSION or Transaction.SERIALIZE_TRANSACTION_NO_WITNESS)
                             } catch (e: Exception) {
-                                return ParsePsbtResult.Failure.InvalidGlobalTx(e.message ?: "failed to parse transaction")
+                                return Either.Left(ParseFailure.InvalidGlobalTx(e.message ?: "failed to parse transaction"))
                             }
                             when {
-                                tx.txIn.any { input -> input.hasWitness || !input.signatureScript.isEmpty() } -> return ParsePsbtResult.Failure.InvalidGlobalTx("global tx inputs must have empty scriptSigs and witness")
+                                tx.txIn.any { input -> input.hasWitness || !input.signatureScript.isEmpty() } -> return Either.Left(ParseFailure.InvalidGlobalTx("global tx inputs must have empty scriptSigs and witness"))
                                 else -> tx
                             }
                         }
                     }
-                } ?: return ParsePsbtResult.Failure.GlobalTxMissing
+                } ?: return Either.Left(ParseFailure.GlobalTxMissing)
                 val xpubs = known.filter { it.key[0] == 0x01.toByte() }.map {
                     when {
-                        it.key.size() != 79 -> return ParsePsbtResult.Failure.InvalidExtendedPublicKey("<xpub> must contain 78 bytes")
+                        it.key.size() != 79 -> return Either.Left(ParseFailure.InvalidExtendedPublicKey("<xpub> must contain 78 bytes"))
                         else -> {
                             val xpub = ByteArrayInput(it.key.drop(1).toByteArray())
                             val prefix = Pack.int32BE(xpub).toUInt().toLong()
@@ -630,12 +618,12 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                             val chainCode = ByteVector32(xpub.readNBytes(32))
                             val publicKey = ByteVector(xpub.readNBytes(33))
                             when {
-                                it.value.size() != 4 * (depth + 1) -> return ParsePsbtResult.Failure.InvalidExtendedPublicKey("<xpub> must contain the master key fingerprint and derivation path")
+                                it.value.size() != 4 * (depth + 1) -> return Either.Left(ParseFailure.InvalidExtendedPublicKey("<xpub> must contain the master key fingerprint and derivation path"))
                                 else -> {
                                     val masterKeyFingerprint = Pack.int32BE(it.value.take(4).toByteArray()).toUInt().toLong()
                                     val derivationPath = KeyPath((0 until depth).map { i -> Pack.int32LE(it.value.slice(4 * (i + 1), 4 * (i + 2)).toByteArray()).toUInt().toLong() })
                                     when {
-                                        derivationPath.lastChildNumber != childNumber -> return ParsePsbtResult.Failure.InvalidExtendedPublicKey("<xpub> last child number mismatch")
+                                        derivationPath.lastChildNumber != childNumber -> return Either.Left(ParseFailure.InvalidExtendedPublicKey("<xpub> last child number mismatch"))
                                         else -> ExtendedPublicKeyWithMaster(prefix, masterKeyFingerprint, DeterministicWallet.ExtendedPublicKey(publicKey, chainCode, depth, derivationPath, parent))
                                     }
                                 }
@@ -649,23 +637,24 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
             /********** Inputs **********/
             val inputs = global.tx.txIn.map { txIn ->
                 val keyTypes = setOf<Byte>(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x0a, 0x0b, 0x0c, 0x0d)
-                val entries = when (val result = readDataMap(input)) {
-                    ReadDataMapResult.DuplicateKeys -> return ParsePsbtResult.Failure.DuplicateKeys
-                    ReadDataMapResult.InvalidData -> return ParsePsbtResult.Failure.InvalidContent
-                    is ReadDataMapResult.Success -> result.entries
+                val entries = readDataMap(input).getOrElse {
+                    return when (it) {
+                        is ReadEntryFailure.DuplicateKeys -> Either.Left(ParseFailure.DuplicateKeys)
+                        else -> Either.Left(ParseFailure.InvalidContent)
+                    }
                 }
                 val (known, unknown) = entries.partition { keyTypes.contains(it.key[0]) }
                 val nonWitnessUtxo = known.find { it.key[0] == 0x00.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("non-witness utxo key must contain exactly 1 byte")
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("non-witness utxo key must contain exactly 1 byte"))
                         else -> {
                             val inputTx = try {
                                 Transaction.read(it.value.bytes)
                             } catch (e: Exception) {
-                                return ParsePsbtResult.Failure.InvalidTxInput(e.message ?: "failed to parse transaction")
+                                return Either.Left(ParseFailure.InvalidTxInput(e.message ?: "failed to parse transaction"))
                             }
                             when {
-                                inputTx.txid != txIn.outPoint.txid || txIn.outPoint.index >= inputTx.txOut.size -> return ParsePsbtResult.Failure.InvalidTxInput("non-witness utxo does not match psbt outpoint")
+                                inputTx.txid != txIn.outPoint.txid || txIn.outPoint.index >= inputTx.txOut.size -> return Either.Left(ParseFailure.InvalidTxInput("non-witness utxo does not match psbt outpoint"))
                                 else -> inputTx
                             }
                         }
@@ -673,45 +662,45 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                 }
                 val witnessUtxo = known.find { it.key[0] == 0x01.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("witness utxo key must contain exactly 1 byte")
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("witness utxo key must contain exactly 1 byte"))
                         else -> {
                             try {
                                 TxOut.read(it.value.bytes)
                             } catch (e: Exception) {
-                                return ParsePsbtResult.Failure.InvalidTxInput(e.message ?: "failed to parse transaction output")
+                                return Either.Left(ParseFailure.InvalidTxInput(e.message ?: "failed to parse transaction output"))
                             }
                         }
                     }
                 }
                 val partialSigs = known.filter { it.key[0] == 0x02.toByte() }.map {
                     when {
-                        it.key.size() != 34 -> return ParsePsbtResult.Failure.InvalidTxInput("public key must contain exactly 33 bytes")
+                        it.key.size() != 34 -> return Either.Left(ParseFailure.InvalidTxInput("public key must contain exactly 33 bytes"))
                         else -> PublicKey(it.key.drop(1)) to it.value
                     }
                 }.toMap()
                 val sighashType = known.find { it.key[0] == 0x03.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("sighash type key must contain exactly 1 byte")
-                        it.value.size() != 4 -> return ParsePsbtResult.Failure.InvalidTxInput("sighash type must contain exactly 4 bytes")
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("sighash type key must contain exactly 1 byte"))
+                        it.value.size() != 4 -> return Either.Left(ParseFailure.InvalidTxInput("sighash type must contain exactly 4 bytes"))
                         else -> Pack.int32LE(it.value.bytes)
                     }
                 }
                 val redeemScript = known.find { it.key[0] == 0x04.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("redeem script key must contain exactly 1 byte")
-                        else -> runCatching { Script.parse(it.value) }.getOrElse { return ParsePsbtResult.Failure.InvalidTxInput("failed to parse redeem script") }
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("redeem script key must contain exactly 1 byte"))
+                        else -> runCatching { Script.parse(it.value) }.getOrElse { return Either.Left(ParseFailure.InvalidTxInput("failed to parse redeem script")) }
                     }
                 }
                 val witnessScript = known.find { it.key[0] == 0x05.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("witness script key must contain exactly 1 byte")
-                        else -> runCatching { Script.parse(it.value) }.getOrElse { return ParsePsbtResult.Failure.InvalidTxInput("failed to parse witness script") }
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("witness script key must contain exactly 1 byte"))
+                        else -> runCatching { Script.parse(it.value) }.getOrElse { return Either.Left(ParseFailure.InvalidTxInput("failed to parse witness script")) }
                     }
                 }
                 val derivationPaths = known.filter { it.key[0] == 0x06.toByte() }.map {
                     when {
-                        it.key.size() != 34 -> return ParsePsbtResult.Failure.InvalidTxInput("bip32 derivation public key must contain exactly 33 bytes")
-                        it.value.size() < 4 || it.value.size() % 4 != 0 -> return ParsePsbtResult.Failure.InvalidTxInput("bip32 derivation must contain master key fingerprint and child indexes")
+                        it.key.size() != 34 -> return Either.Left(ParseFailure.InvalidTxInput("bip32 derivation public key must contain exactly 33 bytes"))
+                        it.value.size() < 4 || it.value.size() % 4 != 0 -> return Either.Left(ParseFailure.InvalidTxInput("bip32 derivation must contain master key fingerprint and child indexes"))
                         else -> {
                             val publicKey = PublicKey(it.key.drop(1))
                             val masterKeyFingerprint = Pack.int32BE(it.value.take(4).toByteArray()).toUInt().toLong()
@@ -723,45 +712,45 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                 }.toMap()
                 val scriptSig = known.find { it.key[0] == 0x07.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("script sig key must contain exactly 1 byte")
-                        else -> runCatching { Script.parse(it.value) }.getOrElse { return ParsePsbtResult.Failure.InvalidTxInput("failed to parse script sig") }
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("script sig key must contain exactly 1 byte"))
+                        else -> runCatching { Script.parse(it.value) }.getOrElse { return Either.Left(ParseFailure.InvalidTxInput("failed to parse script sig")) }
                     }
                 }
                 val scriptWitness = known.find { it.key[0] == 0x08.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxInput("script witness key must contain exactly 1 byte")
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("script witness key must contain exactly 1 byte"))
                         else -> try {
                             ScriptWitness.read(it.value.bytes)
                         } catch (e: Exception) {
-                            return ParsePsbtResult.Failure.InvalidTxInput(e.message ?: "failed to parse script witness")
+                            return Either.Left(ParseFailure.InvalidTxInput(e.message ?: "failed to parse script witness"))
                         }
                     }
                 }
                 val ripemd160Preimages = known.filter { it.key[0] == 0x0a.toByte() }.map {
                     when {
-                        it.key.size() != 21 -> return ParsePsbtResult.Failure.InvalidTxInput("ripemd160 hash must contain exactly 20 bytes")
-                        !it.key.drop(1).contentEquals(Crypto.ripemd160(it.value)) -> return ParsePsbtResult.Failure.InvalidTxInput("invalid ripemd160 preimage")
+                        it.key.size() != 21 -> return Either.Left(ParseFailure.InvalidTxInput("ripemd160 hash must contain exactly 20 bytes"))
+                        !it.key.drop(1).contentEquals(Crypto.ripemd160(it.value)) -> return Either.Left(ParseFailure.InvalidTxInput("invalid ripemd160 preimage"))
                         else -> it.value
                     }
                 }.toSet()
                 val sha256Preimages = known.filter { it.key[0] == 0x0b.toByte() }.map {
                     when {
-                        it.key.size() != 33 -> return ParsePsbtResult.Failure.InvalidTxInput("sha256 hash must contain exactly 32 bytes")
-                        !it.key.drop(1).contentEquals(Crypto.sha256(it.value)) -> return ParsePsbtResult.Failure.InvalidTxInput("invalid sha256 preimage")
+                        it.key.size() != 33 -> return Either.Left(ParseFailure.InvalidTxInput("sha256 hash must contain exactly 32 bytes"))
+                        !it.key.drop(1).contentEquals(Crypto.sha256(it.value)) -> return Either.Left(ParseFailure.InvalidTxInput("invalid sha256 preimage"))
                         else -> it.value
                     }
                 }.toSet()
                 val hash160Preimages = known.filter { it.key[0] == 0x0c.toByte() }.map {
                     when {
-                        it.key.size() != 21 -> return ParsePsbtResult.Failure.InvalidTxInput("hash160 hash must contain exactly 20 bytes")
-                        !it.key.drop(1).contentEquals(Crypto.hash160(it.value)) -> return ParsePsbtResult.Failure.InvalidTxInput("invalid hash160 preimage")
+                        it.key.size() != 21 -> return Either.Left(ParseFailure.InvalidTxInput("hash160 hash must contain exactly 20 bytes"))
+                        !it.key.drop(1).contentEquals(Crypto.hash160(it.value)) -> return Either.Left(ParseFailure.InvalidTxInput("invalid hash160 preimage"))
                         else -> it.value
                     }
                 }.toSet()
                 val hash256Preimages = known.filter { it.key[0] == 0x0d.toByte() }.map {
                     when {
-                        it.key.size() != 33 -> return ParsePsbtResult.Failure.InvalidTxInput("hash256 hash must contain exactly 32 bytes")
-                        !it.key.drop(1).contentEquals(Crypto.hash256(it.value)) -> return ParsePsbtResult.Failure.InvalidTxInput("invalid hash256 preimage")
+                        it.key.size() != 33 -> return Either.Left(ParseFailure.InvalidTxInput("hash256 hash must contain exactly 32 bytes"))
+                        !it.key.drop(1).contentEquals(Crypto.hash256(it.value)) -> return Either.Left(ParseFailure.InvalidTxInput("invalid hash256 preimage"))
                         else -> it.value
                     }
                 }.toSet()
@@ -786,28 +775,29 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
             /********** Outputs **********/
             val outputs = global.tx.txOut.map {
                 val keyTypes = setOf<Byte>(0x00, 0x01, 0x02)
-                val entries = when (val result = readDataMap(input)) {
-                    ReadDataMapResult.DuplicateKeys -> return ParsePsbtResult.Failure.DuplicateKeys
-                    ReadDataMapResult.InvalidData -> return ParsePsbtResult.Failure.InvalidContent
-                    is ReadDataMapResult.Success -> result.entries
+                val entries = readDataMap(input).getOrElse {
+                    return when (it) {
+                        is ReadEntryFailure.DuplicateKeys -> Either.Left(ParseFailure.DuplicateKeys)
+                        else -> Either.Left(ParseFailure.InvalidContent)
+                    }
                 }
                 val (known, unknown) = entries.partition { keyTypes.contains(it.key[0]) }
                 val redeemScript = known.find { it.key[0] == 0x00.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxOutput("redeem script key must contain exactly 1 byte")
-                        else -> runCatching { Script.parse(it.value) }.getOrElse { return ParsePsbtResult.Failure.InvalidTxOutput("failed to parse redeem script") }
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxOutput("redeem script key must contain exactly 1 byte"))
+                        else -> runCatching { Script.parse(it.value) }.getOrElse { return Either.Left(ParseFailure.InvalidTxOutput("failed to parse redeem script")) }
                     }
                 }
                 val witnessScript = known.find { it.key[0] == 0x01.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return ParsePsbtResult.Failure.InvalidTxOutput("witness script key must contain exactly 1 byte")
-                        else -> runCatching { Script.parse(it.value) }.getOrElse { return ParsePsbtResult.Failure.InvalidTxOutput("failed to parse witness script") }
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxOutput("witness script key must contain exactly 1 byte"))
+                        else -> runCatching { Script.parse(it.value) }.getOrElse { return Either.Left(ParseFailure.InvalidTxOutput("failed to parse witness script")) }
                     }
                 }
                 val derivationPaths = known.filter { it.key[0] == 0x02.toByte() }.map {
                     when {
-                        it.key.size() != 34 -> return ParsePsbtResult.Failure.InvalidTxOutput("bip32 derivation public key must contain exactly 33 bytes")
-                        it.value.size() < 4 || it.value.size() % 4 != 0 -> return ParsePsbtResult.Failure.InvalidTxOutput("bip32 derivation must contain master key fingerprint and child indexes")
+                        it.key.size() != 34 -> return Either.Left(ParseFailure.InvalidTxOutput("bip32 derivation public key must contain exactly 33 bytes"))
+                        it.value.size() < 4 || it.value.size() % 4 != 0 -> return Either.Left(ParseFailure.InvalidTxOutput("bip32 derivation must contain master key fingerprint and child indexes"))
                         else -> {
                             val publicKey = PublicKey(it.key.drop(1))
                             val masterKeyFingerprint = Pack.int32BE(it.value.take(4).toByteArray()).toUInt().toLong()
@@ -821,49 +811,46 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
             }
 
             return if (input.availableBytes != 0) {
-                ParsePsbtResult.Failure.InvalidContent
+                Either.Left(ParseFailure.InvalidContent)
             } else {
-                ParsePsbtResult.Success(Psbt(global, inputs, outputs))
+                Either.Right(Psbt(global, inputs, outputs))
             }
         }
 
-        private sealed class ReadDataMapResult {
-            data class Success(val entries: List<DataEntry>) : ReadDataMapResult()
-            object DuplicateKeys : ReadDataMapResult()
-            object InvalidData : ReadDataMapResult()
+        private sealed class ReadEntryFailure {
+            object DuplicateKeys : ReadEntryFailure()
+            object InvalidData : ReadEntryFailure()
+            object EndOfDataMap : ReadEntryFailure()
         }
 
-        private fun readDataMap(input: Input, entries: List<DataEntry> = listOf()): ReadDataMapResult {
+        private fun readDataMap(input: Input, entries: List<DataEntry> = listOf()): Either<ReadEntryFailure, List<DataEntry>> {
             return when (val result = readDataEntry(input)) {
-                is ReadDataEntryResult.Success -> readDataMap(input, entries + result.entry)
-                ReadDataEntryResult.EndOfDataMap -> {
-                    if (entries.map { it.key }.toSet().size != entries.size) {
-                        ReadDataMapResult.DuplicateKeys
-                    } else {
-                        ReadDataMapResult.Success(entries)
+                is Either.Right -> readDataMap(input, entries + result.value)
+                is Either.Left -> when (result.value) {
+                    is ReadEntryFailure.EndOfDataMap -> {
+                        if (entries.map { it.key }.toSet().size != entries.size) {
+                            Either.Left(ReadEntryFailure.DuplicateKeys)
+                        } else {
+                            Either.Right(entries)
+                        }
                     }
+                    is ReadEntryFailure.InvalidData -> Either.Left(ReadEntryFailure.InvalidData)
+                    else -> Either.Left(result.value)
                 }
-                ReadDataEntryResult.InvalidData -> ReadDataMapResult.InvalidData
             }
         }
 
-        private sealed class ReadDataEntryResult {
-            data class Success(val entry: DataEntry) : ReadDataEntryResult()
-            object EndOfDataMap : ReadDataEntryResult()
-            object InvalidData : ReadDataEntryResult()
-        }
-
-        private fun readDataEntry(input: Input): ReadDataEntryResult {
-            if (input.availableBytes == 0) return ReadDataEntryResult.InvalidData
+        private fun readDataEntry(input: Input): Either<ReadEntryFailure, DataEntry> {
+            if (input.availableBytes == 0) return Either.Left(ReadEntryFailure.InvalidData)
             val keyLength = BtcSerializer.varint(input).toInt()
-            if (keyLength == 0) return ReadDataEntryResult.EndOfDataMap
-            val key = input.readNBytesStrict(keyLength) ?: return ReadDataEntryResult.InvalidData
+            if (keyLength == 0) return Either.Left(ReadEntryFailure.EndOfDataMap)
+            val key = input.readNBytesStrict(keyLength) ?: return Either.Left(ReadEntryFailure.InvalidData)
 
-            if (input.availableBytes == 0) return ReadDataEntryResult.InvalidData
+            if (input.availableBytes == 0) return Either.Left(ReadEntryFailure.InvalidData)
             val valueLength = BtcSerializer.varint(input).toInt()
-            val value = input.readNBytesStrict(valueLength) ?: return ReadDataEntryResult.InvalidData
+            val value = input.readNBytesStrict(valueLength) ?: return Either.Left(ReadEntryFailure.InvalidData)
 
-            return ReadDataEntryResult.Success(DataEntry(ByteVector(key), ByteVector(value)))
+            return Either.Right(DataEntry(ByteVector(key), ByteVector(value)))
         }
     }
 

@@ -19,8 +19,8 @@ package fr.acinq.bitcoin
 import kotlin.jvm.JvmStatic
 
 /**
- * Lexicographical Ordering of Transaction Inputs and Outputs
- * see https://github.com/bitcoin/bips/blob/master/bip-0069.mediawiki
+ * Lexicographical Ordering of Transaction Inputs and Outputs.
+ * See https://github.com/bitcoin/bips/blob/master/bip-0069.mediawiki
  */
 public object LexicographicalOrdering {
     private tailrec fun isLessThanInternal(a: ByteArray, b: ByteArray): Boolean {
@@ -67,8 +67,10 @@ public object LexicographicalOrdering {
     @JvmStatic
     public fun isLessThan(a: PublicKey, b: PublicKey): Boolean = isLessThan(a.value, b.value)
 
+    @JvmStatic
+    public fun compare(a: PublicKey, b: PublicKey): Int = if (a == b) 0 else if (isLessThan(a, b)) -1 else 1
+
     /**
-     *
      * @param tx input transaction
      * @return the input tx with inputs and outputs sorted in lexicographical order
      */

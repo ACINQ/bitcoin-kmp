@@ -31,7 +31,7 @@ public object Pack {
     }
 
     @JvmStatic
-    public fun int16BE(input: Input): Short = int16BE(input.readNBytes(Short.SIZE_BYTES))
+    public fun int16BE(input: Input): Short = int16BE(input.readNBytes(Short.SIZE_BYTES) ?: throw IllegalArgumentException("not enough bytes to read from"))
 
     @JvmStatic
     public fun int16LE(bs: ByteArray, off: Int = 0): Short {
@@ -42,7 +42,7 @@ public object Pack {
     }
 
     @JvmStatic
-    public fun int16LE(input: Input): Short = int16LE(input.readNBytes(Short.SIZE_BYTES))
+    public fun int16LE(input: Input): Short = int16LE(input.readNBytes(Short.SIZE_BYTES) ?: throw IllegalArgumentException("not enough bytes to read from"))
 
     @JvmStatic
     public fun writeInt16BE(n: Short, bs: ByteArray, off: Int = 0) {
@@ -85,7 +85,7 @@ public object Pack {
     }
 
     @JvmStatic
-    public fun int32BE(input: Input): Int = int32BE(input.readNBytes(Int.SIZE_BYTES))
+    public fun int32BE(input: Input): Int = int32BE(input.readNBytes(Int.SIZE_BYTES) ?: throw IllegalArgumentException("not enough bytes to read from"))
 
     @JvmStatic
     public fun int32LE(bs: ByteArray, off: Int = 0): Int {
@@ -98,7 +98,7 @@ public object Pack {
     }
 
     @JvmStatic
-    public fun int32LE(input: Input): Int = int32LE(input.readNBytes(Int.SIZE_BYTES))
+    public fun int32LE(input: Input): Int = int32LE(input.readNBytes(Int.SIZE_BYTES) ?: throw IllegalArgumentException("not enough bytes to read from"))
 
     @JvmStatic
     public fun writeInt32BE(n: Int, bs: ByteArray, off: Int = 0) {
@@ -143,7 +143,7 @@ public object Pack {
     }
 
     @JvmStatic
-    public fun int64BE(input: Input): Long = int64BE(input.readNBytes(Long.SIZE_BYTES))
+    public fun int64BE(input: Input): Long = int64BE(input.readNBytes(Long.SIZE_BYTES) ?: throw IllegalArgumentException("not enough bytes to read from"))
 
     @JvmStatic
     public fun int64LE(bs: ByteArray, off: Int = 0): Long {
@@ -154,7 +154,7 @@ public object Pack {
     }
 
     @JvmStatic
-    public fun int64LE(input: Input): Long = int64LE(input.readNBytes(Long.SIZE_BYTES))
+    public fun int64LE(input: Input): Long = int64LE(input.readNBytes(Long.SIZE_BYTES) ?: throw IllegalArgumentException("not enough bytes to read from"))
 
     @JvmStatic
     public fun writeInt64BE(n: Long, bs: ByteArray, off: Int = 0) {

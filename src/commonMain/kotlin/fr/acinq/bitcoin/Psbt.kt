@@ -615,8 +615,8 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
                             val depth = xpub.read()
                             val parent = Pack.int32BE(xpub).toUInt().toLong()
                             val childNumber = Pack.int32BE(xpub).toUInt().toLong()
-                            val chainCode = ByteVector32(xpub.readNBytes(32))
-                            val publicKey = ByteVector(xpub.readNBytes(33))
+                            val chainCode = ByteVector32(xpub.readNBytes(32)!!)
+                            val publicKey = ByteVector(xpub.readNBytes(33)!!)
                             when {
                                 it.value.size() != 4 * (depth + 1) -> return Either.Left(ParseFailure.InvalidExtendedPublicKey("<xpub> must contain the master key fingerprint and derivation path"))
                                 else -> {
@@ -844,11 +844,11 @@ public data class Psbt(val global: Global, val inputs: List<PartiallySignedInput
             if (input.availableBytes == 0) return Either.Left(ReadEntryFailure.InvalidData)
             val keyLength = BtcSerializer.varint(input).toInt()
             if (keyLength == 0) return Either.Left(ReadEntryFailure.EndOfDataMap)
-            val key = input.readNBytesStrict(keyLength) ?: return Either.Left(ReadEntryFailure.InvalidData)
+            val key = input.readNBytes(keyLength) ?: return Either.Left(ReadEntryFailure.InvalidData)
 
             if (input.availableBytes == 0) return Either.Left(ReadEntryFailure.InvalidData)
             val valueLength = BtcSerializer.varint(input).toInt()
-            val value = input.readNBytesStrict(valueLength) ?: return Either.Left(ReadEntryFailure.InvalidData)
+            val value = input.readNBytes(valueLength) ?: return Either.Left(ReadEntryFailure.InvalidData)
 
             return Either.Right(DataEntry(ByteVector(key), ByteVector(value)))
         }

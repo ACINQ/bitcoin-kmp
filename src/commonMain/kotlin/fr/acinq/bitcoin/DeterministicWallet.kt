@@ -20,6 +20,7 @@ import fr.acinq.bitcoin.DeterministicWallet.hardened
 import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.ByteArrayOutput
+import fr.acinq.bitcoin.io.Output
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -119,13 +120,18 @@ public object DeterministicWallet {
     @JvmStatic
     public fun encode(input: ExtendedPublicKey, prefix: Int): String {
         val out = ByteArrayOutput()
+        write(input, out)
+        val buffer = out.toByteArray()
+        return Base58Check.encode(prefix, buffer)
+    }
+
+    @JvmStatic
+    public fun write(input: ExtendedPublicKey, out: Output) {
         out.write(input.depth)
         Pack.writeInt32BE(input.parent.toInt(), out)
         Pack.writeInt32BE(input.path.lastChildNumber.toInt(), out)
         out.write(input.chaincode.toByteArray())
         out.write(input.publickeybytes.toByteArray())
-        val buffer = out.toByteArray()
-        return Base58Check.encode(prefix, buffer)
     }
 
     /**

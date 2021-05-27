@@ -254,8 +254,7 @@ public data class Transaction(
     @JvmField val txIn: List<TxIn>,
     @JvmField val txOut: List<TxOut>,
     @JvmField val lockTime: Long
-) :
-    BtcSerializable<Transaction> {
+) : BtcSerializable<Transaction> {
 
     public val hasWitness: Boolean get() = txIn.any { it.hasWitness }
 
@@ -358,15 +357,16 @@ public data class Transaction(
         override fun read(input: Input, protocolVersion: Long): Transaction {
             val tx = Transaction(uint32(input).toLong(), readCollection(input, TxIn, protocolVersion), listOf(), 0)
             val (flags, tx1) = if (tx.txIn.count() == 0 && serializeTxWitness(protocolVersion)) {
-                // we just read the 0x00 marker
+                // we already read the 0x00 marker (in the first call to readCollection)
                 val flags = uint8(input).toInt()
                 val txIn = readCollection(input, TxIn, protocolVersion)
                 if (flags == 0 && txIn.count() != 0) throw RuntimeException("Extended transaction format unnecessarily used")
                 val txOut = readCollection(input, TxOut, protocolVersion)
                 Pair(flags, tx.copy(txIn = txIn, txOut = txOut))
-            } else Pair(0, tx.copy(txOut = readCollection(input, TxOut, protocolVersion)))
-
-            val tx2 = when (flags) {
+            } else {
+                Pair(0, tx.copy(txOut = readCollection(input, TxOut, protocolVersion)))
+            }
+            return when (flags) {
                 0 -> tx1.copy(lockTime = uint32(input).toLong())
                 1 -> {
                     val witnesses = mutableListOf<ScriptWitness>()
@@ -375,8 +375,6 @@ public data class Transaction(
                 }
                 else -> throw RuntimeException("Unknown transaction optional data $flags")
             }
-
-            return tx2
         }
 
         @JvmStatic

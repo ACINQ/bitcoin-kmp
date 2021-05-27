@@ -50,7 +50,7 @@ public object Script {
             code in 1 until 0x4c -> parse(input, stack + OP_PUSHDATA(BtcSerializer.bytes(input, code), code))
             code == 0x4c -> parse(input, stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint8(input).toInt()), 0x4c))
             code == 0x4d -> parse(input, stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint16(input).toInt()), 0x4d))
-            code == 0x4e -> parse(input, stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint32(input).toInt()), 0x4e))
+            code == 0x4e -> parse(input, stack + OP_PUSHDATA(BtcSerializer.bytes(input, BtcSerializer.uint32(input).toLong()), 0x4e))
             ScriptEltMapping.code2elt.containsKey(code) -> parse(input, stack + ScriptEltMapping.code2elt.getValue(code))
             else -> parse(input, stack + OP_INVALID(code))
         }
@@ -66,7 +66,7 @@ public object Script {
     @JvmStatic
     public fun parse(hex: String): List<ScriptElt> = parse(Hex.decode(hex))
 
-    public tailrec fun write(script: List<ScriptElt>, out: Output): Unit {
+    public tailrec fun write(script: List<ScriptElt>, out: Output) {
         if (script.isEmpty()) return
         else {
             val head = script.first()
@@ -255,6 +255,19 @@ public object Script {
     public fun isPayToScript(script: ByteArray): Boolean =
         script.size == 23 && script[0] == ScriptEltMapping.elt2code.getValue(OP_HASH160).toByte() && script[1] == 0x14.toByte() && script[22] == ScriptEltMapping.elt2code.getValue(OP_EQUAL).toByte()
 
+    @JvmStatic
+    public fun isNativeWitnessScript(script: List<ScriptElt>): Boolean = when {
+        script.size != 2 -> false
+        !setOf(OP_0, OP_1, OP_2, OP_3, OP_4, OP_5, OP_6, OP_7, OP_8, OP_9, OP_10, OP_11, OP_12, OP_13, OP_14, OP_15, OP_16).contains(script[0]) -> false
+        else -> when (val program = script[1]) {
+            is OP_PUSHDATA -> program.data.size() in 2..40
+            else -> false
+        }
+    }
+
+    @JvmStatic
+    public fun isNativeWitnessScript(script: ByteVector): Boolean = runCatching { parse(script) }.map { isNativeWitnessScript(it) }.getOrDefault(false)
+
     /**
      * Creates a m-of-n multisig script.
      *
@@ -396,6 +409,14 @@ public object Script {
     @JvmStatic
     public fun pay2wpkh(pubKey: PublicKey): List<ScriptElt> = pay2wpkh(pubKey.hash160())
 
+    /**
+     * @param pubKey public key
+     * @param sig signature matching the public key
+     * @return script witness for the corresponding pay-to-witness-public-key-hash script
+     */
+    @JvmStatic
+    public fun witnessPay2wpkh(pubKey: PublicKey, sig: ByteVector): ScriptWitness = ScriptWitness(listOf(sig, pubKey.value))
+
     public fun removeSignature(script: List<ScriptElt>, signature: ByteVector): List<ScriptElt> {
         val toRemove = OP_PUSHDATA(signature)
         return script.filterNot { it == toRemove }
@@ -412,12 +433,9 @@ public object Script {
         // We want to compare apples to apples, so fail the script
         // unless the type of nLockTime being tested is the same as
         // the nLockTime in the transaction.
-        if (!(
-                    (tx.lockTime < Transaction.LOCKTIME_THRESHOLD && lockTime < Transaction.LOCKTIME_THRESHOLD) ||
-                            (tx.lockTime >= Transaction.LOCKTIME_THRESHOLD && lockTime >= Transaction.LOCKTIME_THRESHOLD)
-                    )
-        )
+        if (!((tx.lockTime < Transaction.LOCKTIME_THRESHOLD && lockTime < Transaction.LOCKTIME_THRESHOLD) || (tx.lockTime >= Transaction.LOCKTIME_THRESHOLD && lockTime >= Transaction.LOCKTIME_THRESHOLD))) {
             return false
+        }
 
         // Now that we know we're comparing apples-to-apples, the
         // comparison is a simple numeric one.
@@ -470,11 +488,7 @@ public object Script {
         // We want to compare apples to apples, so fail the script
         // unless the type of nSequenceMasked being tested is the same as
         // the nSequenceMasked in the transaction.
-        if (!(
-                    (txToSequenceMasked < TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG && nSequenceMasked < TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG) ||
-                            (txToSequenceMasked >= TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG && nSequenceMasked >= TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG)
-                    )
-        ) {
+        if (!((txToSequenceMasked < TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG && nSequenceMasked < TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG) || (txToSequenceMasked >= TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG && nSequenceMasked >= TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG))) {
             return false
         }
 

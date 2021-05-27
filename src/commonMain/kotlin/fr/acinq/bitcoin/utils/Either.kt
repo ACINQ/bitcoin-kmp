@@ -49,8 +49,9 @@ public sealed class Either<out L, out R> {
     }
 }
 
+@Suppress("UNCHECKED_CAST")
 public inline fun <L, R, X> Either<L, R>.flatMap(f: (R) -> Either<L, X>): Either<L, X> = when (this) {
-    is Either.Left -> Either.Left(this.value)
+    is Either.Left -> this as Either<L, X>
     is Either.Right -> f(this.value)
 }
 

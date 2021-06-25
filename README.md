@@ -19,6 +19,7 @@ This is a simple Kotlin Multiplatform library which implements most of the bitco
 * BIP 39 (mnemonic code for generating deterministic keys)
 * BIP 173 (Base32 address format for native v0-16 witness outputs)
 * BIP 174 (Partially Signed Bitcoin Transaction Format v0)
+* BIP 350 (Bech32m format)
 
 ## Objectives
 

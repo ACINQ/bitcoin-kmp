@@ -19,16 +19,22 @@ package fr.acinq.bitcoin
 import kotlin.jvm.JvmStatic
 
 /**
- * See https://github.com/sipa/bech32/blob/master/bip-witaddr.mediawiki
+ * Bech32 works with 5 bits values, we use this type to make it explicit: whenever you see Int5 it means 5 bits values,
+ * and whenever you see Byte it means 8 bits values.
  */
 public typealias Int5 = Byte
 
+/**
+ * Bech32 and Bech32m address formats.
+ * See https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki and https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki.
+ */
 public object Bech32 {
     public const val alphabet: String = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
-    // 5 bits integer
-    // Bech32 works with 5bits values, we use this type to make it explicit: whenever you see Int5 it means 5bits values, and
-    // whenever you see Byte it means 8bits values
+    public enum class Encoding(public val constant: Int) {
+        Bech32(1),
+        Bech32m(0x2bc830a3)
+    }
 
     // char -> 5 bits value
     private val map = Array<Int5>(255) { -1 }
@@ -70,12 +76,25 @@ public object Bech32 {
     }
 
     /**
-     * decodes a bech32 string
-     * @param bech32 bech32 string
-     * @return a (hrp, data) tuple
+     * @param hrp   human readable prefix
+     * @param int5s 5-bit data
+     * @param encoding encoding to use (bech32 or bech32m)
+     * @return hrp + data encoded as a Bech32 string
      */
     @JvmStatic
-    public fun decode(bech32: String): Pair<String, Array<Int5>> {
+    public fun encode(hrp: String, int5s: ByteArray, encoding: Encoding): String {
+        require(hrp.toLowerCase() == hrp || hrp.toUpperCase() == hrp) { "mixed case strings are not valid bech32 prefixes" }
+        val checksum = checksum(hrp, int5s.toTypedArray(), encoding)
+        return hrp + "1" + (int5s.toTypedArray() + checksum).map { i -> alphabet[i.toInt()] }.toCharArray().concatToString()
+    }
+
+    /**
+     * decodes a bech32 string
+     * @param bech32 bech32 string
+     * @return a (hrp, data, encoding) tuple
+     */
+    @JvmStatic
+    public fun decode(bech32: String): Triple<String, Array<Int5>, Encoding> {
         require(bech32.toLowerCase() == bech32 || bech32.toUpperCase() == bech32) { "mixed case strings are not valid bech32" }
         bech32.forEach { require(it.toInt() in 33..126) { "invalid character " } }
 
@@ -85,27 +104,27 @@ public object Bech32 {
         require(hrp.length in 1..83) { "hrp must contain 1 to 83 characters" }
         val data = Array<Int5>(input.length - pos - 1) { 0 }
         for (i in 0..data.lastIndex) data[i] = map[input[pos + 1 + i].toInt()]
-        val checksum = polymod(expand(hrp), data)
-        require(checksum == 1) { "invalid checksum for $bech32" }
-        return Pair(hrp, data.dropLast(6).toTypedArray())
+        val encoding = when (polymod(expand(hrp), data)) {
+            Encoding.Bech32.constant -> Encoding.Bech32
+            Encoding.Bech32m.constant -> Encoding.Bech32m
+            else -> throw IllegalArgumentException("invalid checksum for $bech32")
+        }
+        return Triple(hrp, data.dropLast(6).toTypedArray(), encoding)
     }
 
     /**
-     *
      * @param hrp Human Readable Part
      * @param data data (a sequence of 5 bits integers)
+     * @param encoding encoding to use (bech32 or bech32m)
      * @return a checksum computed over hrp and data
      */
-    private fun checksum(hrp: String, data: Array<Int5>): Array<Int5> {
+    private fun checksum(hrp: String, data: Array<Int5>, encoding: Encoding): Array<Int5> {
         val values = expand(hrp) + data
-        val poly =
-            polymod(values, arrayOf(0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte())) xor 1
-        val result = Array(6) { i -> (poly.shr(5 * (5 - i)) and 31).toByte() }
-        return result
+        val poly = polymod(values, arrayOf(0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte())) xor encoding.constant
+        return Array(6) { i -> (poly.shr(5 * (5 - i)) and 31).toByte() }
     }
 
     /**
-     *
      * @param input a sequence of 8 bits integers
      * @return a sequence of 5 bits integers
      */
@@ -127,7 +146,6 @@ public object Bech32 {
     }
 
     /**
-     *
      * @param input a sequence of 5 bits integers
      * @return a sequence of 8 bits integers
      */
@@ -153,15 +171,19 @@ public object Bech32 {
     /**
      * encode a bitcoin witness address
      * @param hrp should be "bc" or "tb"
-     * @param witnessVersion witness version (0 to 16, only 0 is currently defined)
+     * @param witnessVersion witness version (0 to 16)
      * @param data witness program: if version is 0, either 20 bytes (P2WPKH) or 32 bytes (P2WSH)
      * @return a bech32 encoded witness address
      */
     @JvmStatic
     public fun encodeWitnessAddress(hrp: String, witnessVersion: Byte, data: ByteArray): String {
-        // prepend witness version: 0
+        require(witnessVersion in 0..16) { "invalid segwit version" }
+        val encoding = when (witnessVersion) {
+            0.toByte() -> Encoding.Bech32
+            else -> Encoding.Bech32m
+        }
         val data1 = arrayOf(witnessVersion) + eight2five(data)
-        val checksum = checksum(hrp, data1)
+        val checksum = checksum(hrp, data1, encoding)
         val chars = (data1 + checksum).map { i -> alphabet[i.toInt()] }
         val sb = StringBuilder()
         for (c in chars) sb.append(c)
@@ -171,31 +193,21 @@ public object Bech32 {
     /**
      * decode a bitcoin witness address
      * @param address witness address
-     * @return a (version, program) tuple where version is the witness version and program the decoded witness program.
-     *         If version is 0, it will be either 20 bytes (P2WPKH) or 32 bytes (P2WSH)
+     * @return a (prefix, version, program) tuple where prefix is the human-readable prefix, version is the witness version and program the decoded witness program.
+     *         If version is 0, it will be either 20 bytes (P2WPKH) or 32 bytes (P2WSH).
      */
     @JvmStatic
     public fun decodeWitnessAddress(address: String): Triple<String, Byte, ByteArray> {
-        val (hrp, data) = decode(address)
+        val (hrp, data, encoding) = decode(address)
         require(hrp == "bc" || hrp == "tb" || hrp == "bcrt") { "invalid HRP $hrp" }
         val version = data[0]
         require(version in 0..16) { "invalid segwit version" }
         val bin = five2eight(data, 1)
         require(bin.size in 2..40) { "invalid witness program length ${bin.size}" }
+        if (version == 0.toByte()) require(encoding == Encoding.Bech32) { "version 0 must be encoded with Bech32" }
         if (version == 0.toByte()) require(bin.size == 20 || bin.size == 32) { "invalid witness program length ${bin.size}" }
+        if (version != 0.toByte()) require(encoding == Encoding.Bech32m) { "version 1 to 16 must be encoded with Bech32m" }
         return Triple(hrp, version, bin)
     }
 
-    /**
-     *
-     * @param hrp   human readable prefix
-     * @param int5s 5-bit data
-     * @return hrp + data encoded as a Bech32 string
-     */
-    @JvmStatic
-    public fun encode(hrp: String, int5s: ByteArray): String {
-        require(hrp.toLowerCase() == hrp || hrp.toUpperCase() == hrp) { "mixed case strings are not valid bech32 prefixes" }
-        val checksum = checksum(hrp, int5s.toTypedArray())
-        return hrp + "1" + (int5s.toTypedArray() + checksum).map { i -> alphabet[i.toInt()] }.toCharArray().concatToString()
-    }
 }

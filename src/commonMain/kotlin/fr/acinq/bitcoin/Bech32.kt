@@ -31,9 +31,9 @@ public typealias Int5 = Byte
 public object Bech32 {
     public const val alphabet: String = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
-    public sealed class Encoding {
-        public object Bech32 : Encoding()
-        public object Bech32m : Encoding()
+    public enum class Encoding(public val constant: Int) {
+        Bech32(1),
+        Bech32m(0x2bc830a3)
     }
 
     // char -> 5 bits value
@@ -105,8 +105,8 @@ public object Bech32 {
         val data = Array<Int5>(input.length - pos - 1) { 0 }
         for (i in 0..data.lastIndex) data[i] = map[input[pos + 1 + i].toInt()]
         val encoding = when (polymod(expand(hrp), data)) {
-            1 -> Encoding.Bech32
-            0x2bc830a3 -> Encoding.Bech32m
+            Encoding.Bech32.constant -> Encoding.Bech32
+            Encoding.Bech32m.constant -> Encoding.Bech32m
             else -> throw IllegalArgumentException("invalid checksum for $bech32")
         }
         return Triple(hrp, data.dropLast(6).toTypedArray(), encoding)
@@ -119,12 +119,8 @@ public object Bech32 {
      * @return a checksum computed over hrp and data
      */
     private fun checksum(hrp: String, data: Array<Int5>, encoding: Encoding): Array<Int5> {
-        val constant = when (encoding) {
-            Encoding.Bech32 -> 1
-            Encoding.Bech32m -> 0x2bc830a3
-        }
         val values = expand(hrp) + data
-        val poly = polymod(values, arrayOf(0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte())) xor constant
+        val poly = polymod(values, arrayOf(0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), 0.toByte())) xor encoding.constant
         return Array(6) { i -> (poly.shr(5 * (5 - i)) and 31).toByte() }
     }
 

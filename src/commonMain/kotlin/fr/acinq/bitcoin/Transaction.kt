@@ -355,26 +355,30 @@ public data class Transaction(
 
         @JvmStatic
         override fun read(input: Input, protocolVersion: Long): Transaction {
-            val tx = Transaction(uint32(input).toLong(), readCollection(input, TxIn, protocolVersion), listOf(), 0)
-            val (flags, tx1) = if (tx.txIn.count() == 0 && serializeTxWitness(protocolVersion)) {
-                // we already read the 0x00 marker (in the first call to readCollection)
-                val flags = uint8(input).toInt()
-                val txIn = readCollection(input, TxIn, protocolVersion)
-                if (flags == 0 && txIn.count() != 0) throw RuntimeException("Extended transaction format unnecessarily used")
-                val txOut = readCollection(input, TxOut, protocolVersion)
-                Pair(flags, tx.copy(txIn = txIn, txOut = txOut))
-            } else {
-                Pair(0, tx.copy(txOut = readCollection(input, TxOut, protocolVersion)))
-            }
-            return when (flags) {
-                0 -> tx1.copy(lockTime = uint32(input).toLong())
-                1 -> {
-                    val witnesses = mutableListOf<ScriptWitness>()
-                    for (i in 0..tx1.txIn.lastIndex) witnesses += ScriptWitness.read(input, protocolVersion)
-                    tx1.updateWitnesses(witnesses.toList()).copy(lockTime = uint32(input).toLong())
+            var tx = Transaction(uint32(input).toLong(), readCollection(input, TxIn, protocolVersion), listOf(), 0)
+            var flags = 0
+            if (tx.txIn.isEmpty() && serializeTxWitness(protocolVersion)) {
+                /* We read a dummy or an empty vin. */
+                flags = uint8(input).toInt()
+                if (flags != 0) {
+                    tx = tx.updateInputs(readCollection(input, TxIn, protocolVersion))
+                    tx = tx.updateOutputs(readCollection(input, TxOut, protocolVersion))
                 }
-                else -> throw RuntimeException("Unknown transaction optional data $flags")
+            } else {
+                /* We read a non-empty vin. Assume a normal vout follows. */
+                tx = tx.updateOutputs(readCollection(input, TxOut, protocolVersion))
             }
+            if ((flags and 1) != 0 && serializeTxWitness(protocolVersion)) {
+                /* The witness flag is present, and we support witnesses. */
+                flags = flags xor 1
+                val witnesses = mutableListOf<ScriptWitness>()
+                for (i in 0..tx.txIn.lastIndex) witnesses += ScriptWitness.read(input, protocolVersion)
+                tx = tx.updateWitnesses(witnesses.toList())
+                require(tx.hasWitness) { "Superfluous witness record" }
+            }
+            require(flags == 0) { "Unknown transaction optional data" }
+            tx = tx.copy(lockTime = uint32(input).toLong())
+            return tx
         }
 
         @JvmStatic

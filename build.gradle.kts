@@ -4,15 +4,15 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "1.4.31"
-    id("org.jetbrains.dokka") version "1.4.30"
+    kotlin("multiplatform") version "1.4.32"
+    id("org.jetbrains.dokka") version "1.4.32"
     `maven-publish`
 }
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.7.0"
+version = "0.7.1-SNAPSHOT"
 
 repositories {
     mavenLocal()
@@ -38,7 +38,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.5.1"
+        val secp256k1KmpVersion = "0.5.2"
         val serializationVersion = "1.1.0"
 
         val commonMain by getting {

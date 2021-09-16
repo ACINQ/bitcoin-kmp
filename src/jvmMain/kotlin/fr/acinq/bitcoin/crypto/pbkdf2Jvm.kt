@@ -11,7 +11,7 @@ public actual object Pbkdf2 {
         SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512")
             .generateSecret(
                 PBEKeySpec(
-                    CharArray(password.size) { password[it].toChar() },
+                    CharArray(password.size) { password[it].toInt().toChar() },
                     salt,
                     count,
                     dkLen * 8

@@ -191,7 +191,7 @@ public abstract class BtcSerializer<T> {
         public fun varstring(input: Input): String {
             val length = varint(input)
             val bytes = bytes(input, length.toInt())
-            val chars = bytes.map { it.toChar() }.toCharArray()
+            val chars = bytes.map { it.toInt().toChar() }.toCharArray()
             return chars.concatToString()
         }
 

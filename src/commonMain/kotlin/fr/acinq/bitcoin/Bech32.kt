@@ -41,15 +41,15 @@ public object Bech32 {
 
     init {
         for (i in 0..alphabet.lastIndex) {
-            map[alphabet[i].toInt()] = i.toByte()
+            map[alphabet[i].code] = i.toByte()
         }
     }
 
     private fun expand(hrp: String): Array<Int5> {
         val result = Array<Int5>(hrp.length + 1 + hrp.length) { 0 }
         for (i in hrp.indices) {
-            result[i] = hrp[i].toInt().shr(5).toByte()
-            result[hrp.length + 1 + i] = (hrp[i].toInt() and 31).toByte()
+            result[i] = hrp[i].code.shr(5).toByte()
+            result[hrp.length + 1 + i] = (hrp[i].code and 31).toByte()
         }
         result[hrp.length] = 0
         return result
@@ -83,7 +83,7 @@ public object Bech32 {
      */
     @JvmStatic
     public fun encode(hrp: String, int5s: ByteArray, encoding: Encoding): String {
-        require(hrp.toLowerCase() == hrp || hrp.toUpperCase() == hrp) { "mixed case strings are not valid bech32 prefixes" }
+        require(hrp.lowercase() == hrp || hrp.uppercase() == hrp) { "mixed case strings are not valid bech32 prefixes" }
         val checksum = checksum(hrp, int5s.toTypedArray(), encoding)
         return hrp + "1" + (int5s.toTypedArray() + checksum).map { i -> alphabet[i.toInt()] }.toCharArray().concatToString()
     }
@@ -95,15 +95,15 @@ public object Bech32 {
      */
     @JvmStatic
     public fun decode(bech32: String): Triple<String, Array<Int5>, Encoding> {
-        require(bech32.toLowerCase() == bech32 || bech32.toUpperCase() == bech32) { "mixed case strings are not valid bech32" }
-        bech32.forEach { require(it.toInt() in 33..126) { "invalid character " } }
+        require(bech32.lowercase() == bech32 || bech32.uppercase() == bech32) { "mixed case strings are not valid bech32" }
+        bech32.forEach { require(it.code in 33..126) { "invalid character " } }
 
-        val input = bech32.toLowerCase()
+        val input = bech32.lowercase()
         val pos = input.lastIndexOf('1')
         val hrp = input.take(pos)
         require(hrp.length in 1..83) { "hrp must contain 1 to 83 characters" }
         val data = Array<Int5>(input.length - pos - 1) { 0 }
-        for (i in 0..data.lastIndex) data[i] = map[input[pos + 1 + i].toInt()]
+        for (i in 0..data.lastIndex) data[i] = map[input[pos + 1 + i].code]
         val encoding = when (polymod(expand(hrp), data)) {
             Encoding.Bech32.constant -> Encoding.Bech32
             Encoding.Bech32m.constant -> Encoding.Bech32m

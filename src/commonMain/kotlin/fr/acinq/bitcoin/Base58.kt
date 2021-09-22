@@ -121,7 +121,7 @@ public object Base58 {
         // Process the characters.
         while (psz < input.length && !input[psz].isWhitespace()) {
             // Decode base58 character
-            var carry = mapBase58[input[psz].toInt()]
+            var carry = mapBase58[input[psz].code]
             require(carry != -1)
             var i = 0
             var it = b256.size - 1

@@ -4,21 +4,21 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "1.4.32"
-    id("org.jetbrains.dokka") version "1.4.32"
+    kotlin("multiplatform") version "1.5.31"
+    id("org.jetbrains.dokka") version "1.5.30"
     `maven-publish`
 }
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.7.1"
+version = "0.8.0-SNAPSHOT"
 
 repositories {
     mavenLocal()
     google()
     mavenCentral()
-    jcenter()
+    maven(url="https://oss.sonatype.org/content/repositories/snapshots/")
 }
 
 kotlin {
@@ -38,8 +38,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.5.2"
-        val serializationVersion = "1.1.0"
+        val secp256k1KmpVersion = "0.6.0"
 
         val commonMain by getting {
             dependencies {
@@ -51,7 +50,7 @@ kotlin {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
                 implementation("org.kodein.memory:kodein-memory-files:0.7.0")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.2.2")
             }
         }
 

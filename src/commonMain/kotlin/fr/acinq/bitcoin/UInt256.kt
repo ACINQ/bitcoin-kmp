@@ -21,7 +21,6 @@ import fr.acinq.secp256k1.Hex
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
-
 @OptIn(ExperimentalUnsignedTypes::class)
 public class UInt256() : Comparable<UInt256> {
     private val pn = UIntArray(WIDTH)

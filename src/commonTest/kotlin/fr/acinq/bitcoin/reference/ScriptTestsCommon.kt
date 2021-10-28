@@ -41,16 +41,10 @@ import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class ScriptTestsCommon {
 
-    //    @Test
-//    fun `error #1`() {
-//        val raw =
-//            """["0x48 0x304502202de8c03fc525285c9c535631019a5f2af7c6454fa9eb392a3756a4917c420edd02210046130bf2baf7cfc065067c8b9e33a066d9c15edcea9feb0ca2d233e3597925b401", "0x21 0x038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508 CHECKSIG", "", "OK", "P2PK with too much S padding but no DERSIG"]"""
-//        runTest(mapper.readValue(raw))
-//    }
-//
     @Test
     fun `reference client script test`() {
         // 	["Format is: [[wit..., amount]?, scriptSig, scriptPubKey, flags, expected_scripterror, ... comments]"]
@@ -60,9 +54,8 @@ class ScriptTestsCommon {
             runTest(it.jsonArray)
             count += 1
         }
-        println("passed $count reference tests")
+        assertEquals(1203, count)
     }
-
 
     companion object {
         val mapFlagNames = mapOf(
@@ -172,8 +165,7 @@ class ScriptTestsCommon {
             flags: String,
             comments: String?,
             expectedText: String
-        ): Unit =
-            runTest(witnessText, 0L.toSatoshi(), scriptSigText, scriptPubKeyText, flags, comments, expectedText)
+        ) = runTest(witnessText, 0L.toSatoshi(), scriptSigText, scriptPubKeyText, flags, comments, expectedText)
 
         fun runTest(
             witnessText: List<String>,
@@ -183,7 +175,7 @@ class ScriptTestsCommon {
             flags: String,
             comments: String?,
             expectedText: String
-        ): Unit {
+        ) {
             val witness = ScriptWitness(witnessText.map { ByteVector(it) })
             val scriptPubKey = parseFromText(scriptPubKeyText)
             val scriptSig = parseFromText(scriptSigText)
@@ -197,9 +189,7 @@ class ScriptTestsCommon {
             } catch (t: Throwable) {
                 false
             }
-            if (result != expected) {
-                throw RuntimeException(comments ?: "")
-            }
+            assertEquals(result, expected, comments)
         }
 
         fun runTest(testCase: JsonArray) {

@@ -19,7 +19,8 @@ package fr.acinq.bitcoin
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_DERSIG
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_LOW_S
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_STRICTENC
-import fr.acinq.bitcoin.crypto.*
+import fr.acinq.bitcoin.crypto.Digest
+import fr.acinq.bitcoin.crypto.hmac
 import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmStatic
@@ -93,22 +94,27 @@ public object Crypto {
     }
 
     @JvmStatic
-    public fun isPubKeyValid(key: ByteArray): Boolean = when {
-        key.size == 65 && (key[0] == 4.toByte() || key[0] == 6.toByte() || key[0] == 7.toByte()) -> true
-        key.size == 33 && (key[0] == 2.toByte() || key[0] == 3.toByte()) -> true
-        else -> false
+    public fun isPubKeyValid(key: ByteArray): Boolean = try {
+        Secp256k1.pubkeyParse(key)
+        true
+    } catch (e: Throwable) {
+        false
     }
 
     @JvmStatic
-    public fun isPubKeyCompressedOrUncompressed(key: ByteArray): Boolean = when {
-        key.size == 65 && key[0] == 4.toByte() -> true
-        key.size == 33 && (key[0] == 2.toByte() || key[0] == 3.toByte()) -> true
-        else -> false
+    public fun isPubKeyCompressedOrUncompressed(key: ByteArray): Boolean {
+        return isPubKeyCompressed(key) || isPubKeyUncompressed(key)
     }
 
     @JvmStatic
     public fun isPubKeyCompressed(key: ByteArray): Boolean = when {
         key.size == 33 && (key[0] == 2.toByte() || key[0] == 3.toByte()) -> true
+        else -> false
+    }
+
+    @JvmStatic
+    public fun isPubKeyUncompressed(key: ByteArray): Boolean = when {
+        key.size == 65 && key[0] == 4.toByte() -> true
         else -> false
     }
 
@@ -147,7 +153,6 @@ public object Crypto {
 
     public fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean =
         verifySignature(data.toByteArray(), signature, publicKey)
-
 
     private fun dropZeroAndFixSize(input: ByteArray, size: Int) = fixSize(input.dropWhile { it == 0.toByte() }.toByteArray(), size)
 
@@ -250,7 +255,7 @@ public object Crypto {
      * @return true if the trailing sighash byte is valid
      */
     @JvmStatic
-    public fun isDefinedHashtypeSignature(sig: ByteArray): Boolean = if (sig.isEmpty()) false else {
+    public fun isDefinedHashTypeSignature(sig: ByteArray): Boolean = if (sig.isEmpty()) false else {
         val hashType = (sig.last().toInt() and 0xff) and (SigHash.SIGHASH_ANYONECANPAY.inv())
         !((hashType < SigHash.SIGHASH_ALL || hashType > SigHash.SIGHASH_SINGLE))
     }
@@ -268,7 +273,7 @@ public object Crypto {
             sig.isEmpty() -> true
             (flags and (SCRIPT_VERIFY_DERSIG or SCRIPT_VERIFY_LOW_S or SCRIPT_VERIFY_STRICTENC)) != 0 && !isDERSignature(sig) -> false
             (flags and SCRIPT_VERIFY_LOW_S) != 0 && !isLowDERSignature(sig.dropLast(1).toByteArray()) -> false // drop the sighash byte
-            (flags and SCRIPT_VERIFY_STRICTENC) != 0 && !isDefinedHashtypeSignature(sig) -> false
+            (flags and SCRIPT_VERIFY_STRICTENC) != 0 && !isDefinedHashTypeSignature(sig) -> false
             else -> true
         }
     }

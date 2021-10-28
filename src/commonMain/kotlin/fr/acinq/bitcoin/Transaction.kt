@@ -37,11 +37,11 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
     public constructor(tx: Transaction, index: Long) : this(tx.hash, index)
 
     init {
+        // The genesis block contains inputs with index = -1, so we cannot require it to be >= 0
         require(index >= -1)
     }
 
     /**
-     *
      * @return the id of the transaction this output belongs to
      */
     @JvmField
@@ -206,10 +206,7 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
 
     public constructor(amount: Satoshi, publicKeyScript: ByteArray) : this(amount, publicKeyScript.byteVector())
 
-    public constructor(amount: Satoshi, publicKeyScript: List<ScriptElt>) : this(
-        amount,
-        Script.write(publicKeyScript).byteVector()
-    )
+    public constructor(amount: Satoshi, publicKeyScript: List<ScriptElt>) : this(amount, Script.write(publicKeyScript).byteVector())
 
     public fun updateAmount(newAmount: Satoshi): TxOut = this.copy(amount = newAmount)
 
@@ -240,8 +237,8 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
         }
 
         override fun validate(t: TxOut) {
-            require(t.amount.sat >= 0) { "invalid txout amount: $t.amount" }
-            require(t.publicKeyScript.size() < Script.MaxScriptElementSize) { "public key script is ${t.publicKeyScript.size()} bytes, limit is $Script.MaxScriptElementSize bytes" }
+            require(t.amount.sat >= 0) { "invalid txout amount: ${t.amount}" }
+            require(t.publicKeyScript.size() < Script.MaxScriptElementSize) { "public key script is ${t.publicKeyScript.size()} bytes, limit is ${Script.MaxScriptElementSize} bytes" }
         }
     }
 
@@ -265,10 +262,9 @@ public data class Transaction(
     public val txid: ByteVector32 = hash.reversed()
 
     /**
-     *
      * @param i         index of the tx input to update
      * @param sigScript new signature script
-     * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
+     * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replaced by sigscript
      */
     public fun updateSigScript(i: Int, sigScript: ByteArray): Transaction {
         val updatedElement = txIn[i].copy(signatureScript = sigScript.byteVector())
@@ -279,10 +275,9 @@ public data class Transaction(
     }
 
     /**
-     *
      * @param i         index of the tx input to update
      * @param sigScript new signature script
-     * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
+     * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replaced by sigscript
      */
     public fun updateSigScript(i: Int, sigScript: List<ScriptElt>): Transaction = updateSigScript(i, Script.write(sigScript))
 
@@ -325,7 +320,6 @@ public data class Transaction(
         public const val LOCKTIME_THRESHOLD: Long = 500000000L
 
         /**
-         *
          * @param version protocol version (and NOT transaction version !)
          * @return true if protocol version specifies that witness data is to be serialized
          */
@@ -393,8 +387,8 @@ public data class Transaction(
 
         @JvmStatic
         override fun validate(input: Transaction) {
-            require(input.txIn.count() > 0) { "input list cannot be empty" }
-            require(input.txOut.count() > 0) { "output list cannot be empty" }
+            require(input.txIn.isNotEmpty()) { "input list cannot be empty" }
+            require(input.txOut.isNotEmpty()) { "output list cannot be empty" }
             // require(Transaction.write(input).size <= Bitcoin.MaxBlockSize)
             // require(input.txOut.map { it.amount }.sum().toLong() <= Bitcoin.MaxMoney) { "sum of outputs amount is invalid" }
             input.txIn.forEach { TxIn.validate(it) }
@@ -422,7 +416,6 @@ public data class Transaction(
 
         @JvmStatic
         public fun weight(tx: Transaction): Int = weight(tx, PROTOCOL_VERSION)
-
 
         @JvmStatic
         public fun isCoinbase(input: Transaction): Boolean = input.txIn.count() == 1 && OutPoint.isCoinbase(input.txIn.first().outPoint)
@@ -635,7 +628,7 @@ public data class Transaction(
                 val amount = prevOutput.amount
                 val ctx = Script.Context(tx, i, amount)
                 val runner = Script.Runner(ctx, scriptFlags, callback)
-                if (!runner.verifyScripts(tx.txIn[i].signatureScript, prevOutputScript, tx.txIn[i].witness)) throw RuntimeException("tx ${tx.txid} does not spend its input # $i")
+                if (!runner.verifyScripts(tx.txIn[i].signatureScript, prevOutputScript, tx.txIn[i].witness)) throw RuntimeException("tx ${tx.txid} does not spend its input #$i")
             }
         }
 

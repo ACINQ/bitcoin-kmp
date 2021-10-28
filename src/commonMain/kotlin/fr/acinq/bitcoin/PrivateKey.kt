@@ -21,6 +21,12 @@ import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
+/**
+ * A bitcoin private key.
+ * A private key is valid if it is not 0 and less than the secp256k1 curve order when interpreted as an integer (most significant byte first).
+ * The probability of choosing a 32-byte string uniformly at random which is an invalid private key is negligible, so this condition is not checked by default.
+ * However, if you receive a private key from an external, untrusted source, you should call `isValid()` before actually using it.
+ */
 public data class PrivateKey(@JvmField val value: ByteVector32) {
     public constructor(data: ByteArray) : this(
         when {
@@ -31,6 +37,12 @@ public data class PrivateKey(@JvmField val value: ByteVector32) {
     )
 
     public constructor(data: ByteVector) : this(data.toByteArray())
+
+    /**
+     * A private key is valid if it is not 0 and less than the secp256k1 curve order when interpreted as an integer (most significant byte first).
+     * The probability of choosing a 32-byte string uniformly at random which is an invalid private key is negligible.
+     */
+    public fun isValid(): Boolean = Secp256k1.secKeyVerify(value.toByteArray())
 
     public operator fun plus(that: PrivateKey): PrivateKey =
         PrivateKey(Secp256k1.privKeyTweakAdd(value.toByteArray(), that.value.toByteArray()))
@@ -46,7 +58,13 @@ public data class PrivateKey(@JvmField val value: ByteVector32) {
         return PublicKey(PublicKey.compress(pub))
     }
 
-    public fun toBase58(prefix: Byte): String = Base58Check.encode(prefix, value.toByteArray() + 1.toByte())
+    public fun compress(): ByteArray = value.toByteArray() + 1.toByte()
+
+    public fun toBase58(prefix: Byte): String = Base58Check.encode(prefix, compress())
+
+    public fun toHex(): String = Hex.encode(value.toByteArray())
+
+    override fun toString(): String = value.toString()
 
     public companion object {
         @JvmStatic

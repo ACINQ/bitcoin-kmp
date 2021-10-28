@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 class BitcoinTestsCommon {
     @Test
     fun `compute address from pubkey script`() {
-        val pub = PrivateKey(Hex.decode("0101010101010101010101010101010101010101010101010101010101010101")).publicKey()
+        val pub = PrivateKey.fromHex("0101010101010101010101010101010101010101010101010101010101010101").publicKey()
 
         fun address(script: List<ScriptElt>, chainHash: ByteVector32) = addressFromPublicKeyScript(chainHash, script)
 

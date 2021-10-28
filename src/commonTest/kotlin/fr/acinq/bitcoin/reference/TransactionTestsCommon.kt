@@ -26,6 +26,8 @@ import org.kodein.memory.system.Environment
 import org.kodein.memory.text.readString
 import org.kodein.memory.use
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.fail
 
 class TransactionTestsCommon {
     companion object {
@@ -42,7 +44,7 @@ class TransactionTestsCommon {
 
         fun process(tests: JsonArray, valid: Boolean): Int {
             var count = 0
-            var comment: String = ""
+            var comment = ""
             tests.map {
                 when (it.jsonArray.size) {
                     1 -> comment = it.jsonArray[0].jsonPrimitive.content
@@ -55,7 +57,7 @@ class TransactionTestsCommon {
             return count
         }
 
-        fun processSingle(testCase: JsonArray, valid: Boolean, comment: String? = null): Unit {
+        fun processSingle(testCase: JsonArray, valid: Boolean, comment: String? = null) {
             val prevoutMap = mutableMapOf<OutPoint, ByteVector>()
             val prevamountMap = mutableMapOf<OutPoint, Satoshi>()
 
@@ -86,7 +88,7 @@ class TransactionTestsCommon {
                                 prevamountMap.put(OutPoint(ByteVector32(hash).reversed(), index), amount)
                             }
                             else -> {
-                                println("unexpected test data $testCase $comment")
+                                fail("unexpected test data $testCase $comment")
                             }
                         }
                     }
@@ -99,23 +101,18 @@ class TransactionTestsCommon {
                             val amount = prevamountMap[tx.txIn[i].outPoint] ?: 0L.toSatoshi()
                             val ctx = Script.Context(tx, i, amount)
                             val runner = Script.Runner(ctx, ScriptTestsCommon.parseScriptFlags(verifyFlags))
-                            if (!runner.verifyScripts(
-                                    tx.txIn[i].signatureScript,
-                                    prevOutputScript,
-                                    tx.txIn[i].witness
-                                )
-                            ) throw RuntimeException("tx ${tx.txid} does not spend its input # $i")
+                            if (!runner.verifyScripts(tx.txIn[i].signatureScript, prevOutputScript, tx.txIn[i].witness)) {
+                                throw RuntimeException("tx ${tx.txid} does not spend its input #$i")
+                            }
                         }
                         true
                     } catch (t: Throwable) {
                         false
                     }
-                    if (result != valid) {
-                        println("failed valid=$valid test $testCase!!")
-                    }
+                    assertEquals(result, valid, "failed valid=$valid test $testCase")
                 }
                 else -> {
-
+                    fail("could not process test $testCase")
                 }
             }
         }
@@ -128,13 +125,14 @@ class TransactionTestsCommon {
 
         val tests = readData("data/tx_valid.json")
         val count = process(tests.jsonArray, true)
-        println("passed $count reference tx_valid tests")
+        assertEquals(120, count)
     }
 
     @Test
     fun `reference invalid tx tests`() {
         val tests = readData("data/tx_invalid.json")
         val count = process(tests.jsonArray, false)
-        println("passed $count reference tx_invalid tests")
+        assertEquals(92, count)
     }
+
 }

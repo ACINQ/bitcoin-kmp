@@ -158,7 +158,7 @@ public data class BlockHeader(
 
             val powLimit = UInt256(Hex.decode("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
             if (target > powLimit) target = powLimit
-            return target.endodeCompact(false)
+            return target.encodeCompact(false)
         }
     }
 
@@ -197,7 +197,6 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
         override fun write(message: Block, out: Output, protocolVersion: Long) {
             BlockHeader.write(message.header, out)
             writeCollection(message.tx, out, Transaction, protocolVersion)
-
         }
 
         @JvmStatic
@@ -270,8 +269,9 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
         }
 
         @JvmField
-        public val TestnetGenesisBlock: Block =
-            LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458))
+        public val TestnetGenesisBlock: Block = LivenetGenesisBlock.copy(
+            header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458)
+        )
 
         @JvmField
         public val RegtestGenesisBlock: Block = LivenetGenesisBlock.copy(

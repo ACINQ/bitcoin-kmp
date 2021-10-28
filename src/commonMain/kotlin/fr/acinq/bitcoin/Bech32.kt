@@ -45,6 +45,14 @@ public object Bech32 {
         }
     }
 
+    @JvmStatic
+    public fun hrp(chainHash: ByteVector32): String = when (chainHash) {
+        Block.TestnetGenesisBlock.hash -> "tb"
+        Block.RegtestGenesisBlock.hash -> "bcrt"
+        Block.LivenetGenesisBlock.hash -> "bc"
+        else -> error("invalid chain hash $chainHash")
+    }
+
     private fun expand(hrp: String): Array<Int5> {
         val result = Array<Int5>(hrp.length + 1 + hrp.length) { 0 }
         for (i in hrp.indices) {

@@ -34,7 +34,6 @@ public object Base58 {
 
     private const val pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-    //@formatter:off
     private val mapBase58 = intArrayOf(
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -53,7 +52,6 @@ public object Base58 {
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
     )
-    //@formatter:on
 
     @JvmStatic
     public fun encode(input: ByteArray): String {
@@ -169,6 +167,8 @@ public object Base58 {
  *
  */
 public object Base58Check {
+
+    @JvmStatic
     public fun checksum(data: ByteArray): ByteArray = Crypto.hash256(data).copyOf(4)
 
     @JvmStatic
@@ -246,4 +246,5 @@ public object Base58Check {
         require(checksum.contentEquals(checksum(versionAndHash))) { "invalid Base58Check data $encoded" }
         return Pair(versionAndHash.take(prefixLen).toByteArray(), versionAndHash.drop(prefixLen).toByteArray())
     }
+
 }

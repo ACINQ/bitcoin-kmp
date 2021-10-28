@@ -40,7 +40,8 @@ public data class MilliBtc(val mbtc: Double) : Comparable<MilliBtc> {
 
     public fun toDouble(): Double = mbtc
     public fun toLong(): Long = mbtc.toLong()
-    public fun toSatoshi(): Satoshi = Satoshi((mbtc * 100000).toLong())
+    public fun toSatoshi(): Satoshi = Satoshi((mbtc * 100_000).toLong())
+    public fun toBtc(): Btc = Btc(mbtc / 1000)
     override fun toString(): String = "$mbtc mbtc"
     // @formatter:on
 }
@@ -72,7 +73,7 @@ public data class Btc(val btc: Double) : Comparable<Btc> {
     public fun toDouble(): Double = btc
     public fun toLong(): Long = btc.toLong()
     public fun toMilliBtc(): MilliBtc = MilliBtc(btc * 1000)
-    public fun toSatoshi(): Satoshi = Satoshi((btc * 100000000).toLong())
+    public fun toSatoshi(): Satoshi = Satoshi((btc * 100_000_000).toLong())
     override fun toString(): String = "$btc btc"
     // @formatter:on
 }

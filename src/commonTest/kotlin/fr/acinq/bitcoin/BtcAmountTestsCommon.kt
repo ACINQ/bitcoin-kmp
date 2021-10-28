@@ -25,6 +25,12 @@ class BtcAmountTestsCommon {
         assertEquals(12345, y.toLong())
         assertEquals(z, z1)
         assertEquals(1234567000, z.toLong())
+        assertEquals(0.00000001.btc(), 1.sat().toBtc())
+        assertEquals(0.00001.mbtc(), 1.sat().toMilliBtc())
+        assertEquals(x.toMilliBtc().toBtc(), x)
+        assertEquals(y.toBtc().toMilliBtc(), y)
+        assertEquals(z.toBtc().toSatoshi(), z)
+        assertEquals(z.toMilliBtc().toSatoshi(), z)
     }
 
     @Test

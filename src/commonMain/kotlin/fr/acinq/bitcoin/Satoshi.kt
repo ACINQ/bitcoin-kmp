@@ -32,6 +32,8 @@ public data class Satoshi(val sat: Long) : Comparable<Satoshi> {
     public fun max(other: Satoshi): Satoshi = if (this > other) this else other
     public fun min(other: Satoshi): Satoshi = if (this < other) this else other
 
+    public fun toMilliBtc(): MilliBtc = MilliBtc(sat.toDouble() / 100_000)
+    public fun toBtc(): Btc = Btc(sat.toDouble() / 100_000_000)
     public fun toLong(): Long = sat
     @OptIn(ExperimentalUnsignedTypes::class)
     public fun toULong(): ULong = sat.toULong()

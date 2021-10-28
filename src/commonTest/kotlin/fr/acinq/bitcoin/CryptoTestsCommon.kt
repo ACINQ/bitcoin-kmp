@@ -47,13 +47,15 @@ class CryptoTestsCommon {
 
     @Test
     fun `validate private keys`() {
-        assertTrue(PrivateKey.fromHex("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55").isValid())
+        val validPrivKey = PrivateKey.fromHex("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
+        assertTrue(Crypto.isPrivKeyValid(validPrivKey.value.toByteArray()))
         // Valid private keys must not be 0.
-        assertFalse(PrivateKey.fromHex("0000000000000000000000000000000000000000000000000000000000000000").isValid())
+        assertFails { PrivateKey.fromHex("0000000000000000000000000000000000000000000000000000000000000000") }
         // Valid private keys must be strictly below the curve order.
-        assertTrue(PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140").isValid())
-        assertFalse(PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141").isValid())
-        assertFalse(PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").isValid())
+        val belowCurveOrder = PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140")
+        assertTrue(Crypto.isPrivKeyValid(belowCurveOrder.value.toByteArray()))
+        assertFails { PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141") }
+        assertFails { PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF") }
     }
 
     @Test

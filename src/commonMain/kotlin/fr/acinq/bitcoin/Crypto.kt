@@ -94,6 +94,9 @@ public object Crypto {
     }
 
     @JvmStatic
+    public fun isPrivKeyValid(key: ByteArray): Boolean = Secp256k1.secKeyVerify(key)
+
+    @JvmStatic
     public fun isPubKeyValid(key: ByteArray): Boolean = try {
         Secp256k1.pubkeyParse(key)
         true

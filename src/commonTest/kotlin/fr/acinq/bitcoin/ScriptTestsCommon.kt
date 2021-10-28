@@ -98,11 +98,4 @@ class ScriptTestsCommon {
             assertEquals(i.toLong(), Script.decodeNumber(Script.encodeNumber(i), checkMinimalEncoding = true))
         }
     }
-
-    @Test
-    fun `encode - decode booleans`() {
-        assertFalse(Script.castToBoolean(ByteVector.empty))
-        assertFalse(Script.castToBoolean(ByteVector(byteArrayOf(0, 0, 0))))
-        assertFalse(Script.castToBoolean(ByteVector("80")))
-    }
 }

@@ -238,7 +238,7 @@ public object Script {
 
     private fun castToBoolean(input: ByteArray): Boolean = castToBoolean(input.asList())
 
-    public fun castToBoolean(input: ByteVector): Boolean = castToBoolean(input.toByteArray())
+    private fun castToBoolean(input: ByteVector): Boolean = castToBoolean(input.toByteArray())
 
     @JvmStatic
     public fun isPushOnly(script: List<ScriptElt>): Boolean = !script.any {

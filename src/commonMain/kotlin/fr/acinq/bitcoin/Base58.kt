@@ -246,5 +246,4 @@ public object Base58Check {
         require(checksum.contentEquals(checksum(versionAndHash))) { "invalid Base58Check data $encoded" }
         return Pair(versionAndHash.take(prefixLen).toByteArray(), versionAndHash.drop(prefixLen).toByteArray())
     }
-
 }

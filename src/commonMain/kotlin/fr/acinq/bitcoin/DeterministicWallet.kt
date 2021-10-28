@@ -45,7 +45,7 @@ public object DeterministicWallet {
         @JvmField val parent: Long
     ) {
         init {
-            require(PrivateKey(secretKeyBytes).isValid()) { "private key is invalid" }
+            require(Crypto.isPrivKeyValid(secretKeyBytes.toByteArray())) { "private key is invalid" }
             require(depth != 0 || parent == 0L) { "zero depth with non-zero parent fingerprint" }
             require(depth != 0 || path.lastChildNumber == 0L) { "zero depth with non-zero child number" }
         }
@@ -200,10 +200,10 @@ public object DeterministicWallet {
         }
         val IL = I.take(32).toByteArray()
         val IR = I.takeLast(32).toByteArray()
-        require(PrivateKey(IL).isValid()) { "cannot generate child private key: IL is invalid" }
+        require(Crypto.isPrivKeyValid(IL)) { "cannot generate child private key: IL is invalid" }
 
         val key = PrivateKey(IL) + parent.privateKey
-        require(key.isValid()) { "cannot generate child private key: resulting private key is invalid" }
+        require(Crypto.isPrivKeyValid(key.value.toByteArray())) { "cannot generate child private key: resulting private key is invalid" }
         return ExtendedPrivateKey(
             secretKeyBytes = key.value,
             chaincode = IR.byteVector32(),
@@ -228,10 +228,10 @@ public object DeterministicWallet {
         )
         val IL = I.take(32).toByteArray()
         val IR = I.takeLast(32).toByteArray()
-        require(PrivateKey(IL).isValid()) { "cannot generate child public key: IL is invalid" }
+        require(Crypto.isPrivKeyValid(IL)) { "cannot generate child public key: IL is invalid" }
 
-        // NB: if the resulting public key is invalid (e.g. point at infinity) the addition will throw.
         val Ki = PrivateKey(IL).publicKey() + parent.publicKey
+        require(Crypto.isPubKeyValid(Ki.value.toByteArray())) { "cannot generate child public key: resulting public key is invalid" }
         return ExtendedPublicKey(
             publicKeyBytes = Ki.value,
             chaincode = IR.byteVector32(),

@@ -46,16 +46,25 @@ class CryptoTestsCommon {
     }
 
     @Test
+    fun `toString does not leak private key`() {
+        val priv = PrivateKey.fromHex("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
+        assertEquals("<private_key>", priv.toString())
+    }
+
+    @Test
     fun `validate private keys`() {
         val validPrivKey = PrivateKey.fromHex("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
-        assertTrue(Crypto.isPrivKeyValid(validPrivKey.value.toByteArray()))
+        assertTrue(validPrivKey.isValid())
         // Valid private keys must not be 0.
-        assertFails { PrivateKey.fromHex("0000000000000000000000000000000000000000000000000000000000000000") }
+        val zeroPrivKey = PrivateKey.fromHex("0000000000000000000000000000000000000000000000000000000000000000")
+        assertFalse(zeroPrivKey.isValid())
         // Valid private keys must be strictly below the curve order.
         val belowCurveOrder = PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140")
-        assertTrue(Crypto.isPrivKeyValid(belowCurveOrder.value.toByteArray()))
-        assertFails { PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141") }
-        assertFails { PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF") }
+        assertTrue(belowCurveOrder.isValid())
+        val curveOrder = PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141")
+        assertFalse(curveOrder.isValid())
+        val aboveCurveOrder = PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
+        assertFalse(aboveCurveOrder.isValid())
     }
 
     @Test
@@ -114,10 +123,18 @@ class CryptoTestsCommon {
     fun `create invalid public key`() {
         val privateKey = PrivateKey.fromHex("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
         val publicKey = privateKey.publicKey()
+        assertTrue(publicKey.isValid())
         val nPublicKey = PublicKey.parse(Secp256k1.pubKeyNegate(publicKey.value.toByteArray()))
+        assertTrue(nPublicKey.isValid())
         // The result would be the point at infinity, which isn't a valid curve point.
         assertFails { publicKey - publicKey }
         assertFails { publicKey + nPublicKey }
+        // You can't get the public key for an invalid private key.
+        val invalidPrivateKey = PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141")
+        assertFails { invalidPrivateKey.publicKey() }
+        // It is possible to create an invalid public key, but you can detect it.
+        val invalidPublicKey = PublicKey.fromHex("020000000000000000000000000000000000000000000000000000000000000007")
+        assertFalse(invalidPublicKey.isValid())
     }
 
     @Test

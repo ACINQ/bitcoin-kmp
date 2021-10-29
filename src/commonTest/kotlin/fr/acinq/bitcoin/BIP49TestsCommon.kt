@@ -17,7 +17,6 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Bitcoin.computeBIP49Address
-import fr.acinq.secp256k1.Hex
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -32,7 +31,7 @@ class BIP49TestsCommon {
         assertEquals(DeterministicWallet.encode(accountKey, DeterministicWallet.tprv), "tprv8gRrNu65W2Msef2BdBSUgFdRTGzC8EwVXnV7UGS3faeXtuMVtGfEdidVeGbThs4ELEoayCAzZQ4uUji9DUiAs7erdVskqju7hrBcDvDsdbY")
 
         val key = DeterministicWallet.derivePrivateKey(accountKey, listOf(0L, 0L))
-        assertEquals(key.secretKeyBytes, DeterministicWallet.derivePrivateKey(master, KeyPath("m/49'/1'/0'/0/0")).secretKeyBytes)
+        assertEquals(key.secretkeybytes, DeterministicWallet.derivePrivateKey(master, KeyPath("m/49'/1'/0'/0/0")).secretkeybytes)
         assertEquals(key.privateKey.toBase58(Base58.Prefix.SecretKeyTestnet), "cULrpoZGXiuC19Uhvykx7NugygA3k86b3hmdCeyvHYQZSxojGyXJ")
         assertEquals(
             key.privateKey,

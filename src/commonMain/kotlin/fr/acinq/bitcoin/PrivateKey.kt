@@ -22,7 +22,10 @@ import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 /**
- * A valid bitcoin private key.
+ * A bitcoin private key.
+ * A private key is valid if it is not 0 and less than the secp256k1 curve order when interpreted as an integer (most significant byte first).
+ * The probability of choosing a 32-byte string uniformly at random which is an invalid private key is negligible, so this condition is not checked by default.
+ * However, if you receive a private key from an external, untrusted source, you should call `isValid()` before actually using it.
  */
 public data class PrivateKey(@JvmField val value: ByteVector32) {
     public constructor(data: ByteArray) : this(
@@ -35,9 +38,11 @@ public data class PrivateKey(@JvmField val value: ByteVector32) {
 
     public constructor(data: ByteVector) : this(data.toByteArray())
 
-    init {
-        require(Crypto.isPrivKeyValid(value.toByteArray())) { "invalid private key: must be different than 0 and below the curve order" }
-    }
+    /**
+     * A private key is valid if it is not 0 and less than the secp256k1 curve order when interpreted as an integer (most significant byte first).
+     * The probability of choosing a 32-byte string uniformly at random which is an invalid private key is negligible.
+     */
+    public fun isValid(): Boolean = Crypto.isPrivKeyValid(value.toByteArray())
 
     public operator fun plus(that: PrivateKey): PrivateKey =
         PrivateKey(Secp256k1.privKeyTweakAdd(value.toByteArray(), that.value.toByteArray()))
@@ -57,9 +62,13 @@ public data class PrivateKey(@JvmField val value: ByteVector32) {
 
     public fun toBase58(prefix: Byte): String = Base58Check.encode(prefix, compress())
 
-    public fun toHex(): String = Hex.encode(value.toByteArray())
+    public fun toHex(): String = value.toHex()
 
-    override fun toString(): String = value.toString()
+    /**
+     * We avoid accidentally logging private keys.
+     * You should use an explicit method if you want to convert the private key to a string representation.
+     */
+    override fun toString(): String = "<private_key>"
 
     public companion object {
         @JvmStatic

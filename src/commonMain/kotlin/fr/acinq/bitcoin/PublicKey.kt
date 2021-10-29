@@ -22,15 +22,22 @@ import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 /**
- * A valid bitcoin public key (in compressed form).
+ * A bitcoin public key (in compressed form).
+ * A public key is valid if it represents a point on the secp256k1 curve.
+ * The validity of this public key is not checked by default, because when you create a public key from a private key it will always be valid.
+ * However, if you receive a public key from an external, untrusted source, you should call `isValid()` before actually using it.
  */
 public data class PublicKey(@JvmField val value: ByteVector) {
     public constructor(data: ByteArray) : this(ByteVector(data))
 
     init {
         require(value.size() == 33) { "public key must be in compressed form" }
-        require(Crypto.isPubKeyValid(value.toByteArray())) { "public key must be valid" }
     }
+
+    /**
+     * A public key is valid if it represents a point on the secp256k1 curve.
+     */
+    public fun isValid(): Boolean = Crypto.isPubKeyValid(value.toByteArray())
 
     public operator fun plus(that: PublicKey): PublicKey {
         val pub = Secp256k1.pubKeyAdd(value.toByteArray(), that.value.toByteArray())

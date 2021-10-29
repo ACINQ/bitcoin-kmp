@@ -38,20 +38,26 @@ public object DeterministicWallet {
     public fun isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
     public data class ExtendedPrivateKey(
-        @JvmField val secretKeyBytes: ByteVector32,
+        @JvmField val secretkeybytes: ByteVector32,
         @JvmField val chaincode: ByteVector32,
         @JvmField val depth: Int,
         @JvmField val path: KeyPath,
         @JvmField val parent: Long
     ) {
         init {
-            require(Crypto.isPrivKeyValid(secretKeyBytes.toByteArray())) { "private key is invalid" }
+            require(Crypto.isPrivKeyValid(secretkeybytes.toByteArray())) { "private key is invalid" }
             require(depth != 0 || parent == 0L) { "zero depth with non-zero parent fingerprint" }
             require(depth != 0 || path.lastChildNumber == 0L) { "zero depth with non-zero child number" }
         }
 
-        val privateKey: PrivateKey get() = PrivateKey(secretKeyBytes)
+        val privateKey: PrivateKey get() = PrivateKey(secretkeybytes)
         val publicKey: PublicKey get() = privateKey.publicKey()
+
+        /**
+         * We avoid accidentally logging extended private keys.
+         * You should use an explicit method if you want to convert the extended private key to a string representation.
+         */
+        override fun toString(): String = "<extended_private_key>"
 
         public companion object {
             @JvmStatic
@@ -73,20 +79,20 @@ public object DeterministicWallet {
     }
 
     public data class ExtendedPublicKey(
-        @JvmField val publicKeyBytes: ByteVector,
+        @JvmField val publickeybytes: ByteVector,
         @JvmField val chaincode: ByteVector32,
         @JvmField val depth: Int,
         @JvmField val path: KeyPath,
         @JvmField val parent: Long
     ) {
         init {
-            require(publicKeyBytes.size() == 33)
-            require(Crypto.isPubKeyValid(publicKeyBytes.toByteArray())) { "public key is invalid" }
+            require(publickeybytes.size() == 33)
+            require(Crypto.isPubKeyValid(publickeybytes.toByteArray())) { "public key is invalid" }
             require(depth != 0 || parent == 0L) { "zero depth with non-zero parent fingerprint" }
             require(depth != 0 || path.lastChildNumber == 0L) { "zero depth with non-zero child number" }
         }
 
-        val publicKey: PublicKey get() = PublicKey(publicKeyBytes)
+        val publicKey: PublicKey get() = PublicKey(publickeybytes)
 
         public companion object {
             @JvmStatic
@@ -117,7 +123,7 @@ public object DeterministicWallet {
         Pack.writeInt32BE(input.path.lastChildNumber.toInt(), out)
         out.write(input.chaincode.toByteArray())
         out.write(0)
-        out.write(input.secretKeyBytes.toByteArray())
+        out.write(input.secretkeybytes.toByteArray())
         val buffer = out.toByteArray()
         return Base58Check.encode(prefix, buffer)
     }
@@ -139,7 +145,7 @@ public object DeterministicWallet {
         Pack.writeInt32BE(input.parent.toInt(), out)
         Pack.writeInt32BE(input.path.lastChildNumber.toInt(), out)
         out.write(input.chaincode.toByteArray())
-        out.write(input.publicKeyBytes.toByteArray())
+        out.write(input.publickeybytes.toByteArray())
     }
 
     /**
@@ -175,7 +181,7 @@ public object DeterministicWallet {
      * @return the fingerprint for this public key
      */
     @JvmStatic
-    public fun fingerprint(input: ExtendedPublicKey): Long = Pack.int32LE(ByteArrayInput(Crypto.hash160(input.publicKeyBytes).take(4).reversed().toByteArray())).toLong()
+    public fun fingerprint(input: ExtendedPublicKey): Long = Pack.int32LE(ByteArrayInput(Crypto.hash160(input.publickeybytes).take(4).reversed().toByteArray())).toLong()
 
     /**
      * @param input extended private key
@@ -192,10 +198,10 @@ public object DeterministicWallet {
     @JvmStatic
     public fun derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey {
         val I = if (isHardened(index)) {
-            val data = arrayOf(0.toByte()).toByteArray() + parent.secretKeyBytes.toByteArray() + Pack.writeInt32BE(index.toInt())
+            val data = arrayOf(0.toByte()).toByteArray() + parent.secretkeybytes.toByteArray() + Pack.writeInt32BE(index.toInt())
             Crypto.hmac512(parent.chaincode.toByteArray(), data)
         } else {
-            val data = publicKey(parent).publicKeyBytes.toByteArray() + Pack.writeInt32BE(index.toInt())
+            val data = publicKey(parent).publickeybytes.toByteArray() + Pack.writeInt32BE(index.toInt())
             Crypto.hmac512(parent.chaincode.toByteArray(), data)
         }
         val IL = I.take(32).toByteArray()
@@ -205,7 +211,7 @@ public object DeterministicWallet {
         val key = PrivateKey(IL) + parent.privateKey
         require(Crypto.isPrivKeyValid(key.value.toByteArray())) { "cannot generate child private key: resulting private key is invalid" }
         return ExtendedPrivateKey(
-            secretKeyBytes = key.value,
+            secretkeybytes = key.value,
             chaincode = IR.byteVector32(),
             depth = parent.depth + 1,
             path = parent.path.derive(index),
@@ -224,7 +230,7 @@ public object DeterministicWallet {
 
         val I = Crypto.hmac512(
             parent.chaincode.toByteArray(),
-            parent.publicKeyBytes.toByteArray() + Pack.writeInt32BE(index.toInt())
+            parent.publickeybytes.toByteArray() + Pack.writeInt32BE(index.toInt())
         )
         val IL = I.take(32).toByteArray()
         val IR = I.takeLast(32).toByteArray()
@@ -233,7 +239,7 @@ public object DeterministicWallet {
         val Ki = PrivateKey(IL).publicKey() + parent.publicKey
         require(Crypto.isPubKeyValid(Ki.value.toByteArray())) { "cannot generate child public key: resulting public key is invalid" }
         return ExtendedPublicKey(
-            publicKeyBytes = Ki.value,
+            publickeybytes = Ki.value,
             chaincode = IR.byteVector32(),
             depth = parent.depth + 1,
             path = parent.path.derive(index),

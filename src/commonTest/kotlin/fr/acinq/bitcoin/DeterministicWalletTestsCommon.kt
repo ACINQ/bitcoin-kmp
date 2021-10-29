@@ -288,7 +288,7 @@ class DeterministicWalletTestsCommon {
             DeterministicWallet.encode(m, testnet = false),
             "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi"
         )
-        val masterPriv = PrivateKey(m.secretKeyBytes)
+        val masterPriv = PrivateKey(m.secretkeybytes)
         val masterPub = DeterministicWallet.publicKey(m)
         assertEquals(
             DeterministicWallet.encode(masterPub, testnet = false),
@@ -299,9 +299,9 @@ class DeterministicWalletTestsCommon {
         // now we have: the master public key, and a child private key, and we want to climb the tree back up
         // to the master private key
         val m42 = DeterministicWallet.derivePrivateKey(m, 42L)
-        val I = Crypto.hmac512(masterPub.chaincode.toByteArray(), masterPub.publicKeyBytes.toByteArray() + Pack.writeInt32BE(42))
+        val I = Crypto.hmac512(masterPub.chaincode.toByteArray(), masterPub.publickeybytes.toByteArray() + Pack.writeInt32BE(42))
         val IL = I.take(32)
-        val recovered = PrivateKey(m42.secretKeyBytes) - PrivateKey(IL.toByteArray())
+        val recovered = PrivateKey(m42.secretkeybytes) - PrivateKey(IL.toByteArray())
         assertContentEquals(masterPriv.value.toByteArray(), recovered.value.toByteArray())
     }
 
@@ -329,7 +329,7 @@ class DeterministicWalletTestsCommon {
                 val (prefixPriv, decodedPriv) = DeterministicWallet.ExtendedPrivateKey.decode(encodedPriv)
                 assertEquals(prefixPriv, DeterministicWallet.tprv)
                 assertEquals(decodedPriv.chaincode, priv.chaincode)
-                assertContentEquals(decodedPriv.secretKeyBytes.toByteArray(), priv.secretKeyBytes.toByteArray())
+                assertContentEquals(decodedPriv.secretkeybytes.toByteArray(), priv.secretkeybytes.toByteArray())
 
                 val pub = DeterministicWallet.publicKey(priv)
                 val encodedPub = DeterministicWallet.encode(pub, DeterministicWallet.tpub)
@@ -339,6 +339,12 @@ class DeterministicWalletTestsCommon {
                 assertContentEquals(decodedPub.publicKey.value.toByteArray(), pub.publicKey.value.toByteArray())
             }
         }
+    }
+
+    @Test
+    fun `toString does not leak xpriv`() {
+        val m = DeterministicWallet.generate(ByteVector("000102030405060708090a0b0c0d0e0f"))
+        assertEquals("<extended_private_key>", m.toString())
     }
 
 }

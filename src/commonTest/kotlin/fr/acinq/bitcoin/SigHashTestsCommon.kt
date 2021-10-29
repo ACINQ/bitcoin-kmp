@@ -33,12 +33,12 @@ class SighashSpec {
         val publicKeys = privateKeys.map { it.publicKey() }
 
         val previousTx = listOf(
-            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(42.mbtc().toSatoshi(), Script.pay2pkh(publicKeys[0]))), lockTime = 0),
-            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(42.mbtc().toSatoshi(), Script.pay2pkh(publicKeys[1]))), lockTime = 0)
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(4_200_000.sat(), Script.pay2pkh(publicKeys[0]))), lockTime = 0),
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(4_200_000.sat(), Script.pay2pkh(publicKeys[1]))), lockTime = 0)
         )
 
         // create a tx with no inputs
-        val tx = Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(80.mbtc().toSatoshi(), Script.pay2wsh(Script.createMultiSigMofN(2, publicKeys)))), lockTime = 0L)
+        val tx = Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(8_000_000.sat(), Script.pay2wsh(Script.createMultiSigMofN(2, publicKeys)))), lockTime = 0L)
 
         // add an input
         val tx1 = run {
@@ -59,7 +59,7 @@ class SighashSpec {
         Transaction.correctlySpends(tx2, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
         // but I cannot change the tx output
-        val tx3 = tx2.copy(txOut = tx2.txOut.updated(0, tx2.txOut[0].copy(amount = 40.mbtc().toSatoshi())))
+        val tx3 = tx2.copy(txOut = tx2.txOut.updated(0, tx2.txOut[0].copy(amount = 4_000_000.sat())))
 
         assertFails {
             Transaction.correctlySpends(tx3, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
@@ -76,12 +76,12 @@ class SighashSpec {
         val publicKeys = privateKeys.map { it.publicKey() }
 
         val previousTx = listOf(
-            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(42.mbtc().toSatoshi(), Script.pay2wpkh(publicKeys[0]))), lockTime = 0),
-            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(42.mbtc().toSatoshi(), Script.pay2wpkh(publicKeys[1]))), lockTime = 0)
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(4_200_000.sat(), Script.pay2wpkh(publicKeys[0]))), lockTime = 0),
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(4_200_000.sat(), Script.pay2wpkh(publicKeys[1]))), lockTime = 0)
         )
 
         // create a tx with no inputs
-        val tx = Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(80.mbtc().toSatoshi(), Script.pay2wsh(Script.createMultiSigMofN(2, publicKeys)))), lockTime = 0L)
+        val tx = Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(8_000_000.sat(), Script.pay2wsh(Script.createMultiSigMofN(2, publicKeys)))), lockTime = 0L)
 
         // add an input
         val tx1 = run {
@@ -102,7 +102,7 @@ class SighashSpec {
         Transaction.correctlySpends(tx2, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
         // but I cannot change the tx output
-        val tx3 = tx2.copy(txOut = tx2.txOut.updated(0, tx2.txOut[0].copy(amount = 40.mbtc().toSatoshi())))
+        val tx3 = tx2.copy(txOut = tx2.txOut.updated(0, tx2.txOut[0].copy(amount = 4_000_000.sat())))
         assertFails {
             Transaction.correctlySpends(tx3, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         }

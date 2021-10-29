@@ -54,7 +54,7 @@ class MnemonicCodeTestsCommon {
     }
 
     @Test
-    fun `validate mnemonics(valid)`() {
+    fun `validate mnemonics (valid)`() {
         val random = Random
 
         for (i in 0..99) {

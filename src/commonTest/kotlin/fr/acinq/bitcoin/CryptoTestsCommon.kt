@@ -24,12 +24,10 @@ import org.kodein.memory.file.resolve
 import org.kodein.memory.io.readLine
 import org.kodein.memory.use
 import kotlin.random.Random
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
-@OptIn(ExperimentalStdlibApi::class)
 class CryptoTestsCommon {
+
     @Test
     fun `import private keys`() {
         // exported from the bitcoin client running in testnet mode
@@ -38,32 +36,107 @@ class CryptoTestsCommon {
 
         val (version, _) = Base58Check.decode(privateKey)
         assertEquals(Base58.Prefix.SecretKeyTestnet, version)
-        val priv = PrivateKey.fromBase58(privateKey, Base58.Prefix.SecretKeyTestnet).first
+        val (priv, compressed) = PrivateKey.fromBase58(privateKey, Base58.Prefix.SecretKeyTestnet)
+        assertTrue(compressed)
+        assertEquals(priv.value, ByteVector32("7e39cf5faec688ce096d40726ec9322fb1f29ea7254f547dad788f9160753587"))
+        assertContentEquals(priv.compress(), Hex.decode("7e39cf5faec688ce096d40726ec9322fb1f29ea7254f547dad788f916075358701"))
         val publicKey = priv.publicKey()
         val computedAddress = Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, publicKey.hash160())
         assertEquals(address, computedAddress)
     }
 
     @Test
-    fun `generate public keys from private keys`() {
-        val privateKey =
-            PrivateKey(Hex.decode("18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725"))
-        val publicKey = privateKey.publicKey()
-        assertEquals(publicKey.value, ByteVector("0250863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b2352"))
+    fun `toString does not leak private key`() {
+        val priv = PrivateKey.fromHex("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
+        assertEquals("<private_key>", priv.toString())
     }
 
     @Test
-    fun `generate public keys from private keys 2`() {
-        val privateKey =
-            PrivateKey(Hex.decode("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55"))
-        val publicKey = privateKey.publicKey()
-        assertEquals(publicKey.value, ByteVector("03D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE"))
+    fun `validate private keys`() {
+        val validPrivKey = PrivateKey.fromHex("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
+        assertTrue(validPrivKey.isValid())
+        // Valid private keys must not be 0.
+        val zeroPrivKey = PrivateKey.fromHex("0000000000000000000000000000000000000000000000000000000000000000")
+        assertFalse(zeroPrivKey.isValid())
+        // Valid private keys must be strictly below the curve order.
+        val belowCurveOrder = PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140")
+        assertTrue(belowCurveOrder.isValid())
+        val curveOrder = PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141")
+        assertFalse(curveOrder.isValid())
+        val aboveCurveOrder = PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
+        assertFalse(aboveCurveOrder.isValid())
+    }
 
-        val address = Base58Check.encode(Base58.Prefix.PubkeyAddress, Crypto.hash160(publicKey.toUncompressedBin()))
+    @Test
+    fun `check generator`() {
+        val check = Secp256k1.pubkeyCreate(Hex.decode("0000000000000000000000000000000000000000000000000000000000000001"))
+        assertEquals(PublicKey.Generator, PublicKey.parse(check))
+    }
+
+    @Test
+    fun `generate public keys from private keys`() {
+        val privateKey1 = PrivateKey.fromHex("18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725")
+        val publicKey1 = privateKey1.publicKey()
+        assertEquals(publicKey1.value, ByteVector("0250863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b2352"))
+
+        val privateKey2 = PrivateKey.fromHex("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
+        val publicKey2 = privateKey2.publicKey()
+        assertEquals(publicKey2.value, ByteVector("03D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE"))
+
+        val address = Base58Check.encode(Base58.Prefix.PubkeyAddress, Crypto.hash160(publicKey2.toUncompressedBin()))
         assertEquals(address, "19FgFQGZy47NcGTJ4hfNdGMwS8EATqoa1X")
     }
 
-    @ExperimentalStdlibApi
+    @Test
+    fun `compress and decompress public keys`() {
+        val publicKey1 = PrivateKey.fromHex("18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725").publicKey()
+        assertTrue(Crypto.isPubKeyCompressedOrUncompressed(publicKey1.value.toByteArray()))
+        assertTrue(Crypto.isPubKeyCompressed(publicKey1.value.toByteArray()))
+        assertFalse(Crypto.isPubKeyUncompressed(publicKey1.value.toByteArray()))
+
+        val uncompressed1 = publicKey1.toUncompressedBin()
+        assertTrue(Crypto.isPubKeyCompressedOrUncompressed(uncompressed1))
+        assertFalse(Crypto.isPubKeyCompressed(uncompressed1))
+        assertTrue(Crypto.isPubKeyUncompressed(uncompressed1))
+
+        val compressed1 = PublicKey.compress(uncompressed1)
+        assertContentEquals(compressed1, publicKey1.value.toByteArray())
+        assertTrue(Crypto.isPubKeyCompressedOrUncompressed(compressed1))
+        assertTrue(Crypto.isPubKeyCompressed(compressed1))
+        assertFalse(Crypto.isPubKeyUncompressed(compressed1))
+
+        val publicKey2 = PublicKey(compressed1)
+        assertTrue(Crypto.isPubKeyCompressedOrUncompressed(publicKey2.value.toByteArray()))
+        assertTrue(Crypto.isPubKeyCompressed(publicKey2.value.toByteArray()))
+        assertFalse(Crypto.isPubKeyUncompressed(publicKey2.value.toByteArray()))
+        assertEquals(publicKey1.value, publicKey2.value)
+
+        assertFails { PublicKey(uncompressed1) }
+        val publicKey3 = PublicKey.parse(uncompressed1)
+        assertTrue(Crypto.isPubKeyCompressedOrUncompressed(publicKey3.value.toByteArray()))
+        assertTrue(Crypto.isPubKeyCompressed(publicKey3.value.toByteArray()))
+        assertFalse(Crypto.isPubKeyUncompressed(publicKey3.value.toByteArray()))
+        assertEquals(publicKey1.value, publicKey3.value)
+    }
+
+    @Test
+    fun `create invalid public key`() {
+        val privateKey = PrivateKey.fromHex("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
+        val publicKey = privateKey.publicKey()
+        assertTrue(publicKey.isValid())
+        val nPublicKey = PublicKey.parse(Secp256k1.pubKeyNegate(publicKey.value.toByteArray()))
+        assertTrue(nPublicKey.isValid())
+        // The result would be the point at infinity, which isn't a valid curve point.
+        assertFails { publicKey - publicKey }
+        assertFails { publicKey + nPublicKey }
+        // You can't get the public key for an invalid private key.
+        val invalidPrivateKey = PrivateKey.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141")
+        assertFails { invalidPrivateKey.publicKey() }
+        // It is possible to create an invalid public key, but you can detect it.
+        val invalidPublicKey = PublicKey.fromHex("020000000000000000000000000000000000000000000000000000000000000007")
+        assertFalse(invalidPublicKey.isValid())
+    }
+
     @Test
     fun `sign and verify signatures`() {
         val privateKey = PrivateKey.fromBase58(
@@ -78,7 +151,7 @@ class CryptoTestsCommon {
     }
 
     @Test
-    fun `der2compact`() {
+    fun `der to compact`() {
         assertEquals(
             ByteVector64("3f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e78223ea13203caf853b71e97e5cc149f65547d1d7ab98c96353d0d8318934e7716"),
             Crypto.der2compact(Hex.decode("304402203f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e780220ddc15ecdfc3507ac48e1681a33eb60996631bf6bf5bc0a0682c4db743ce7ca2b01"))
@@ -121,7 +194,7 @@ class CryptoTestsCommon {
         )
         dataset.forEach {
             val (k, m, s) = it
-            val compact = Crypto.sign(Crypto.sha256(m.encodeToByteArray()), PrivateKey(Hex.decode(k)))
+            val compact = Crypto.sign(Crypto.sha256(m.encodeToByteArray()), PrivateKey.fromHex(k))
             val sig = Crypto.compact2der(compact)
 
             assertEquals(Hex.encode(sig.toByteArray()), s)
@@ -129,9 +202,32 @@ class CryptoTestsCommon {
     }
 
     @Test
-    fun `check generator`() {
-        val check = Secp256k1.pubkeyCreate(Hex.decode("0000000000000000000000000000000000000000000000000000000000000001"))
-        assertEquals(PublicKey.Generator, PublicKey(check))
+    fun `ECDH shared secrets`() {
+        val privateKey = PrivateKey.fromHex("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
+        val publicKey = privateKey.publicKey()
+        val shared = Crypto.ecdh(privateKey, publicKey)
+        assertEquals("56bc84cffc7db1ca04046fc04ec8f84232c340be789bc4779d221fe8b978af06", Hex.encode(shared))
+
+        val random = Random
+        val privateKey1 = PrivateKey(random.nextBytes(32))
+        val privateKey2 = PrivateKey(random.nextBytes(32))
+        val shared1 = Crypto.ecdh(privateKey1, privateKey2.publicKey())
+        val shared2 = Crypto.ecdh(privateKey2, privateKey1.publicKey())
+        assertContentEquals(shared1, shared2)
+    }
+
+    @Test
+    fun `DER encoding compatibility tests`() {
+        val sig = ByteVector64(ByteArray(64) { 0xaa.toByte() })
+        val der = Crypto.compact2der(sig)
+        assertEquals(der.size(), 71)
+    }
+
+    @Test
+    fun `DER decoding compatibility tests`() {
+        val der = Hex.decode("3045022100b50cbdd83b17b722b0e1f58e21cf3789ab18b36648023ed3811b522342ddaa9e02207182673961b7a10bfa94fe89780da0d03bfe1de137e0be32cc47a51edcaf08f301")
+        val sig = Crypto.der2compact(der)
+        assertEquals(sig, ByteVector64("b50cbdd83b17b722b0e1f58e21cf3789ab18b36648023ed3811b522342ddaa9e7182673961b7a10bfa94fe89780da0d03bfe1de137e0be32cc47a51edcaf08f3"))
     }
 
     @Test
@@ -152,28 +248,6 @@ class CryptoTestsCommon {
             assertTrue(Crypto.verifySignature(message, sig, pub2))
             assertTrue(pub == pub1 || pub == pub2)
         }
-    }
-
-    @Test
-    fun `ECDH shared secrets`() {
-        val privateKey = PrivateKey(Hex.decode("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55"))
-        val publicKey = privateKey.publicKey()
-        val shared = Crypto.ecdh(privateKey, publicKey)
-        assertEquals("56bc84cffc7db1ca04046fc04ec8f84232c340be789bc4779d221fe8b978af06", Hex.encode(shared))
-    }
-
-    @Test
-    fun `DER encoding compatibility tests`() {
-        val sig = ByteVector64(ByteArray(64) { 0xaa.toByte() })
-        val der = Crypto.compact2der(sig)
-        assertEquals(der.size(), 71)
-    }
-
-    @Test
-    fun `DER decoding compatibility tests`() {
-        val der = Hex.decode("3045022100b50cbdd83b17b722b0e1f58e21cf3789ab18b36648023ed3811b522342ddaa9e02207182673961b7a10bfa94fe89780da0d03bfe1de137e0be32cc47a51edcaf08f301")
-        val sig = Crypto.der2compact(der)
-        assertEquals(sig, ByteVector64("b50cbdd83b17b722b0e1f58e21cf3789ab18b36648023ed3811b522342ddaa9e7182673961b7a10bfa94fe89780da0d03bfe1de137e0be32cc47a51edcaf08f3"))
     }
 
     @Test
@@ -210,4 +284,5 @@ class CryptoTestsCommon {
             }
         }
     }
+
 }

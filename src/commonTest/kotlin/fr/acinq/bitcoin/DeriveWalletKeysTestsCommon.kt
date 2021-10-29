@@ -7,9 +7,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class DeriveWalletKeysTestsCommon {
-    val mnemonics = "gun please vital unable phone catalog explain raise erosion zoo truly exist"
-    val seed = MnemonicCode.toSeed(mnemonics, "")
-    val master = DeterministicWallet.generate(seed)
+    private val mnemonics = "gun please vital unable phone catalog explain raise erosion zoo truly exist"
+    private val seed = MnemonicCode.toSeed(mnemonics, "")
+    private val master = DeterministicWallet.generate(seed)
 
     @Test
     fun `restore BIP44 wallet`() {
@@ -30,7 +30,7 @@ class DeriveWalletKeysTestsCommon {
         val xpub = DeterministicWallet.encode(DeterministicWallet.publicKey(account), DeterministicWallet.upub)
         assertEquals(xpub, "upub5DKk7kdrLoL3HqrfVdf3mLZJ59g6Bix8UtB6YJQNSKfE3E6YU2Vq7dH7E8ce87jUAac4nRag6Zd7c2cXs45Q4nJcLdrJyNWPxS5D9LFSpGL")
         assertEquals(
-            deriveAddresses(xpub),
+            deriveAddresses(xpub, DerivationScheme.BIP49),
             listOf(
                 "2NAV38YdZBS6s6b89QdmyPnjBxn6Jn3BkhQ",
                 "2Mzxym6Rey5Mwnnxh6L134MaHFwTPQB4fdx",
@@ -48,7 +48,7 @@ class DeriveWalletKeysTestsCommon {
         val xpub = DeterministicWallet.encode(DeterministicWallet.publicKey(account), DeterministicWallet.vpub)
         assertEquals(xpub, "vpub5YmxxDXhaEfLoqxn8xJExGMSQepxRbJDFqyc9FpDKyW8z966eDsgqbTHnJCvc698MhN3FDRt49DuPBgdRufopecaeyffJCUKXRKHoNn7BhX")
         assertEquals(
-            deriveAddresses(xpub),
+            deriveAddresses(xpub, DerivationScheme.BIP84),
             listOf(
                 "tb1ql63el50rtln6n4kxa76jrhuts3kxmk9wtz6hp0",
                 "tb1qa2hyhca4y07xqcl9r9m63rtv4hgdh063hldn6r",
@@ -66,19 +66,19 @@ class DeriveWalletKeysTestsCommon {
             object BIP84 : DerivationScheme()
         }
 
-        fun deriveAddresses(xpub: String, derivationScheme: DerivationScheme? = null): List<String> {
+        fun deriveAddresses(xpub: String, derivationScheme: DerivationScheme): List<String> {
             val (prefix, master) = DeterministicWallet.ExtendedPublicKey.decode(xpub)
             return (0L..4L).map {
                 val pub = DeterministicWallet.derivePublicKey(master, listOf(0L, it))
                 val address = when {
                     prefix == DeterministicWallet.tpub && derivationScheme == DerivationScheme.BIP44 -> computeBIP44Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
                     prefix == DeterministicWallet.tpub && derivationScheme == DerivationScheme.BIP49 -> computeBIP49Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
-                    prefix == DeterministicWallet.upub -> computeBIP49Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
-                    prefix == DeterministicWallet.vpub -> computeBIP84Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
+                    prefix == DeterministicWallet.upub && derivationScheme == DerivationScheme.BIP49 -> computeBIP49Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
+                    prefix == DeterministicWallet.vpub && derivationScheme == DerivationScheme.BIP84 -> computeBIP84Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
                     prefix == DeterministicWallet.xpub && derivationScheme == DerivationScheme.BIP44 -> computeBIP44Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
                     prefix == DeterministicWallet.xpub && derivationScheme == DerivationScheme.BIP49 -> computeBIP49Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
-                    prefix == DeterministicWallet.ypub -> computeBIP49Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
-                    prefix == DeterministicWallet.zpub -> computeBIP84Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
+                    prefix == DeterministicWallet.ypub && derivationScheme == DerivationScheme.BIP49 -> computeBIP49Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
+                    prefix == DeterministicWallet.zpub && derivationScheme == DerivationScheme.BIP84 -> computeBIP84Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
                     else -> error("invalid prefix $prefix")
                 }
                 address

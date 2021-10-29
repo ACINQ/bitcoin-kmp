@@ -26,7 +26,7 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
     public constructor(input: String) : this(Hex.decode(input))
 
     init {
-        require(offset >= 0) { "offset ($size) must be > 0" }
+        require(offset >= 0) { "offset ($offset) must be > 0" }
         require(size >= 0) { "size ($size) must be > 0" }
         require(offset + size <= bytes.size) { "offset ($offset) + size ($size) must be <= buffer size (${bytes.size})" }
     }

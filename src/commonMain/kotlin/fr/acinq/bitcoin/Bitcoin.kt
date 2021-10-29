@@ -16,14 +16,9 @@
 
 package fr.acinq.bitcoin
 
-import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
-@JvmField
-public val MaxScriptElementSize: Int = 520
-
-@JvmField
-public val MaxBlockSize: Int = 1000000
+public const val MaxBlockSize: Int = 1000000
 
 public fun fixSize(data: ByteArray, size: Int): ByteArray = when {
     data.size == size -> data
@@ -47,8 +42,7 @@ public object Bitcoin {
     public fun computeBIP44Address(pub: PublicKey, chainHash: ByteVector32): String = computeP2PkhAddress(pub, chainHash)
 
     /**
-     *
-     * @param pub       public key
+     * @param pub public key
      * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
      * @return the p2swh-of-p2pkh address for this key). It is a Base58 address that is compatible with most bitcoin wallets
      */
@@ -59,8 +53,7 @@ public object Bitcoin {
     public fun computeBIP49Address(pub: PublicKey, chainHash: ByteVector32): String = computeP2ShOfP2WpkhAddress(pub, chainHash)
 
     /**
-     *
-     * @param pub       public key
+     * @param pub public key
      * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
      * @return the BIP84 address for this key (i.e. the p2wpkh address for this key). It is a Bech32 address that will be
      *         understood only by native sewgit wallets
@@ -91,14 +84,32 @@ public object Bitcoin {
                     }
                     Base58Check.encode(prefix, (pubkeyScript[1] as OP_PUSHDATA).data)
                 }
-                Script.isPay2wpkh(pubkeyScript) || Script.isPay2wsh(pubkeyScript) -> {
-                    val hrp = when (chainHash) {
-                        Block.LivenetGenesisBlock.hash -> "bc"
-                        Block.TestnetGenesisBlock.hash -> "tb"
-                        Block.RegtestGenesisBlock.hash -> "bcrt"
-                        else -> error("invalid chain hash")
+                Script.isNativeWitnessScript(pubkeyScript) -> {
+                    val hrp = Bech32.hrp(chainHash)
+                    val witnessScript = (pubkeyScript[1] as OP_PUSHDATA).data.toByteArray()
+                    when (pubkeyScript[0]) {
+                        is OP_0 -> when {
+                            Script.isPay2wpkh(pubkeyScript) || Script.isPay2wsh(pubkeyScript) -> Bech32.encodeWitnessAddress(hrp, 0, witnessScript)
+                            else -> null
+                        }
+                        is OP_1 -> Bech32.encodeWitnessAddress(hrp, 1, witnessScript)
+                        is OP_2 -> Bech32.encodeWitnessAddress(hrp, 2, witnessScript)
+                        is OP_3 -> Bech32.encodeWitnessAddress(hrp, 3, witnessScript)
+                        is OP_4 -> Bech32.encodeWitnessAddress(hrp, 4, witnessScript)
+                        is OP_5 -> Bech32.encodeWitnessAddress(hrp, 5, witnessScript)
+                        is OP_6 -> Bech32.encodeWitnessAddress(hrp, 6, witnessScript)
+                        is OP_7 -> Bech32.encodeWitnessAddress(hrp, 7, witnessScript)
+                        is OP_8 -> Bech32.encodeWitnessAddress(hrp, 8, witnessScript)
+                        is OP_9 -> Bech32.encodeWitnessAddress(hrp, 9, witnessScript)
+                        is OP_10 -> Bech32.encodeWitnessAddress(hrp, 10, witnessScript)
+                        is OP_11 -> Bech32.encodeWitnessAddress(hrp, 11, witnessScript)
+                        is OP_12 -> Bech32.encodeWitnessAddress(hrp, 12, witnessScript)
+                        is OP_13 -> Bech32.encodeWitnessAddress(hrp, 13, witnessScript)
+                        is OP_14 -> Bech32.encodeWitnessAddress(hrp, 14, witnessScript)
+                        is OP_15 -> Bech32.encodeWitnessAddress(hrp, 15, witnessScript)
+                        is OP_16 -> Bech32.encodeWitnessAddress(hrp, 16, witnessScript)
+                        else -> null
                     }
-                    Bech32.encodeWitnessAddress(hrp, 0, (pubkeyScript[1] as OP_PUSHDATA).data.toByteArray())
                 }
                 else -> null
             }

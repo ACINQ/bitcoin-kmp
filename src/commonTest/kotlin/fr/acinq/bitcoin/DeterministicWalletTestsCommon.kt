@@ -16,12 +16,16 @@
 
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.secp256k1.Hex
+import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 
 class DeterministicWalletTestsCommon {
+
     @Test
     fun `generate and derive keys (test vector #1)`() {
         val m = DeterministicWallet.generate(Hex.decode("000102030405060708090a0b0c0d0e0f"))
@@ -244,4 +248,103 @@ class DeterministicWalletTestsCommon {
             "xpub6BJA1jSqiukeaesWfxe6sNK9CCGaujFFSJLomWHprUL9DePQ4JDkM5d88n49sMGJxrhpjazuXYWdMf17C9T5XnxkopaeS7jGk1GyyVziaMt"
         )
     }
+
+    @Test
+    fun `generate and derive keys (test vector #5)`() {
+        val testCases = listOf(
+            "xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6LBpB85b3D2yc8sfvZU521AAwdZafEz7mnzBBsz4wKY5fTtTQBm", // pubkey version / prvkey mismatch
+            "xprv9s21ZrQH143K24Mfq5zL5MhWK9hUhhGbd45hLXo2Pq2oqzMMo63oStZzFGTQQD3dC4H2D5GBj7vWvSQaaBv5cxi9gafk7NF3pnBju6dwKvH", // prvkey version / pubkey mismatch
+            "xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6Txnt3siSujt9RCVYsx4qHZGc62TG4McvMGcAUjeuwZdduYEvFn", // invalid pubkey prefix 04
+            "xprv9s21ZrQH143K24Mfq5zL5MhWK9hUhhGbd45hLXo2Pq2oqzMMo63oStZzFGpWnsj83BHtEy5Zt8CcDr1UiRXuWCmTQLxEK9vbz5gPstX92JQ", // invalid prvkey prefix 04
+            "xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6N8ZMMXctdiCjxTNq964yKkwrkBJJwpzZS4HS2fxvyYUA4q2Xe4", // invalid pubkey prefix 01
+            "xprv9s21ZrQH143K24Mfq5zL5MhWK9hUhhGbd45hLXo2Pq2oqzMMo63oStZzFAzHGBP2UuGCqWLTAPLcMtD9y5gkZ6Eq3Rjuahrv17fEQ3Qen6J", // invalid prvkey prefix 01
+            "xprv9s2SPatNQ9Vc6GTbVMFPFo7jsaZySyzk7L8n2uqKXJen3KUmvQNTuLh3fhZMBoG3G4ZW1N2kZuHEPY53qmbZzCHshoQnNf4GvELZfqTUrcv", // zero depth with non-zero parent fingerprint
+            "xpub661no6RGEX3uJkY4bNnPcw4URcQTrSibUZ4NqJEw5eBkv7ovTwgiT91XX27VbEXGENhYRCf7hyEbWrR3FewATdCEebj6znwMfQkhRYHRLpJ", // zero depth with non-zero parent fingerprint
+            "xprv9s21ZrQH4r4TsiLvyLXqM9P7k1K3EYhA1kkD6xuquB5i39AU8KF42acDyL3qsDbU9NmZn6MsGSUYZEsuoePmjzsB3eFKSUEh3Gu1N3cqVUN", // zero depth with non-zero index
+            "xpub661MyMwAuDcm6CRQ5N4qiHKrJ39Xe1R1NyfouMKTTWcguwVcfrZJaNvhpebzGerh7gucBvzEQWRugZDuDXjNDRmXzSZe4c7mnTK97pTvGS8", // zero depth with non-zero index
+            "DMwo58pR1QLEFihHiXPVykYB6fJmsTeHvyTp7hRThAtCX8CvYzgPcn8XnmdfHGMQzT7ayAmfo4z3gY5KfbrZWZ6St24UVf2Qgo6oujFktLHdHY4", // unknown extended key version
+            "DMwo58pR1QLEFihHiXPVykYB6fJmsTeHvyTp7hRThAtCX8CvYzgPcn8XnmdfHPmHJiEDXkTiJTVV9rHEBUem2mwVbbNfvT2MTcAqj3nesx8uBf9", // unknown extended key version
+            "xprv9s21ZrQH143K24Mfq5zL5MhWK9hUhhGbd45hLXo2Pq2oqzMMo63oStZzF93Y5wvzdUayhgkkFoicQZcP3y52uPPxFnfoLZB21Teqt1VvEHx", // private key 0 not in 1..n-1
+            "xprv9s21ZrQH143K24Mfq5zL5MhWK9hUhhGbd45hLXo2Pq2oqzMMo63oStZzFAzHGBP2UuGCqWLTAPLcMtD5SDKr24z3aiUvKr9bJpdrcLg1y3G", // private key n not in 1..n-1
+            "xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6Q5JXayek4PRsn35jii4veMimro1xefsM58PgBMrvdYre8QyULY", // invalid pubkey 020000000000000000000000000000000000000000000000000000000000000007
+            "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHL", // invalid checksum
+        )
+        testCases.forEach { testCase ->
+            when {
+                testCase.startsWith("xpub") -> assertFails { DeterministicWallet.ExtendedPublicKey.decode(testCase) }
+                testCase.startsWith("xpriv") -> assertFails { DeterministicWallet.ExtendedPrivateKey.decode(testCase) }
+                else -> {
+                    assertFails { DeterministicWallet.ExtendedPublicKey.decode(testCase) }
+                    assertFails { DeterministicWallet.ExtendedPrivateKey.decode(testCase) }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `recover parent private key chain from master public key and child private key`() {
+        val m = DeterministicWallet.generate(ByteVector("000102030405060708090a0b0c0d0e0f"))
+        assertEquals(
+            DeterministicWallet.encode(m, testnet = false),
+            "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi"
+        )
+        val masterPriv = PrivateKey(m.secretkeybytes)
+        val masterPub = DeterministicWallet.publicKey(m)
+        assertEquals(
+            DeterministicWallet.encode(masterPub, testnet = false),
+            "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8"
+        )
+        assertEquals(DeterministicWallet.fingerprint(m), 876747070)
+
+        // now we have: the master public key, and a child private key, and we want to climb the tree back up
+        // to the master private key
+        val m42 = DeterministicWallet.derivePrivateKey(m, 42L)
+        val I = Crypto.hmac512(masterPub.chaincode.toByteArray(), masterPub.publickeybytes.toByteArray() + Pack.writeInt32BE(42))
+        val IL = I.take(32)
+        val recovered = PrivateKey(m42.secretkeybytes) - PrivateKey(IL.toByteArray())
+        assertContentEquals(masterPriv.value.toByteArray(), recovered.value.toByteArray())
+    }
+
+    @Test
+    fun `parse string-formatted derivation paths`() {
+        assertEquals(KeyPath("m/44'/0'/0'/0"), KeyPath(listOf(DeterministicWallet.hardened(44), DeterministicWallet.hardened(0), DeterministicWallet.hardened(0), 0)))
+        assertEquals(KeyPath("/44'/0'/0'/0"), KeyPath(listOf(DeterministicWallet.hardened(44), DeterministicWallet.hardened(0), DeterministicWallet.hardened(0), 0)))
+        assertEquals(KeyPath("44'/0'/0'/0"), KeyPath(listOf(DeterministicWallet.hardened(44), DeterministicWallet.hardened(0), DeterministicWallet.hardened(0), 0)))
+        assertEquals(KeyPath("m/44/0'/0'/0"), KeyPath(listOf(44, DeterministicWallet.hardened(0), DeterministicWallet.hardened(0), 0)))
+        assertEquals(KeyPath("m"), KeyPath(listOf()))
+        assertEquals(KeyPath(""), KeyPath(listOf()))
+        listOf("aa/1/2/3", "1/'2/3").forEach { path -> assertFails { KeyPath(path) } }
+    }
+
+    @Test
+    fun `derive private keys`() {
+        val random = Random
+        for (i in 0..50) {
+            val master = DeterministicWallet.generate(random.nextBytes(32))
+            for (j in 0..50) {
+                val index = random.nextLong()
+                val priv = DeterministicWallet.derivePrivateKey(master, index)
+
+                val encodedPriv = DeterministicWallet.encode(priv, DeterministicWallet.tprv)
+                val (prefixPriv, decodedPriv) = DeterministicWallet.ExtendedPrivateKey.decode(encodedPriv)
+                assertEquals(prefixPriv, DeterministicWallet.tprv)
+                assertEquals(decodedPriv.chaincode, priv.chaincode)
+                assertContentEquals(decodedPriv.secretkeybytes.toByteArray(), priv.secretkeybytes.toByteArray())
+
+                val pub = DeterministicWallet.publicKey(priv)
+                val encodedPub = DeterministicWallet.encode(pub, DeterministicWallet.tpub)
+                val (prefixPub, decodedPub) = DeterministicWallet.ExtendedPublicKey.decode(encodedPub)
+                assertEquals(prefixPub, DeterministicWallet.tpub)
+                assertEquals(decodedPub.chaincode, pub.chaincode)
+                assertContentEquals(decodedPub.publicKey.value.toByteArray(), pub.publicKey.value.toByteArray())
+            }
+        }
+    }
+
+    @Test
+    fun `toString does not leak xpriv`() {
+        val m = DeterministicWallet.generate(ByteVector("000102030405060708090a0b0c0d0e0f"))
+        assertEquals("<extended_private_key>", m.toString())
+    }
+
 }

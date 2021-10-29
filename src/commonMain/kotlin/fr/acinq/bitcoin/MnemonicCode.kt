@@ -67,8 +67,7 @@ public object MnemonicCode {
         val bitlength = (bits.size * 32) / 33
         val databits = bits.subList(0, bitlength)
         val checksumbits = bits.subList(bitlength, bits.size)
-        val data = group(databits, 8).map { fromBinary(it) }.map { it.toByte() }
-            .toByteArray()   // .grouped(8).map(fromBinary).map(_.toByte).toSeq
+        val data = group(databits, 8).map { fromBinary(it) }.map { it.toByte() }.toByteArray()
         val check = toBinary(Crypto.sha256(data)).take(data.size / 4)
         require(check == checksumbits) { "invalid checksum" }
     }
@@ -102,12 +101,10 @@ public object MnemonicCode {
      * @return a seed derived from the mnemonic words and passphrase
      */
     @JvmStatic
-    @OptIn(ExperimentalStdlibApi::class)
     public fun toSeed(mnemonics: List<String>, passphrase: String): ByteArray {
         val password = mnemonics.joinToString(" ").encodeToByteArray()
         val salt = ("mnemonic$passphrase").encodeToByteArray()
-        val key = Pbkdf2.withHmacSha512(password, salt, 2048, 64)
-        return key
+        return Pbkdf2.withHmacSha512(password, salt, 2048, 64)
     }
 
     @JvmStatic

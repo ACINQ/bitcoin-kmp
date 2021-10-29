@@ -21,7 +21,6 @@ import fr.acinq.secp256k1.Hex
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
-
 @OptIn(ExperimentalUnsignedTypes::class)
 public class UInt256() : Comparable<UInt256> {
     private val pn = UIntArray(WIDTH)
@@ -169,7 +168,7 @@ public class UInt256() : Comparable<UInt256> {
 
     public fun getLow64(): Long = pn[0].toLong() or (pn[1].toLong().shl(32))
 
-    public fun endodeCompact(fNegative: Boolean): Long {
+    public fun encodeCompact(fNegative: Boolean): Long {
         var nSize = (bits() + 7) / 8
         var nCompact: Long = if (nSize <= 3) {
             getLow64() shl 8 * (3 - nSize)

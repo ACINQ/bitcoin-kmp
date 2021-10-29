@@ -21,7 +21,6 @@ import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
-import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 public typealias RunnerCallback = (List<ScriptElt>, List<ByteVector>, Script.Runner.Companion.State) -> Boolean
@@ -29,11 +28,10 @@ public typealias RunnerCallback = (List<ScriptElt>, List<ByteVector>, Script.Run
 @OptIn(ExperimentalUnsignedTypes::class)
 public object Script {
     public const val MaxScriptElementSize: Int = 520
+    public const val LockTimeThreshold: Long = 500000000L
+
     public val True: ByteVector = ByteVector("01")
     public val False: ByteVector = ByteVector.empty
-
-    @JvmField
-    public val LockTimeThreshold: Long = 500000000L
 
     /**
      * parse a script from a input stream of binary data
@@ -288,14 +286,14 @@ public object Script {
     }
 
     /**
-     *
-     * @param pubKeyHash public key hash
-     * @return a pay-to-public-key-hash script
+     * @param pubKeys are the public keys signatures will be checked against.
+     * @param sigs    are the signatures for a subset of the public keys.
+     * @return script witness for the pay-to-witness-script-hash script containing a multisig script.
      */
     @JvmStatic
-    public fun pay2pkh(pubKeyHash: ByteArray): List<ScriptElt> {
-        require(pubKeyHash.size == 20) { "pubkey hash length must be 20 bytes" }
-        return listOf(OP_DUP, OP_HASH160, OP_PUSHDATA(pubKeyHash), OP_EQUALVERIFY, OP_CHECKSIG)
+    public fun witnessMultiSigMofN(pubKeys: List<PublicKey>, sigs: List<ByteVector>): ScriptWitness {
+        val redeemScript = write(createMultiSigMofN(sigs.size, pubKeys))
+        return ScriptWitness(listOf(ByteVector.empty) + sigs + listOf(ByteVector(redeemScript)))
     }
 
     @JvmStatic
@@ -343,7 +341,16 @@ public object Script {
     public fun isPay2wsh(script: ByteArray): Boolean = isPay2wsh(parse(script))
 
     /**
-     *
+     * @param pubKeyHash public key hash
+     * @return a pay-to-public-key-hash script
+     */
+    @JvmStatic
+    public fun pay2pkh(pubKeyHash: ByteArray): List<ScriptElt> {
+        require(pubKeyHash.size == 20) { "pubkey hash length must be 20 bytes" }
+        return listOf(OP_DUP, OP_HASH160, OP_PUSHDATA(pubKeyHash), OP_EQUALVERIFY, OP_CHECKSIG)
+    }
+
+    /**
      * @param pubKey public key
      * @return a pay-to-public-key-hash script
      */
@@ -567,7 +574,7 @@ public object Script {
                         val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags, context.amount, signatureVersion)
                         // signature is normalized here, but high-S correctness has already been checked
                         val normalized = Crypto.normalize(sigBytes1).first
-                        val pub = PublicKey(pubKey)
+                        val pub = PublicKey.parse(pubKey)
                         val result = Crypto.verifySignature(hash, normalized, pub)
                         result
                     }
@@ -1315,7 +1322,7 @@ public object Script {
             }
         }
 
-        public fun verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteArray): Unit {
+        public fun verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteArray) {
             val (stack, scriptPubKey) = when {
                 witnessVersion == 0L && program.size == 20 -> {
                     // P2WPKH, program is simply the pubkey hash

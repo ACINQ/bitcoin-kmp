@@ -21,11 +21,31 @@ import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
+/**
+ * A bitcoin public key (in compressed form).
+ * A public key is valid if it represents a point on the secp256k1 curve.
+ * The validity of this public key is not checked by default, because when you create a public key from a private key it will always be valid.
+ * However, if you receive a public key from an external, untrusted source, you should call `isValid()` before actually using it.
+ */
 public data class PublicKey(@JvmField val value: ByteVector) {
     public constructor(data: ByteArray) : this(ByteVector(data))
 
+    init {
+        require(value.size() == 33) { "public key must be in compressed form" }
+    }
+
+    /**
+     * A public key is valid if it represents a point on the secp256k1 curve.
+     */
+    public fun isValid(): Boolean = Crypto.isPubKeyValid(value.toByteArray())
+
     public operator fun plus(that: PublicKey): PublicKey {
         val pub = Secp256k1.pubKeyAdd(value.toByteArray(), that.value.toByteArray())
+        return PublicKey(compress(pub))
+    }
+
+    public operator fun minus(that: PublicKey): PublicKey {
+        val pub = Secp256k1.pubKeyAdd(value.toByteArray(), Secp256k1.pubKeyNegate(that.value.toByteArray()))
         return PublicKey(compress(pub))
     }
 
@@ -35,17 +55,14 @@ public data class PublicKey(@JvmField val value: ByteVector) {
     }
 
     /**
-     *
-     * @return the hash160 of the binary representation of this point. This can be used to generated addresses (the address
-     *         of a public key is he base58 encoding of its hash)
+     * @return the hash160 of the compressed binary representation of this point.
      */
     public fun hash160(): ByteArray = Crypto.hash160(value.toByteArray())
 
-    override fun toString(): String = value.toString()
-
-    public fun toUncompressedBin(): ByteArray {
-        return Secp256k1.pubkeyParse(value.toByteArray())
-    }
+    /**
+     * @return the uncompressed public key, which can be used for legacy addresses.
+     */
+    public fun toUncompressedBin(): ByteArray = Secp256k1.pubkeyParse(value.toByteArray())
 
     /**
      * @param chainHash chain hash (i.e. hash of the genesis block of the chain we're on)
@@ -58,9 +75,9 @@ public data class PublicKey(@JvmField val value: ByteVector) {
     }
 
     /**
-     *
      * @param chainHash chain hash (i.e. hash of the genesis block of the chain we're on)
-     * @return the p2swh-of-p2pkh address for this key). It is a Base58 address that is compatible with most bitcoin wallets
+     * @return the p2swh-of-p2pkh address for this key.
+     * It is a Base58 address that is compatible with most bitcoin wallets.
      */
     public fun p2shOfP2wpkhAddress(chainHash: ByteVector32): String {
         val script = Script.pay2wpkh(this)
@@ -73,35 +90,32 @@ public data class PublicKey(@JvmField val value: ByteVector) {
     }
 
     /**
-     *
      * @param chainHash chain hash (i.e. hash of the genesis block of the chain we're on)
-     * @return the BIP84 address for this key (i.e. the p2wpkh address for this key). It is a Bech32 address that will be
-     *         understood only by native segwit wallets
+     * @return the BIP84 address for this key (i.e. the p2wpkh address for this key).
+     * It is a Bech32 address that will be understood only by native segwit wallets.
      */
     public fun p2wpkhAddress(chainHash: ByteVector32): String {
-        val hrp = when (chainHash) {
-            Block.TestnetGenesisBlock.hash -> "tb"
-            Block.RegtestGenesisBlock.hash -> "bcrt"
-            Block.LivenetGenesisBlock.hash -> "bc"
-            else -> error("invalid chain hash $chainHash")
-        }
-        return Bech32.encodeWitnessAddress(hrp, 0, hash160())
+        return Bech32.encodeWitnessAddress(Bech32.hrp(chainHash), 0, hash160())
     }
 
-    init {
-        require(Crypto.isPubKeyValid(value.toByteArray()))
-    }
+    public fun toHex(): String = value.toHex()
+
+    override fun toString(): String = value.toString()
 
     public companion object {
         @JvmField
-        public val Generator: PublicKey = PublicKey(Hex.decode("0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"))
+        public val Generator: PublicKey = parse(Hex.decode("0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"))
 
         @JvmStatic
-        public fun compress(pub: ByteArray): ByteArray {
-            return if (Crypto.isPubKeyCompressed(pub)) pub else {
-                val pub1 = pub.copyOf(33)
-                pub1[0] = if (pub.last() % 2 == 0) 2.toByte() else 3.toByte()
-                pub1
+        public fun parse(pub: ByteArray): PublicKey = PublicKey(compress(pub))
+
+        @JvmStatic
+        public fun compress(pub: ByteArray): ByteArray = when {
+            Crypto.isPubKeyCompressed(pub) -> pub
+            else -> {
+                val compressed = pub.copyOf(33)
+                compressed[0] = if (pub.last() % 2 == 0) 2.toByte() else 3.toByte()
+                compressed
             }
         }
 

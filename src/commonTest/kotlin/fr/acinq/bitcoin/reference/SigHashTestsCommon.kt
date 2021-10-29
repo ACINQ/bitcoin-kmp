@@ -16,7 +16,6 @@
 
 package fr.acinq.bitcoin.reference
 
-
 import fr.acinq.bitcoin.Transaction
 import fr.acinq.secp256k1.Hex
 import kotlinx.serialization.json.Json
@@ -28,8 +27,10 @@ import org.kodein.memory.file.resolve
 import org.kodein.memory.text.readString
 import org.kodein.memory.use
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class SigHashTestsCommon {
+
     @Test
     fun `reference client sighash test`() {
         val file = TransactionTestsCommon.resourcesDir().resolve("data/sighash.json")
@@ -38,23 +39,15 @@ class SigHashTestsCommon {
         val json = format.parseToJsonElement(raw)
         // 	["raw_transaction, script, input_index, hashType, signature_hash (result)"],
         json.jsonArray.filter { it.jsonArray.size == 5 }.map { it.jsonArray }.forEach {
-            val raw_transaction = it[0].jsonPrimitive.content
+            val rawTx = it[0].jsonPrimitive.content
             val script = it[1].jsonPrimitive.content
-            val input_index = it[2].jsonPrimitive.int
+            val inputIndex = it[2].jsonPrimitive.int
             val hashType = it[3].jsonPrimitive.int
-            val signature_hash = it[4].jsonPrimitive.content
-
-            val tx = Transaction.read(raw_transaction)
-            val hash = Transaction.hashForSigning(tx, input_index, Hex.decode(script), hashType)
-            if (Hex.encode(hash.reversed().toByteArray()) != signature_hash) {
-                println("sighash error")
-                println("$raw_transaction")
-                println("$script")
-                println("$input_index")
-                println("$hashType")
-                println("$signature_hash")
-                throw RuntimeException("sighash error")
-            }
+            val signatureHash = it[4].jsonPrimitive.content
+            val tx = Transaction.read(rawTx)
+            val hash = Transaction.hashForSigning(tx, inputIndex, Hex.decode(script), hashType)
+            assertEquals(signatureHash, Hex.encode(hash.reversed().toByteArray()))
         }
     }
+
 }

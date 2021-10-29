@@ -17,7 +17,6 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Bitcoin.computeBIP84Address
-import fr.acinq.secp256k1.Hex
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -42,7 +41,7 @@ class BIP84TestsCommon {
         assertEquals(key.privateKey.toBase58(Base58.Prefix.SecretKey), "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d")
         assertEquals(
             key.publicKey,
-            PublicKey(Hex.decode("0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c"))
+            PublicKey.fromHex("0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c")
         )
         assertEquals(computeBIP84Address(key.publicKey, Block.LivenetGenesisBlock.hash), "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu")
 
@@ -51,7 +50,7 @@ class BIP84TestsCommon {
         assertEquals(key1.privateKey.toBase58(Base58.Prefix.SecretKey), "Kxpf5b8p3qX56DKEe5NqWbNUP9MnqoRFzZwHRtsFqhzuvUJsYZCy")
         assertEquals(
             key1.publicKey,
-            PublicKey(Hex.decode("03e775fd51f0dfb8cd865d9ff1cca2a158cf651fe997fdc9fee9c1d3b5e995ea77"))
+            PublicKey.fromHex("03e775fd51f0dfb8cd865d9ff1cca2a158cf651fe997fdc9fee9c1d3b5e995ea77")
         )
         assertEquals(computeBIP84Address(key1.publicKey, Block.LivenetGenesisBlock.hash), "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g")
 
@@ -60,7 +59,7 @@ class BIP84TestsCommon {
         assertEquals(key2.privateKey.toBase58(Base58.Prefix.SecretKey), "KxuoxufJL5csa1Wieb2kp29VNdn92Us8CoaUG3aGtPtcF3AzeXvF")
         assertEquals(
             key2.publicKey,
-            PublicKey(Hex.decode("03025324888e429ab8e3dbaf1f7802648b9cd01e9b418485c5fa4c1b9b5700e1a6"))
+            PublicKey.fromHex("03025324888e429ab8e3dbaf1f7802648b9cd01e9b418485c5fa4c1b9b5700e1a6")
         )
         assertEquals(computeBIP84Address(key2.publicKey, Block.LivenetGenesisBlock.hash), "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el")
     }

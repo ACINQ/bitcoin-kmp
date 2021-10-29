@@ -44,26 +44,36 @@ public object DeterministicWallet {
         @JvmField val path: KeyPath,
         @JvmField val parent: Long
     ) {
-        @JvmField
-        val privateKey: PrivateKey = PrivateKey(secretkeybytes)
+        init {
+            require(Crypto.isPrivKeyValid(secretkeybytes.toByteArray())) { "private key is invalid" }
+            require(depth != 0 || parent == 0L) { "zero depth with non-zero parent fingerprint" }
+            require(depth != 0 || path.lastChildNumber == 0L) { "zero depth with non-zero child number" }
+        }
 
-        @JvmField
-        val publicKey: PublicKey = privateKey.publicKey()
+        val privateKey: PrivateKey get() = PrivateKey(secretkeybytes)
+        val publicKey: PublicKey get() = privateKey.publicKey()
+
+        /**
+         * We avoid accidentally logging extended private keys.
+         * You should use an explicit method if you want to convert the extended private key to a string representation.
+         */
+        override fun toString(): String = "<extended_private_key>"
 
         public companion object {
             @JvmStatic
             public fun decode(input: String, parentPath: KeyPath = KeyPath.empty): Pair<Int, ExtendedPrivateKey> {
                 val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
+                require(prefix == xprv || prefix == yprv || prefix == zprv || prefix == tprv || prefix == uprv || prefix == vprv) { "invalid prefix" }
                 val bis = ByteArrayInput(bin)
                 val depth = bis.read()
-                val parent = Pack.int32BE(bis).toLong() and 0xffffffffL
-                val childNumber = Pack.int32BE(bis).toLong() and 0xffffffffL
+                val parent = Pack.int32BE(bis).toLong() and 0xffffffff
+                val childNumber = Pack.int32BE(bis).toLong() and 0xffffffff
                 val chaincode = ByteArray(32)
                 bis.read(chaincode, 0)
                 require(bis.read() == 0)
-                val secretkeybytes = ByteArray(32)
-                bis.read(secretkeybytes, 0)
-                return Pair(prefix, ExtendedPrivateKey(secretkeybytes.byteVector32(), chaincode.byteVector32(), depth, parentPath.derive(childNumber), parent))
+                val secretKeyBytes = ByteArray(32)
+                bis.read(secretKeyBytes, 0)
+                return Pair(prefix, ExtendedPrivateKey(secretKeyBytes.byteVector32(), chaincode.byteVector32(), depth, parentPath.derive(childNumber), parent))
             }
         }
     }
@@ -77,6 +87,9 @@ public object DeterministicWallet {
     ) {
         init {
             require(publickeybytes.size() == 33)
+            require(Crypto.isPubKeyValid(publickeybytes.toByteArray())) { "public key is invalid" }
+            require(depth != 0 || parent == 0L) { "zero depth with non-zero parent fingerprint" }
+            require(depth != 0 || path.lastChildNumber == 0L) { "zero depth with non-zero child number" }
         }
 
         val publicKey: PublicKey get() = PublicKey(publickeybytes)
@@ -85,15 +98,16 @@ public object DeterministicWallet {
             @JvmStatic
             public fun decode(input: String, parentPath: KeyPath = KeyPath.empty): Pair<Int, ExtendedPublicKey> {
                 val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
+                require(prefix == xpub || prefix == ypub || prefix == zpub || prefix == tpub || prefix == upub || prefix == vpub) { "invalid prefix" }
                 val bis = ByteArrayInput(bin)
                 val depth = bis.read()
-                val parent = Pack.int32BE(bis).toLong() and 0xffffffffL
-                val childNumber = Pack.int32BE(bis).toLong() and 0xffffffffL
+                val parent = Pack.int32BE(bis).toLong() and 0xffffffff
+                val childNumber = Pack.int32BE(bis).toLong() and 0xffffffff
                 val chaincode = ByteArray(32)
                 bis.read(chaincode, 0)
-                val publickeybytes = ByteArray(33)
-                bis.read(publickeybytes, 0)
-                return Pair(prefix, ExtendedPublicKey(publickeybytes.byteVector(), chaincode.byteVector32(), depth, parentPath.derive(childNumber), parent))
+                val publicKeyBytes = ByteArray(33)
+                bis.read(publicKeyBytes, 0)
+                return Pair(prefix, ExtendedPublicKey(publicKeyBytes.byteVector(), chaincode.byteVector32(), depth, parentPath.derive(childNumber), parent))
             }
         }
     }
@@ -135,12 +149,10 @@ public object DeterministicWallet {
     }
 
     /**
-     *
      * @param seed random seed
      * @return a "master" private key
      */
     @JvmStatic
-    @OptIn(ExperimentalStdlibApi::class)
     public fun generate(seed: ByteArray): ExtendedPrivateKey {
         val I = Crypto.hmac512("Bitcoin seed".encodeToByteArray(), seed)
         val IL = I.take(32).toByteArray().byteVector32()
@@ -149,7 +161,6 @@ public object DeterministicWallet {
     }
 
     /**
-     *
      * @param seed random seed
      * @return a "master" private key
      */
@@ -157,7 +168,6 @@ public object DeterministicWallet {
     public fun generate(seed: ByteVector): ExtendedPrivateKey = generate(seed.toByteArray())
 
     /**
-     *
      * @param input extended private key
      * @return the public key for this private key
      */
@@ -167,7 +177,6 @@ public object DeterministicWallet {
     }
 
     /**
-     *
      * @param input extended public key
      * @return the fingerprint for this public key
      */
@@ -175,7 +184,6 @@ public object DeterministicWallet {
     public fun fingerprint(input: ExtendedPublicKey): Long = Pack.int32LE(ByteArrayInput(Crypto.hash160(input.publickeybytes).take(4).reversed().toByteArray())).toLong()
 
     /**
-     *
      * @param input extended private key
      * @return the fingerprint for this private key (which is based on the corresponding public key)
      */
@@ -183,7 +191,6 @@ public object DeterministicWallet {
     public fun fingerprint(input: ExtendedPrivateKey): Long = fingerprint(publicKey(input))
 
     /**
-     *
      * @param parent extended private key
      * @param index  index of the child key
      * @return the derived private key at the specified index
@@ -191,19 +198,20 @@ public object DeterministicWallet {
     @JvmStatic
     public fun derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey {
         val I = if (isHardened(index)) {
-            val buffer = arrayOf(0.toByte()).toByteArray() + parent.secretkeybytes.toByteArray()
-            Crypto.hmac512(parent.chaincode.toByteArray(), buffer + Pack.writeInt32BE(index.toInt()))
+            val data = arrayOf(0.toByte()).toByteArray() + parent.secretkeybytes.toByteArray() + Pack.writeInt32BE(index.toInt())
+            Crypto.hmac512(parent.chaincode.toByteArray(), data)
         } else {
-            val pub = publicKey(parent).publickeybytes
-            Crypto.hmac512(parent.chaincode.toByteArray(), pub.toByteArray() + Pack.writeInt32BE(index.toInt()))
+            val data = publicKey(parent).publickeybytes.toByteArray() + Pack.writeInt32BE(index.toInt())
+            Crypto.hmac512(parent.chaincode.toByteArray(), data)
         }
         val IL = I.take(32).toByteArray()
         val IR = I.takeLast(32).toByteArray()
+        require(Crypto.isPrivKeyValid(IL)) { "cannot generate child private key: IL is invalid" }
 
         val key = PrivateKey(IL) + parent.privateKey
-        val buffer = key.value.toByteArray()
+        require(Crypto.isPrivKeyValid(key.value.toByteArray())) { "cannot generate child private key: resulting private key is invalid" }
         return ExtendedPrivateKey(
-            buffer.byteVector32(),
+            secretkeybytes = key.value,
             chaincode = IR.byteVector32(),
             depth = parent.depth + 1,
             path = parent.path.derive(index),
@@ -212,7 +220,6 @@ public object DeterministicWallet {
     }
 
     /**
-     *
      * @param parent extended public key
      * @param index  index of the child key
      * @return the derived public key at the specified index
@@ -227,20 +234,12 @@ public object DeterministicWallet {
         )
         val IL = I.take(32).toByteArray()
         val IR = I.takeLast(32).toByteArray()
+        require(Crypto.isPrivKeyValid(IL)) { "cannot generate child public key: IL is invalid" }
 
-        // TODO: add this check (extremely unlikely)
-//        val p = UInt256(IL)
-//        if (p.compareTo(Crypto.curve.n) == 1) {
-//            throw RuntimeException("cannot generated child public key")
-//        }
         val Ki = PrivateKey(IL).publicKey() + parent.publicKey
-        // TODO: add this check (extremely unlikely)
-//        if (Ki.point.isInfinity) {
-//            throw RuntimeException("cannot generated child public key")
-//        }
-        val buffer = Ki.value
+        require(Crypto.isPubKeyValid(Ki.value.toByteArray())) { "cannot generate child public key: resulting public key is invalid" }
         return ExtendedPublicKey(
-            buffer,
+            publickeybytes = Ki.value,
             chaincode = IR.byteVector32(),
             depth = parent.depth + 1,
             path = parent.path.derive(index),
@@ -326,16 +325,20 @@ public data class KeyPath(@JvmField val path: List<Long>) {
             fun toNumber(value: String): Long = if (value.last() == '\'') hardened(value.dropLast(1).toLong()) else value.toLong()
 
             val path1 = path.removePrefix("m").removePrefix("/")
-            return if (path1.isEmpty())
+            return if (path1.isEmpty()) {
                 listOf()
-            else
+            } else {
                 path1.split('/').map { toNumber(it) }
+            }
         }
 
         @JvmStatic
         public fun fromPath(path: String): KeyPath = KeyPath(path)
 
-        public fun childNumberToString(childNumber: Long): String =
-            if (DeterministicWallet.isHardened(childNumber)) ((childNumber - DeterministicWallet.hardenedKeyIndex).toString() + "'") else childNumber.toString()
+        public fun childNumberToString(childNumber: Long): String = if (DeterministicWallet.isHardened(childNumber)) {
+            ((childNumber - DeterministicWallet.hardenedKeyIndex).toString() + "'")
+        } else {
+            childNumber.toString()
+        }
     }
 }

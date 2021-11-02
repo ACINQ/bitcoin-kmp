@@ -7,8 +7,26 @@ import fr.acinq.bitcoin.Bitcoin.computeP2WpkhAddress
 import fr.acinq.secp256k1.Hex
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 
 class BitcoinTestsCommon {
+    @Test
+    fun `update lists`() {
+        assertEquals(listOf<Int>().updated(0, 1), listOf(1))
+        assertEquals(listOf(5).updated(0, 1), listOf(1))
+        val l = listOf(2, 3, 5, 7, 11, 13, 17)
+        assertFails { l.updated(-1, 1) }
+        assertEquals(l.updated(0, 1), listOf(1, 3, 5, 7, 11, 13, 17))
+        assertEquals(l.updated(1, 1), listOf(2, 1, 5, 7, 11, 13, 17))
+        assertEquals(l.updated(2, 1), listOf(2, 3, 1, 7, 11, 13, 17))
+        assertEquals(l.updated(3, 1), listOf(2, 3, 5, 1, 11, 13, 17))
+        assertEquals(l.updated(4, 1), listOf(2, 3, 5, 7, 1, 13, 17))
+        assertEquals(l.updated(5, 1), listOf(2, 3, 5, 7, 11, 1, 17))
+        assertEquals(l.updated(6, 1), listOf(2, 3, 5, 7, 11, 13, 1))
+        assertEquals(l.updated(7, 1), listOf(2, 3, 5, 7, 11, 13, 17, 1))
+        assertEquals(l.updated(42, 1), listOf(2, 3, 5, 7, 11, 13, 17, 1))
+    }
+
     @Test
     fun `compute address from pubkey script`() {
         val pub = PrivateKey.fromHex("0101010101010101010101010101010101010101010101010101010101010101").publicKey()

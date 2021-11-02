@@ -31,7 +31,7 @@ public fun fixSize(data: ByteArray, size: Int): ByteArray = when {
 public fun <T> List<T>.updated(i: Int, t: T): List<T> = when (i) {
     0 -> listOf(t) + this.drop(1)
     this.lastIndex -> this.dropLast(1) + t
-    else -> this.take(i) + t + this.take(this.size - i - 1)
+    else -> this.take(i) + t + this.drop(i + 1)
 }
 
 public object Bitcoin {

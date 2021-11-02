@@ -37,13 +37,13 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
 
     public operator fun get(i: Int): Byte = bytes[offset + i]
 
-    public fun take(n: Int): ByteVector {
-        return ByteVector(bytes, offset, n)
-    }
+    public fun take(n: Int): ByteVector = ByteVector(bytes, offset, n)
 
-    public fun drop(n: Int): ByteVector {
-        return ByteVector(bytes, offset + n, size - n)
-    }
+    public fun drop(n: Int): ByteVector = ByteVector(bytes, offset + n, size - n)
+
+    public fun takeRight(n: Int): ByteVector = drop(size - n)
+
+    public fun dropRight(n: Int): ByteVector = take(size - n)
 
     public fun slice(from: Int, to: Int): ByteVector = drop(from).take(to - from)
 
@@ -53,20 +53,12 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
         return ByteVector(newbytes)
     }
 
-    public fun takeRight(n: Int): ByteVector = drop(size - n)
-
-    public fun dropRight(n: Int): ByteVector = take(size - n)
-
-    public fun concat(value: Byte): ByteVector {
-        return ByteVector(toByteArray() + value)
-    }
-
     public operator fun plus(other: ByteVector): ByteVector = concat(other)
 
     public operator fun plus(other: ByteArray): ByteVector = concat(other)
 
     public fun or(other: ByteVector): ByteVector {
-        require(size() == other.size) { "cannot call or() on byte vectors of different sizes" }
+        require(size == other.size) { "cannot call or() on byte vectors of different sizes" }
         val data = toByteArray()
         for (i in data.indices) {
             data[i] = data[i] or other[i]
@@ -85,6 +77,8 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
         if (length == size) return this
         return ByteVector(toByteArray() + ByteArray(length - size))
     }
+
+    public fun concat(value: Byte): ByteVector = ByteVector(toByteArray() + value)
 
     public fun concat(other: ByteArray): ByteVector = ByteVector(toByteArray() + other)
 
@@ -133,6 +127,9 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
     public companion object {
         @JvmField
         public val empty: ByteVector = ByteVector(ByteArray(0))
+
+        @JvmStatic
+        public fun fromHex(hex: String): ByteVector = ByteVector(Hex.decode(hex))
     }
 }
 
@@ -141,11 +138,7 @@ public class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, off
     public constructor(input: String) : this(Hex.decode(input), 0)
     public constructor(input: ByteVector) : this(input.bytes, input.offset)
 
-    override fun update(i: Int, b: Byte): ByteVector32 {
-        val newbytes = toByteArray()
-        newbytes[i] = b
-        return ByteVector32(newbytes)
-    }
+    override fun update(i: Int, b: Byte): ByteVector32 = ByteVector32(super.update(i, b))
 
     override fun reversed(): ByteVector32 = ByteVector32(super.toByteArray().reversedArray())
 
@@ -164,6 +157,11 @@ public class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, off
 public class ByteVector64(bytes: ByteArray, offset: Int) : ByteVector(bytes, offset, 64) {
     public constructor(bytes: ByteArray) : this(bytes, 0)
     public constructor(input: String) : this(Hex.decode(input), 0)
+    public constructor(input: ByteVector) : this(input.bytes, input.offset)
+
+    override fun update(i: Int, b: Byte): ByteVector64 = ByteVector64(super.update(i, b))
+
+    override fun reversed(): ByteVector64 = ByteVector64(super.toByteArray().reversedArray())
 
     public companion object {
         @JvmField

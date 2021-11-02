@@ -157,7 +157,13 @@ public object Crypto {
     public fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean =
         verifySignature(data.toByteArray(), signature, publicKey)
 
-    private fun dropZeroAndFixSize(input: ByteArray, size: Int) = fixSize(input.dropWhile { it == 0.toByte() }.toByteArray(), size)
+    private fun padLeft(data: ByteArray, size: Int): ByteArray = when {
+        data.size == size -> data
+        data.size < size -> ByteArray(size - data.size) + data
+        else -> throw RuntimeException("cannot pad left: byte array is too big (${data.size} > $size)")
+    }
+
+    private fun dropZeroAndFixSize(input: ByteArray, size: Int) = padLeft(input.dropWhile { it == 0.toByte() }.toByteArray(), size)
 
     @JvmStatic
     public fun compact2der(signature: ByteVector64): ByteVector {

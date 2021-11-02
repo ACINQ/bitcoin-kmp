@@ -20,14 +20,6 @@ import kotlin.jvm.JvmStatic
 
 public const val MaxBlockSize: Int = 1000000
 
-public fun fixSize(data: ByteArray, size: Int): ByteArray = when {
-    data.size == size -> data
-    data.size < size -> ByteArray(size - data.size) + data
-    else -> {
-        throw RuntimeException("overflow")
-    }
-}
-
 public fun <T> List<T>.updated(i: Int, t: T): List<T> = when (i) {
     0 -> listOf(t) + this.drop(1)
     this.lastIndex -> this.dropLast(1) + t

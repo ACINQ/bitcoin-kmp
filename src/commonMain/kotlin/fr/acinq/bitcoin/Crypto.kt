@@ -364,4 +364,16 @@ public object Crypto {
     public fun recoverPublicKey(sig: ByteVector64, message: ByteArray, recid: Int): PublicKey {
         return PublicKey(PublicKey.compress(Secp256k1.ecdsaRecover(sig.toByteArray(), message, recid)))
     }
+
+    /**
+     * @param input data to be hashed
+     * @param tag tag name
+     * @return the tagged hash of input as defined in BIP340
+     */
+    @JvmStatic
+    public fun taggedHash(input: ByteArray, tag: String): ByteVector32 {
+        val hashedTag = sha256(tag.encodeToByteArray())
+        return sha256(hashedTag + hashedTag + input).byteVector32()
+    }
+
 }

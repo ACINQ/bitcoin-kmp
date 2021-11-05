@@ -179,7 +179,7 @@ class ScriptTestsCommon {
             val scriptPubKey = parseFromText(scriptPubKeyText)
             val scriptSig = parseFromText(scriptSigText)
             val tx = spendingTx(scriptSig, creditTx(scriptPubKey, amount)).updateWitness(0, witness)
-            val ctx = Script.Context(tx, 0, amount)
+            val ctx = Script.Context(tx, 0, amount, listOf())
             val runner = Script.Runner(ctx, parseScriptFlags(flags))
 
             val expected = expectedText == "OK"

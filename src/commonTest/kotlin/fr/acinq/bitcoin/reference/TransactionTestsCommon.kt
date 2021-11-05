@@ -102,7 +102,7 @@ class TransactionTestsCommon {
                             if (tx.txIn[i].outPoint.isCoinbase) continue
                             val prevOutputScript = prevoutMap.getValue(tx.txIn[i].outPoint)
                             val amount = prevamountMap[tx.txIn[i].outPoint] ?: 0L.toSatoshi()
-                            val ctx = Script.Context(tx, i, amount)
+                            val ctx = Script.Context(tx, i, amount, listOf())
                             val runner = Script.Runner(ctx, if (valid) verifyFlags.inv() else verifyFlags)
                             if (!runner.verifyScripts(tx.txIn[i].signatureScript, prevOutputScript, tx.txIn[i].witness)) {
                                 throw RuntimeException("tx ${tx.txid} does not spend its input #$i")

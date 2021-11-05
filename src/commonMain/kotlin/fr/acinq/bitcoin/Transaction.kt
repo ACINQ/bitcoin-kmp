@@ -318,6 +318,22 @@ public data class Transaction(
 
     public fun weight(): Int = weight(this)
 
+    public fun transactionData(inputs: List<TxOut>, sighashType: Int) : ByteArray {
+        val out = ByteArrayOutput()
+        BtcSerializer.writeUInt32(version.toUInt(), out)
+        BtcSerializer.writeUInt32(lockTime.toUInt(), out)
+        if ((sighashType and 0x80) != SigHash.SIGHASH_ANYONECANPAY) {
+            out.write(prevoutsSha256(this))
+            out.write(amountsSha256(inputs))
+            out.write(scriptPubkeysSha256(inputs))
+            out.write(sequencesSha256(this))
+        }
+        if ((sighashType and 3) != SigHash.SIGHASH_NONE && (sighashType and 3) != SigHash.SIGHASH_SINGLE) {
+            out.write(outputsSha256(this))
+        }
+        return out.toByteArray()
+    }
+
     override fun toString(): String {
         return Hex.encode(write(this))
     }
@@ -429,6 +445,41 @@ public data class Transaction(
 
         @JvmStatic
         public fun isCoinbase(input: Transaction): Boolean = input.txIn.count() == 1 && OutPoint.isCoinbase(input.txIn.first().outPoint)
+
+        @JvmStatic
+        public fun prevoutsSha256(tx: Transaction): ByteArray {
+            val arrays = tx.txIn.map { it.outPoint }.map { OutPoint.write(it, Protocol.PROTOCOL_VERSION) }
+            val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
+            return Crypto.sha256(concatenated)
+        }
+
+        @JvmStatic
+        public fun amountsSha256(inputs: List<TxOut>): ByteArray {
+            val arrays = inputs.map { it.amount }.map { BtcSerializer.writeUInt64(it.toLong().toULong()) }
+            val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
+            return Crypto.sha256(concatenated)
+        }
+
+        @JvmStatic
+        public fun scriptPubkeysSha256(inputs: List<TxOut>): ByteArray {
+            val buffer = ByteArrayOutput()
+            inputs.forEach { BtcSerializer.writeScript(it.publicKeyScript, buffer) }
+            return Crypto.sha256(buffer.toByteArray())
+        }
+
+        @JvmStatic
+        public fun sequencesSha256(tx: Transaction): ByteArray {
+            val arrays = tx.txIn.map { it.sequence }.map { BtcSerializer.writeUInt32(it.toUInt()) }
+            val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
+            return Crypto.sha256(concatenated)
+        }
+
+        @JvmStatic
+        public fun outputsSha256(tx: Transaction): ByteArray {
+            val arrays = tx.txOut.map { TxOut.write(it) }
+            val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
+            return Crypto.sha256(concatenated)
+        }
 
         /**
          * prepare a transaction for signing a specific input
@@ -630,13 +681,38 @@ public data class Transaction(
             signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, privateKey)
 
         @JvmStatic
+        public fun hashForSigningSchnorr(tx: Transaction, inputIndex: Int, inputs: List<TxOut>, sighashType: Int): ByteVector32 {
+            val out = ByteArrayOutput()
+            out.write(0)
+            out.write(sighashType)
+            val txData = tx.transactionData(inputs, sighashType)
+            out.write(txData)
+            out.write(0)
+            if ((sighashType and 0x80) == SigHash.SIGHASH_ANYONECANPAY) {
+                OutPoint.write(tx.txIn[inputIndex].outPoint, out)
+                writeUInt64(inputs[inputIndex].amount.toULong(), out)
+                writeScript(inputs[inputIndex].publicKeyScript, out)
+                writeUInt32(tx.txIn[inputIndex].sequence.toUInt(), out)
+            } else {
+                writeUInt32(inputIndex.toUInt(), out)
+            }
+            if ((sighashType and 3) == SigHash.SIGHASH_SINGLE) {
+                val ser = TxOut.write(tx.txOut[inputIndex])
+                out.write(Crypto.sha256(ser))
+            }
+            val preimage = out.toByteArray()
+            return Crypto.taggedHash(preimage, "TapSighash")
+        }
+
+        @JvmStatic
         public fun correctlySpends(tx: Transaction, previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int, callback: RunnerCallback? = null) {
+            val prevouts = tx.txIn.map { previousOutputs[it.outPoint]!! }
             for (i in 0 until tx.txIn.count()) {
                 if (OutPoint.isCoinbase(tx.txIn.elementAt(i).outPoint)) continue
                 val prevOutput = previousOutputs.getValue(tx.txIn[i].outPoint)
                 val prevOutputScript = prevOutput.publicKeyScript
                 val amount = prevOutput.amount
-                val ctx = Script.Context(tx, i, amount)
+                val ctx = Script.Context(tx, i, amount, prevouts)
                 val runner = Script.Runner(ctx, scriptFlags, callback)
                 if (!runner.verifyScripts(tx.txIn[i].signatureScript, prevOutputScript, tx.txIn[i].witness)) throw RuntimeException("tx ${tx.txid} does not spend its input #$i")
             }

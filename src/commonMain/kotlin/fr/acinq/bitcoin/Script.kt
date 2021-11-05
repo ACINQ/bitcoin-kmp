@@ -21,6 +21,7 @@ import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
+import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmStatic
 
 public typealias RunnerCallback = (List<ScriptElt>, List<ByteVector>, Script.Runner.Companion.State) -> Boolean
@@ -435,6 +436,13 @@ public object Script {
     public fun pay2wpkh(pubKey: PublicKey): List<ScriptElt> = pay2wpkh(pubKey.hash160())
 
     /**
+     * @param pubkey x-only public key
+     * @return a pay-to-taproot script
+     */
+    @JvmStatic
+    public fun pay2tr(pubkey: XonlyPublicKey): List<ScriptElt> = listOf(OP_1, OP_PUSHDATA(pubkey.value))
+
+    /**
      * @param pubKey public key
      * @param sig signature matching the public key
      * @return script witness for the corresponding pay-to-witness-public-key-hash script
@@ -542,7 +550,7 @@ public object Script {
      * @param tx         transaction that is being verified
      * @param inputIndex 0-based index of the tx input that is being processed
      */
-    public data class Context(val tx: Transaction, val inputIndex: Int, val amount: Satoshi) {
+    public data class Context(val tx: Transaction, val inputIndex: Int, val amount: Satoshi, val prevouts: List<TxOut>) {
         init {
             require(inputIndex >= 0 && inputIndex < tx.txIn.count()) { "invalid input index" }
         }
@@ -554,6 +562,10 @@ public object Script {
         public val callback: RunnerCallback? = null
     ) {
         public companion object {
+            public val WITNESS_V0_SCRIPTHASH_SIZE: Int = 32
+            public val WITNESS_V0_KEYHASH_SIZE: Int = 20
+            public val WITNESS_V1_TAPROOT_SIZE: Int = 32
+
             /**
              * This class represents the state of the script execution engine
              *
@@ -1340,21 +1352,48 @@ public object Script {
             }
         }
 
-        public fun verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteArray) {
+        public fun verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteArray, isP2sh: Boolean = false) {
+
+            fun sigHashType(sig: ByteArray): Int = when {
+                sig.size == 64 -> SigHash.SIGHASH_DEFAULT
+                sig.size == 65 && sig[64].toInt() == SigHash.SIGHASH_DEFAULT -> error("invalid sig hashtype")
+                sig.size == 65 -> sig[64].toInt()
+                else -> error("invalid signature")
+            }
+
+            fun sigHashType(sig: ByteVector): Int = sigHashType(sig.toByteArray())
+
             val (stack, scriptPubKey) = when {
-                witnessVersion == 0L && program.size == 20 -> {
+                witnessVersion == 0L && program.size == WITNESS_V0_KEYHASH_SIZE -> {
                     // P2WPKH, program is simply the pubkey hash
                     require(witness.stack.count() == 2) { "Invalid witness program, should have 2 items" }
                     Pair(witness.stack, listOf(OP_DUP, OP_HASH160, OP_PUSHDATA(program), OP_EQUALVERIFY, OP_CHECKSIG))
 
                 }
-                witnessVersion == 0L && program.size == 32 -> {
+                witnessVersion == 0L && program.size == WITNESS_V0_SCRIPTHASH_SIZE -> {
                     // P2WPSH, program is the hash of the script, and witness is the stack + the script
                     val check = Crypto.sha256(witness.stack.last())
                     require(check.contentEquals(program)) { "witness program mismatch" }
                     Pair(witness.stack.take(witness.stack.count() - 1), parse(witness.stack.last()))
                 }
                 witnessVersion == 0L -> throw IllegalArgumentException("Invalid witness program length: ${program.size}")
+                witnessVersion == 1L && program.size == WITNESS_V1_TAPROOT_SIZE && !isP2sh -> {
+                    // BIP341 Taproot: 32-byte non-P2SH witness v1 program (which encodes a P2C-tweaked pubkey)
+                    if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_TAPROOT) == 0) return
+                    require(witness.stack.isNotEmpty()) { "Witness program cannot be empty" }
+                    // Key path spending (stack size is 1 after removing optional annex)
+                    if (witness.stack.size == 1) {
+                        val sig = witness.stack.first()
+                        val pub = XonlyPublicKey(program.byteVector32())
+                        val hashType = sigHashType(sig)
+                        val hash = Transaction.hashForSigningSchnorr(context.tx, context.inputIndex, context.prevouts, hashType)
+                        require(Secp256k1.verifySchnorr(sig.toByteArray(), hash.toByteArray(), pub.value.toByteArray())) { " invalid Schnorr signature " }
+                        return
+                    } else {
+                        // FIXME: implement tapscript
+                        Pair(witness.stack.take(witness.stack.count() - 1), parse(witness.stack.last()))
+                    }
+                }
                 (scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM) != 0 -> throw IllegalArgumentException("Invalid witness version: $witnessVersion")
                 else -> {
                     // Higher version witness scripts return true for future softfork compatibility

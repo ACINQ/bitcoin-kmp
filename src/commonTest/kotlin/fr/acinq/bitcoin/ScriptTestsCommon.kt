@@ -81,7 +81,7 @@ class ScriptTestsCommon {
             txOut = listOf(TxOut(0x12a05f200L.sat(), ByteVector.empty)),
             lockTime = 0
         )
-        val ctx = Script.Context(tx, 0, 0.sat())
+        val ctx = Script.Context(tx, 0, 0.sat(), listOf())
         val runner = Script.Runner(ctx)
         val script = listOf(OP_1, OP_2, OP_EQUAL, OP_IF, OP_3, OP_ELSE, OP_4, OP_ENDIF)
         val stack = runner.run(script, SigVersion.SIGVERSION_BASE)

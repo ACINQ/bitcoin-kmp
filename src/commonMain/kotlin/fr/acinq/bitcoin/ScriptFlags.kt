@@ -100,6 +100,20 @@ public object ScriptFlags {
     //
     public const val SCRIPT_VERIFY_CONST_SCRIPTCODE: Int = (1 shl 16)
 
+    // Taproot/Tapscript validation (BIPs 341 & 342)
+    //
+    public const val SCRIPT_VERIFY_TAPROOT: Int = (1 shl 17)
+
+    // Making unknown Taproot leaf versions non-standard
+    //
+    public const val SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION: Int = (1 shl 18)
+
+    // Making unknown OP_SUCCESS non-standard
+    public const val SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS: Int = (1 shl 19)
+
+    // Making unknown public key versions (in BIP 342 scripts) non-standard
+    public const val SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_PUBKEYTYPE: Int = (1 shl 20)
+
     /**
      * Mandatory script verification flags that all new blocks must comply with for
      * them to be valid. (but old blocks may not comply with) Currently just P2SH,
@@ -129,8 +143,13 @@ public object ScriptFlags {
             SCRIPT_VERIFY_CHECKSEQUENCEVERIFY or
             SCRIPT_VERIFY_LOW_S or
             SCRIPT_VERIFY_WITNESS or
-            SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM
-
+            SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM or
+            SCRIPT_VERIFY_WITNESS_PUBKEYTYPE or
+            SCRIPT_VERIFY_CONST_SCRIPTCODE or
+            SCRIPT_VERIFY_TAPROOT or
+            SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION or
+            SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS or
+            SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_PUBKEYTYPE
     /** For convenience, standard but not mandatory verify flags. */
     public const val STANDARD_NOT_MANDATORY_VERIFY_FLAGS: Int = STANDARD_SCRIPT_VERIFY_FLAGS and MANDATORY_SCRIPT_VERIFY_FLAGS.inv()
 }

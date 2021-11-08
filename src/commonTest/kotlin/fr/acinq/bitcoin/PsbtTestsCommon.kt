@@ -19,6 +19,7 @@ package fr.acinq.bitcoin
 import fr.acinq.bitcoin.SigHash.SIGHASH_ALL
 import fr.acinq.bitcoin.SigHash.SIGHASH_ANYONECANPAY
 import fr.acinq.bitcoin.SigHash.SIGHASH_NONE
+import fr.acinq.bitcoin.SigHash.SIGHASH_SINGLE
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.flatMap
 import fr.acinq.secp256k1.Hex
@@ -174,7 +175,7 @@ class PsbtTestsCommon {
             lockTime = 3
         )
         val psbt = Psbt(tx)
-        val updated = psbt.update(inputTx1, 1, redeemScript = listOf(OP_RETURN)).flatMap { it.update(inputTx2, 0, redeemScript = listOf(OP_RETURN)) }
+        val updated = psbt.updateNonWitnessInput(inputTx1, 1, redeemScript = listOf(OP_RETURN)).flatMap { it.updateNonWitnessInput(inputTx2, 0, redeemScript = listOf(OP_RETURN)) }
         assertTrue(updated.isRight)
 
         val outputIndexMismatch = updated.right!!.copy(
@@ -401,7 +402,7 @@ class PsbtTestsCommon {
             TestCase(
                 "70736274ff0100a00200000002ab0949a08c5af7c49b8212f417e2f15ab3f5c33dcf153821a8139f877a5b7be40000000000feffffffab0949a08c5af7c49b8212f417e2f15ab3f5c33dcf153821a8139f877a5b7be40100000000feffffff02603bea0b000000001976a914768a40bbd740cbe81d988e71de2a4d5c71396b1d88ac8e240000000000001976a9146f4620b553fa095e721b9ee0efe9fa039cca459788ac0000000000010122d3dff505000000001976a914d48ed3110b94014cb114bd32d6f4d066dc74256b88ac0001012000e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc787010416001485d13537f2e265405a34dbafa9e3dda01fb8230800220202ead596687ca806043edc3de116cdf29d5e9257c196cd055cf698c8d02bf24e9910b4a6ba670000008000000080020000800022020394f62be9df19952c5587768aeb7698061ad2c4a25c894f47d8c162b4d7213d0510b4a6ba6700000080010000800200008000",
                 0,
-                Psbt.Companion.UpdateFailure.InvalidWitnessUtxo("witness utxo must use native witness program or P2SH witness program")
+                Psbt.Companion.UpdateFailure.InvalidWitnessUtxo("witness utxo must use native segwit or P2SH embedded segwit")
             ),
             // redeemScript with non-witness UTXO does not match the scriptPubKey
             TestCase(
@@ -453,47 +454,56 @@ class PsbtTestsCommon {
 
     @Test
     fun `update PSBT (official test vectors)`() {
+        val firstInputTx = Transaction.read(
+            "0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000"
+        )
+        val firstInputIndex = 0
+        val secondInputTx = Transaction.read(
+            "0200000000010158e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7501000000171600145f275f436b09a8cc9a2eb2a2f528485c68a56323feffffff02d8231f1b0100000017a914aed962d6654f9a2b36608eb9d64d2b260db4f1118700c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88702483045022100a22edcc6e5bc511af4cc4ae0de0fcd75c7e04d8c1c3a8aa9d820ed4b967384ec02200642963597b9b1bc22c75e9f3e117284a962188bf5e8a74c895089046a20ad770121035509a48eb623e10aace8bfd0212fdb8a8e5af3c94b0b133b95e114cab89e4f7965000000"
+        )
+        val secondInputIndex = 1
         // Updated PSBT from the previous step.
         val psbt = readValidPsbt(
             "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000"
         )
         // Update input 1 with a non-witness multi-sig utxo:
-        val updated = psbt.update(
-            Transaction.read("0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000"),
-            0,
-            Script.parse("5221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae"),
+        val updated = psbt.updateNonWitnessInput(
+            firstInputTx,
+            firstInputIndex,
+            Script.createMultiSigMofN(2, listOf(PublicKey.fromHex("029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f"), PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7"))),
             derivationPaths = mapOf(
                 PublicKey.fromHex("029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/0'")),
                 PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/1'"))
             )
         ).flatMap {
             // Update input 2 with a witness multi-sig utxo:
-            it.update(
-                Transaction.read("0200000000010158e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7501000000171600145f275f436b09a8cc9a2eb2a2f528485c68a56323feffffff02d8231f1b0100000017a914aed962d6654f9a2b36608eb9d64d2b260db4f1118700c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88702483045022100a22edcc6e5bc511af4cc4ae0de0fcd75c7e04d8c1c3a8aa9d820ed4b967384ec02200642963597b9b1bc22c75e9f3e117284a962188bf5e8a74c895089046a20ad770121035509a48eb623e10aace8bfd0212fdb8a8e5af3c94b0b133b95e114cab89e4f7965000000"),
-                1,
-                Script.parse("00208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903"),
-                Script.parse("522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae"),
+            it.updateWitnessInputTx(
+                secondInputTx,
+                secondInputIndex,
+                Script.pay2wsh(
+                    Script.createMultiSigMofN(
+                        2,
+                        listOf(PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc"), PublicKey.fromHex("023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73"))
+                    )
+                ),
+                Script.createMultiSigMofN(2, listOf(PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc"), PublicKey.fromHex("023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73"))),
                 derivationPaths = mapOf(
                     PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/2'")),
                     PublicKey.fromHex("023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/3'"))
                 )
             )
-        }.map {
-            // Update outputs with known derivation paths:
-            it.copy(
-                outputs = listOf(
-                    psbt.outputs[0].copy(
-                        derivationPaths = mapOf(
-                            PublicKey.fromHex("03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/4'"))
-                        )
-                    ),
-                    psbt.outputs[1].copy(
-                        derivationPaths = mapOf(
-                            PublicKey.fromHex("027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/5'"))
-                        )
-                    )
-                )
+        }.flatMap {
+            // Update first output with known derivation paths:
+            val paths = mapOf(
+                PublicKey.fromHex("03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/4'"))
             )
+            it.updateNonWitnessOutput(0, derivationPaths = paths)
+        }.flatMap {
+            // Update second output with known derivation paths:
+            val paths = mapOf(
+                PublicKey.fromHex("027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/5'"))
+            )
+            it.updateWitnessOutput(1, derivationPaths = paths)
         }
         assertTrue(updated.isRight)
 
@@ -505,7 +515,7 @@ class PsbtTestsCommon {
             )
         )
         // But if we remove the nonWitnessUtxo in the second input, we match the official test vector:
-        val withOnlyWitnessUtxo = updated.right!!.copy(inputs = listOf(updated.right!!.inputs[0], updated.right!!.inputs[1].copy(nonWitnessUtxo = null)))
+        val withOnlyWitnessUtxo = updated.right!!.copy(inputs = listOf(updated.right!!.inputs[0], (updated.right!!.inputs[1] as Psbt.Companion.Input.WitnessInput.PartiallySignedWitnessInput).copy(nonWitnessUtxo = null)))
         assertEquals(
             Psbt.write(withOnlyWitnessUtxo),
             ByteVector(
@@ -513,9 +523,12 @@ class PsbtTestsCommon {
             )
         )
         // Update inputs to use SIGHASH_ALL:
-        val withSighash = withOnlyWitnessUtxo.copy(inputs = withOnlyWitnessUtxo.inputs.map { it.copy(sighashType = SIGHASH_ALL) })
+        val withSighash = withOnlyWitnessUtxo.updateNonWitnessInput(firstInputTx, firstInputIndex, sighashType = SIGHASH_ALL).flatMap {
+            it.updateWitnessInput(OutPoint(secondInputTx, secondInputIndex.toLong()), secondInputTx.txOut[secondInputIndex], sighashType = SIGHASH_ALL)
+        }
+        assertTrue(withSighash.isRight)
         assertEquals(
-            Psbt.write(withSighash),
+            Psbt.write(withSighash.right!!),
             ByteVector(
                 "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8870103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
             )
@@ -536,10 +549,10 @@ class PsbtTestsCommon {
                 1 to DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/2'"))
             )
             assertEquals(inputKeys.values.map { it.privateKey.toBase58(Base58.Prefix.SecretKeyTestnet) }.toSet(), setOf("cP53pDbR5WtAD8dYAW9hhTjuvvTVaEiQBdrz9XPrgLBeRFiyCbQr", "cR6SXDoyfQrcp4piaiHE97Rsgta9mNhGTen9XeonVgwsh4iSgw6d"))
-            val signed = psbt.sign(inputKeys.getValue(0).privateKey, 0).flatMap { it.sign(inputKeys.getValue(1).privateKey, 1) }
+            val signed = psbt.sign(inputKeys.getValue(0).privateKey, 0).flatMap { it.psbt.sign(inputKeys.getValue(1).privateKey, 1) }
             assertTrue(signed.isRight)
             assertEquals(
-                Psbt.write(signed.right!!),
+                Psbt.write(signed.right!!.psbt),
                 ByteVector(
                     "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000002202029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e887220203089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
                 )
@@ -552,10 +565,10 @@ class PsbtTestsCommon {
                 1 to DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/3'"))
             )
             assertEquals(inputKeys.values.map { it.privateKey.toBase58(Base58.Prefix.SecretKeyTestnet) }.toSet(), setOf("cT7J9YpCwY3AVRFSjN6ukeEeWY6mhpbJPxRaDaP5QTdygQRxP9Au", "cNBc3SWUip9PPm1GjRoLEJT6T41iNzCYtD7qro84FMnM5zEqeJsE"))
-            val signed = psbt.sign(inputKeys.getValue(0).privateKey, 0).flatMap { it.sign(inputKeys.getValue(1).privateKey, 1) }
+            val signed = psbt.sign(inputKeys.getValue(0).privateKey, 0).flatMap { it.psbt.sign(inputKeys.getValue(1).privateKey, 1) }
             assertTrue(signed.isRight)
             assertEquals(
-                Psbt.write(signed.right!!),
+                Psbt.write(signed.right!!.psbt),
                 ByteVector(
                     "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000220202dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8872202023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d2010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
                 )
@@ -601,6 +614,99 @@ class PsbtTestsCommon {
     }
 
     @Test
+    fun `combine PSBTs`() {
+        val inputTx1 = Transaction(2, listOf(), listOf(TxOut(500.sat(), ByteVector.empty), TxOut(1500.sat(), ByteVector.empty), TxOut(10000.sat(), ByteVector("11223344"))), 0)
+        val input1 = OutPoint(inputTx1, 2)
+        val inputTx2 = Transaction(2, listOf(), listOf(TxOut(7500.sat(), ByteVector("ff01ee02dd03")), TxOut(250.sat(), ByteVector.empty)), 0)
+        val input2 = OutPoint(inputTx2, 0)
+        val globalTx = Transaction(2, listOf(TxIn(input1, ByteVector.empty, 0), TxIn(input2, ByteVector.empty, 0)), listOf(TxOut(5000.sat(), ByteVector("01020304")), TxOut(6000.sat(), ByteVector("abcdef"))), 0)
+        val psbt1 = Psbt(globalTx).updateWitnessInputTx(
+            inputTx1, 2, null, listOf(OP_1), SIGHASH_ALL, mapOf(
+                PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") to Psbt.Companion.KeyPathWithMaster(
+                    DeterministicWallet.fingerprint(
+                        masterPrivKey
+                    ), KeyPath("m/0'/0'/2'")
+                )
+            )
+        )
+            .flatMap {
+                it.updateNonWitnessInput(inputTx2, 0, listOf(OP_RETURN), SIGHASH_SINGLE)
+            }.flatMap {
+                it.updateNonWitnessOutput(
+                    0, derivationPaths = mapOf(
+                        PublicKey.fromHex("03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") to Psbt.Companion.KeyPathWithMaster(
+                            DeterministicWallet.fingerprint(masterPrivKey),
+                            KeyPath("m/0'/0'/4'")
+                        )
+                    )
+                )
+            }
+        val psbt2 = Psbt(globalTx).updateNonWitnessInput(
+            inputTx1, 2, listOf(OP_2DROP), SIGHASH_NONE, mapOf(
+                PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") to Psbt.Companion.KeyPathWithMaster(
+                    DeterministicWallet.fingerprint(
+                        masterPrivKey
+                    ), KeyPath("m/0'/0'/1'")
+                )
+            )
+        ).flatMap {
+            it.updateWitnessInputTx(inputTx2, 0, null, listOf(OP_8))
+        }
+        val psbt3 = Psbt(globalTx).updateNonWitnessOutput(
+            0, listOf(OP_DIV), mapOf(
+                PublicKey.fromHex("027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") to Psbt.Companion.KeyPathWithMaster(
+                    DeterministicWallet.fingerprint(masterPrivKey),
+                    KeyPath("m/0'/0'/5'")
+                )
+            )
+        ).flatMap {
+            it.updateWitnessOutput(1, listOf(OP_4), listOf(OP_ADD))
+        }
+        val combined = Psbt.combine(psbt1.right!!, psbt2.right!!, psbt3.right!!)
+        assertTrue(combined.isRight)
+        val expected = Psbt(
+            Psbt.Companion.Global(0, globalTx, listOf(), listOf()),
+            listOf(
+                Psbt.Companion.Input.WitnessInput.PartiallySignedWitnessInput(
+                    inputTx1.txOut[2],
+                    inputTx1,
+                    SIGHASH_ALL,
+                    mapOf(),
+                    mapOf(
+                        PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/1'")),
+                        PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/2'")),
+                    ),
+                    listOf(OP_2DROP),
+                    listOf(OP_1),
+                    setOf(), setOf(), setOf(), setOf(), listOf()
+                ),
+                Psbt.Companion.Input.WitnessInput.PartiallySignedWitnessInput(
+                    inputTx2.txOut[0],
+                    inputTx2,
+                    SIGHASH_SINGLE,
+                    mapOf(),
+                    mapOf(),
+                    listOf(OP_RETURN),
+                    listOf(OP_8),
+                    setOf(), setOf(), setOf(), setOf(), listOf()
+                )
+            ),
+            listOf(
+                Psbt.Companion.Output.NonWitnessOutput(
+                    listOf(OP_DIV),
+                    mapOf(
+                        PublicKey.fromHex("03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/4'")),
+                        PublicKey.fromHex("027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") to Psbt.Companion.KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/5'")),
+                    ),
+                    listOf()
+                ),
+                Psbt.Companion.Output.WitnessOutput(listOf(OP_4), listOf(OP_ADD), mapOf(), listOf())
+            )
+        )
+        assertEquals(combined.right, expected)
+    }
+
+    @Test
     fun `finalize PSBT (official test vectors)`() {
         val psbt = readValidPsbt(
             "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000002202029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01220202dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e887220203089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f012202023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d2010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000"
@@ -611,7 +717,7 @@ class PsbtTestsCommon {
             val sig2 = psbt.inputs[0].partialSigs.getValue(PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7"))
             val redeemScript = Script.write(psbt.inputs[0].redeemScript!!)
             val scriptSig = listOf(OP_0, OP_PUSHDATA(sig1), OP_PUSHDATA(sig2), OP_PUSHDATA(redeemScript))
-            val finalized = psbt.finalize(0, scriptSig)
+            val finalized = psbt.finalizeNonWitnessInput(0, scriptSig)
             assertTrue(finalized.isRight)
             finalized.right!!
         }
@@ -621,7 +727,7 @@ class PsbtTestsCommon {
             val sig2 = psbt.inputs[1].partialSigs.getValue(PublicKey.fromHex("023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73"))
             val witnessScript = Script.write(psbt.inputs[1].witnessScript!!)
             val scriptWitness = ScriptWitness(listOf(ByteVector.empty, sig1, sig2, ByteVector(witnessScript)))
-            val finalized = finalized0.finalize(1, scriptWitness)
+            val finalized = finalized0.finalizeWitnessInput(1, scriptWitness)
             assertTrue(finalized.isRight)
             finalized.right!!
         }
@@ -693,28 +799,142 @@ class PsbtTestsCommon {
         )
 
         assertNull(psbt.computeFees()) // inputs have not been updated yet
-        val oneInput = psbt.update(inputTx1, 1, witnessScript = listOf(OP_RETURN))
+        val oneInput = psbt.updateWitnessInputTx(inputTx1, 1, witnessScript = listOf(OP_RETURN))
         assertTrue(oneInput.isRight)
         assertNull(oneInput.right!!.computeFees()) // second input has not been updated yet
-        val bothInputs = oneInput.right!!.update(inputTx2, 0, redeemScript = listOf(OP_RETURN))
+        val bothInputs = oneInput.right!!.updateNonWitnessInput(inputTx2, 0, redeemScript = listOf(OP_RETURN))
         assertTrue(bothInputs.isRight)
         assertEquals(bothInputs.right!!.computeFees(), 250.toSatoshi())
     }
 
     @Test
     fun `preimage challenges`() {
-        val psbt = readValidPsbt(
+        val withPreimageChallenges = readValidPsbt(
             "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000"
-        )
-        val withPreimageChallenges = psbt.copy(
-            inputs = listOf(
-                psbt.inputs[0].copy(ripemd160 = setOf(ByteVector("01020304"), ByteVector("0102")), hash160 = setOf(ByteVector("123456")), hash256 = setOf(ByteVector("abcdef"), ByteVector("00000000"))),
-                psbt.inputs[1].copy(ripemd160 = setOf(ByteVector("0102")), sha256 = setOf(ByteVector("123456"), ByteVector("11")), hash256 = setOf(ByteVector("abcdef"), ByteVector("00000000"))),
-            )
-        )
+        ).updatePreimageChallenges(0, setOf(ByteVector("01020304"), ByteVector("0102")), setOf(), setOf(ByteVector("123456")), setOf(ByteVector("abcdef"), ByteVector("00000000"))).flatMap {
+            it.updatePreimageChallenges(1, setOf(ByteVector("0102")), setOf(ByteVector("123456"), ByteVector("11")), setOf(), setOf(ByteVector("abcdef"), ByteVector("00000000")))
+        }.right!!
+        assertEquals(setOf(ByteVector("123456")), withPreimageChallenges.inputs.first().hash160)
+        assertEquals(setOf(ByteVector("123456"), ByteVector("11")), withPreimageChallenges.inputs.last().sha256)
         val decoded = Psbt.read(Psbt.write(withPreimageChallenges))
         assertTrue(decoded.isRight)
         assertEquals(decoded.right!!, withPreimageChallenges)
+    }
+
+    @Test
+    fun `create psbt with various input types`() {
+        val masterFingerprint = DeterministicWallet.fingerprint(masterPrivKey)
+        val priv1 = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/3'/1'")).privateKey
+        val priv2 = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/3'/2'")).privateKey
+        val priv3 = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/3'/3'")).privateKey
+        val pubKeys = listOf(priv1, priv2, priv3).map { it.publicKey() }
+        val allDerivationPaths = mapOf(
+            priv1.publicKey() to Psbt.Companion.KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/1'")),
+            priv2.publicKey() to Psbt.Companion.KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/2'")),
+            priv3.publicKey() to Psbt.Companion.KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/3'")),
+        )
+        val inputTx = Transaction(
+            2,
+            listOf(),
+            listOf(
+                TxOut(15000.sat(), Script.pay2pkh(priv1.publicKey())),
+                TxOut(12000.sat(), Script.pay2sh(Script.createMultiSigMofN(2, pubKeys))),
+                TxOut(16000.sat(), Script.pay2sh(Script.pay2wpkh(priv2.publicKey()))),
+                TxOut(11000.sat(), Script.pay2wpkh(priv3.publicKey())),
+                TxOut(13000.sat(), Script.pay2wsh(Script.createMultiSigMofN(2, pubKeys))),
+                TxOut(10000.sat(), Script.pay2sh(Script.pay2wsh(Script.createMultiSigMofN(1, pubKeys))))
+            ),
+            0
+        )
+        val globalTx = Transaction(
+            2,
+            (0..5).map { i -> TxIn(OutPoint(inputTx, i.toLong()), ByteVector.empty, 0) },
+            listOf(TxOut(60000.sat(), Script.pay2wsh(Script.createMultiSigMofN(1, pubKeys.drop(1))))),
+            0
+        )
+        val psbt = Psbt(globalTx)
+        assertEquals(psbt.getInput(2), Psbt.Companion.Input.PartiallySignedInputWithoutUtxo(null, mapOf(), setOf(), setOf(), setOf(), setOf(), listOf()))
+        assertNull(psbt.getInput(6))
+        assertEquals(psbt.getInput(OutPoint(inputTx, 1)), Psbt.Companion.Input.PartiallySignedInputWithoutUtxo(null, mapOf(), setOf(), setOf(), setOf(), setOf(), listOf()))
+        assertNull(psbt.getInput(OutPoint(ByteVector32.Zeroes, 0)))
+
+        // We can't sign the psbt before adding the utxo details (updater role).
+        assertTrue(psbt.sign(priv1, 0).isLeft)
+        assertTrue(psbt.sign(priv3, OutPoint(inputTx, 3)).isLeft)
+
+        // Update all inputs and outputs.
+        val updated = psbt.updateNonWitnessInput(inputTx, 0, null, SIGHASH_SINGLE or SIGHASH_ANYONECANPAY, mapOf(priv1.publicKey() to Psbt.Companion.KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/1'"))))
+            .flatMap { it.updateNonWitnessInput(inputTx, 1, Script.createMultiSigMofN(2, pubKeys), SIGHASH_ALL, allDerivationPaths) }
+            .flatMap { it.updateWitnessInputTx(inputTx, 2, Script.pay2wpkh(priv2.publicKey()), Script.pay2pkh(priv2.publicKey())) }
+            .flatMap { it.updateWitnessInputTx(inputTx, 3, null, Script.pay2pkh(priv3.publicKey()), SIGHASH_SINGLE, mapOf(priv3.publicKey() to Psbt.Companion.KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/3'")))) }
+            .flatMap { it.updateWitnessInputTx(inputTx, 4, null, Script.createMultiSigMofN(2, pubKeys)) }
+            .flatMap { it.updateWitnessInputTx(inputTx, 5, Script.pay2wsh(Script.createMultiSigMofN(1, pubKeys)), Script.createMultiSigMofN(1, pubKeys)) }
+            .flatMap { it.updateWitnessOutput(0, Script.createMultiSigMofN(1, pubKeys.drop(1)), null, allDerivationPaths - priv1.publicKey()) }
+            .right!!
+
+        assertEquals((updated.getInput(0)!! as Psbt.Companion.Input.NonWitnessInput.PartiallySignedNonWitnessInput).sighashType, SIGHASH_SINGLE or SIGHASH_ANYONECANPAY)
+        assertEquals((updated.getInput(OutPoint(inputTx, 2))!! as Psbt.Companion.Input.WitnessInput.PartiallySignedWitnessInput).redeemScript, Script.pay2wpkh(priv2.publicKey()))
+        // We reject invalid updates.
+        assertTrue(updated.updateWitnessInputTx(inputTx, 1, sighashType = SIGHASH_ALL).isLeft)
+        assertTrue(updated.updateNonWitnessInput(inputTx, 3, derivationPaths = allDerivationPaths).isLeft)
+
+        val signed = updated.sign(priv1, 0)
+            .flatMap { it.psbt.sign(priv1, 1) }
+            .flatMap { it.psbt.sign(priv2, OutPoint(inputTx, 1)) }
+            .flatMap { it.psbt.sign(priv2, 2) }
+            .flatMap { it.psbt.sign(priv3, OutPoint(inputTx, 3)) }
+            .flatMap { it.psbt.sign(priv2, 4) }
+            .flatMap { it.psbt.sign(priv3, OutPoint(inputTx, 4)) }
+            .flatMap { it.psbt.sign(priv2, 5) }
+            .right!!
+            .psbt
+
+        assertEquals(signed.getInput(0)!!.partialSigs.size, 1)
+        assertEquals(signed.getInput(OutPoint(inputTx, 4))!!.partialSigs.size, 2)
+        assertEquals(signed.getInput(5)!!.partialSigs.size, 1)
+        assertTrue(signed.finalizeWitnessInput(0, ScriptWitness(listOf(priv1.publicKey().value))).isLeft)
+        assertTrue(signed.finalizeNonWitnessInput(3, listOf(OP_PUSHDATA(priv1.publicKey()))).isLeft)
+
+        val scriptSig0 = run {
+            val sig = signed.getInput(0)?.partialSigs?.get(priv1.publicKey())!!
+            listOf(OP_PUSHDATA(sig), OP_PUSHDATA(priv1.publicKey()))
+        }
+        val scriptSig1 = run {
+            val sig1 = signed.getInput(1)?.partialSigs?.get(priv1.publicKey())!!
+            val sig2 = signed.getInput(1)?.partialSigs?.get(priv2.publicKey())!!
+            val redeemScript = Script.write(Script.createMultiSigMofN(2, pubKeys))
+            listOf(OP_0, OP_PUSHDATA(sig1), OP_PUSHDATA(sig2), OP_PUSHDATA(redeemScript))
+        }
+        val scriptWitness2 = run {
+            val sig = signed.getInput(2)?.partialSigs?.get(priv2.publicKey())!!
+            Script.witnessPay2wpkh(priv2.publicKey(), sig)
+        }
+        val scriptWitness3 = run {
+            val sig = signed.getInput(3)?.partialSigs?.get(priv3.publicKey())!!
+            Script.witnessPay2wpkh(priv3.publicKey(), sig)
+        }
+        val scriptWitness4 = run {
+            val sig1 = signed.getInput(4)?.partialSigs?.get(priv2.publicKey())!!
+            val sig2 = signed.getInput(4)?.partialSigs?.get(priv3.publicKey())!!
+            Script.witnessMultiSigMofN(pubKeys, listOf(sig1, sig2))
+        }
+        val scriptWitness5 = run {
+            val sig = signed.getInput(5)?.partialSigs?.get(priv2.publicKey())!!
+            Script.witnessMultiSigMofN(pubKeys, listOf(sig))
+        }
+
+        val finalized = signed.finalizeNonWitnessInput(0, scriptSig0)
+            .flatMap { it.finalizeNonWitnessInput(1, scriptSig1) }
+            .flatMap { it.finalizeWitnessInput(OutPoint(inputTx, 2), scriptWitness2) }
+            .flatMap { it.finalizeWitnessInput(3, scriptWitness3) }
+            .flatMap { it.finalizeWitnessInput(4, scriptWitness4) }
+            .flatMap { it.finalizeWitnessInput(OutPoint(inputTx, 5), scriptWitness5) }
+
+        assertTrue(finalized.isRight)
+        assertTrue(finalized.right!!.extract().isRight)
+        // Once the psbt is finalized, we reject updates.
+        assertTrue(finalized.right!!.sign(priv2, 2).isLeft)
+        assertTrue(finalized.right!!.finalizeWitnessInput(3, scriptWitness3).isLeft)
     }
 
     @Test
@@ -734,7 +954,7 @@ class PsbtTestsCommon {
             val anchorScript = anchorScript(fundingPrivKey.publicKey())
             val txToBump = Transaction(2, listOf(), listOf(TxOut(330.toSatoshi(), Script.pay2wsh(anchorScript))), 0)
             val lightningPsbt = Psbt(Transaction(2, listOf(TxIn(OutPoint(txToBump, 0), 0)), listOf(), 0))
-                .update(txToBump, 0, null, anchorScript, SIGHASH_NONE or SIGHASH_ANYONECANPAY)
+                .updateWitnessInputTx(txToBump, 0, null, anchorScript, SIGHASH_NONE or SIGHASH_ANYONECANPAY)
                 .flatMap { it.sign(fundingPrivKey, 0) }
             assertTrue(lightningPsbt.isRight)
             Pair(fundingPrivKey.publicKey(), lightningPsbt.right!!)
@@ -744,21 +964,119 @@ class PsbtTestsCommon {
         val walletPrivKey = PrivateKey(ByteVector32("0202020202020202020202020202020202020202020202020202020202020202"))
         val confirmedTx = Transaction(2, listOf(), listOf(TxOut(100_000.toSatoshi(), Script.pay2wpkh(walletPrivKey.publicKey()))), 0)
         val finalTx = Psbt.join(
-            lightningPsbt,
+            lightningPsbt.psbt,
             Psbt(Transaction(2, listOf(TxIn(OutPoint(confirmedTx, 0), 0)), listOf(TxOut(75_000.toSatoshi(), Script.pay2wpkh(walletPrivKey.publicKey()))), 0))
         ).flatMap {
-            it.update(confirmedTx, 0, null, Script.pay2pkh(walletPrivKey.publicKey()))
+            it.updateWitnessInputTx(confirmedTx, 0, null, Script.pay2pkh(walletPrivKey.publicKey()))
         }.flatMap {
             it.sign(walletPrivKey, 1)
         }.flatMap {
-            it.finalize(0, ScriptWitness(listOf(it.inputs[0].partialSigs.getValue(fundingPubKey), ByteVector(Script.write(anchorScript(fundingPubKey))))))
+            it.psbt.finalizeWitnessInput(0, ScriptWitness(listOf(it.psbt.inputs[0].partialSigs.getValue(fundingPubKey), ByteVector(Script.write(anchorScript(fundingPubKey))))))
         }.flatMap {
-            it.finalize(1, Script.witnessPay2wpkh(walletPrivKey.publicKey(), it.inputs[1].partialSigs.getValue(walletPrivKey.publicKey())))
+            it.finalizeWitnessInput(1, Script.witnessPay2wpkh(walletPrivKey.publicKey(), it.inputs[1].partialSigs.getValue(walletPrivKey.publicKey())))
         }.flatMap {
             it.extract()
         }
         assertTrue(finalTx.isRight)
         assertNotNull(finalTx.right)
+    }
+
+    @Test
+    fun `manual coinjoin workflow`() {
+        val alicePrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/1'")).privateKey
+        val aliceNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/2'")).publicKey
+        val aliceInputTx = Transaction(2, listOf(), listOf(TxOut(50000.sat(), Script.pay2wpkh(alicePrivKey.publicKey()))), 0)
+        val bobPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/1'")).privateKey
+        val bobNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/2'")).publicKey
+        val bobInputTx = Transaction(2, listOf(), listOf(TxOut(40000.sat(), Script.pay2wpkh(bobPrivKey.publicKey()))), 0)
+        val carolPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/1'")).privateKey
+        val carolNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/2'")).publicKey
+        val carolInputTx = Transaction(2, listOf(), listOf(TxOut(60000.sat(), Script.pay2wpkh(carolPrivKey.publicKey()))), 0)
+
+        // Each participant adds their inputs and fills their utxos.
+        val alicePsbt = Psbt(Transaction(2, listOf(TxIn(OutPoint(aliceInputTx, 0), ByteVector.empty, 0)), listOf(TxOut(50000.sat(), Script.pay2wpkh(aliceNextPubKey))), 0))
+            .updateWitnessInputTx(aliceInputTx, 0, null, Script.pay2pkh(alicePrivKey.publicKey()), SIGHASH_ALL)
+            .right!!
+        val bobPsbt = Psbt(Transaction(2, listOf(TxIn(OutPoint(bobInputTx, 0), ByteVector.empty, 0)), listOf(TxOut(50000.sat(), Script.pay2wpkh(bobNextPubKey))), 0))
+            .updateWitnessInput(OutPoint(bobInputTx, 0), bobInputTx.txOut[0], null, Script.pay2pkh(bobPrivKey.publicKey()), SIGHASH_ALL)
+            .right!!
+        val carolPsbt = Psbt(Transaction(2, listOf(TxIn(OutPoint(carolInputTx, 0), ByteVector.empty, 0)), listOf(TxOut(50000.sat(), Script.pay2wpkh(carolNextPubKey))), 0))
+            .updateWitnessInputTx(carolInputTx, 0, null, Script.pay2pkh(carolPrivKey.publicKey()), SIGHASH_ALL)
+            .right!!
+
+        // Carol joins the psbts, signs and finalizes her inputs.
+        val carolFinal = run {
+            val joined = Psbt.join(alicePsbt, bobPsbt, carolPsbt).right!!
+            val outPoint = OutPoint(carolInputTx, 0)
+            // Carol verifies the sighash before signing her inputs.
+            assertEquals(joined.getInput(outPoint)?.sighashType, SIGHASH_ALL)
+            joined.sign(carolPrivKey, outPoint).flatMap { signed ->
+                signed.psbt.finalizeWitnessInput(outPoint, Script.witnessPay2wpkh(carolPrivKey.publicKey(), signed.sig))
+            }.right!!
+        }
+
+        // Bob signs and finalizes his inputs.
+        val bobFinal = run {
+            val outPoint = OutPoint(bobInputTx, 0)
+            // Bob verifies the sighash before signing his inputs.
+            assertEquals(carolFinal.getInput(outPoint)?.sighashType, SIGHASH_ALL)
+            carolFinal.sign(bobPrivKey, outPoint).flatMap { signed ->
+                signed.psbt.finalizeWitnessInput(outPoint, Script.witnessPay2wpkh(bobPrivKey.publicKey(), signed.sig))
+            }.right!!
+        }
+
+        // Alice signs and extracts the final tx.
+        val conjoinTx = run {
+            val outPoint = OutPoint(aliceInputTx, 0)
+            // Alice verifies the sighash before signing her inputs.
+            assertEquals(bobFinal.getInput(outPoint)?.sighashType, SIGHASH_ALL)
+            val aliceFinal = bobFinal.sign(alicePrivKey, outPoint).flatMap { signed ->
+                signed.psbt.finalizeWitnessInput(outPoint, Script.witnessPay2wpkh(alicePrivKey.publicKey(), signed.sig))
+            }.right!!
+            // Alice verifies that all inputs have been finalized.
+            assertEquals(aliceFinal.inputs.filter {
+                when (it) {
+                    is Psbt.Companion.Input.FinalizedInputWithoutUtxo -> true
+                    is Psbt.Companion.Input.WitnessInput.FinalizedWitnessInput -> true
+                    is Psbt.Companion.Input.NonWitnessInput.FinalizedNonWitnessInput -> true
+                    else -> false
+                }
+            }.size, aliceFinal.inputs.size)
+            aliceFinal.extract()
+        }
+
+        assertTrue(conjoinTx.isRight)
+    }
+
+    @Test
+    fun `2-of-3 multisig workflow`() {
+        val alicePrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/1'")).privateKey
+        val aliceNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/2'")).publicKey
+        val bobPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/0'")).privateKey
+        val bobNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/1'")).publicKey
+        val carolPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/1'")).privateKey
+        val pubKeys = listOf(alicePrivKey, bobPrivKey, carolPrivKey).map { it.publicKey() }
+        val inputTx = Transaction(2, listOf(), listOf(TxOut(250000.sat(), Script.pay2wsh(Script.createMultiSigMofN(2, pubKeys)))), 0)
+
+        // Alice creates the (unsigned) PSBT and sends it to Bob and Carol.
+        val spendingTx = Transaction(2, listOf(TxIn(OutPoint(inputTx, 0), ByteVector.empty, 0)), listOf(TxOut(100000.sat(), Script.pay2wpkh(aliceNextPubKey)), TxOut(125000.sat(), Script.pay2wpkh(bobNextPubKey))), 0)
+        val unsignedPsbt = Psbt(spendingTx).updateWitnessInputTx(inputTx, 0, null, Script.createMultiSigMofN(2, pubKeys), SIGHASH_ALL).right!!
+
+        // Each participant signs the input.
+        val aliceSigned = unsignedPsbt.sign(alicePrivKey, 0).map { it.psbt }.right!!
+        val bobSigned = unsignedPsbt.sign(bobPrivKey, 0).map { it.psbt }.right!!
+        val carolSigned = unsignedPsbt.sign(carolPrivKey, 0).map { it.psbt }.right!!
+
+        // Alice combines the inputs and broadcasts the final transaction.
+        val finalTx = run {
+            val combined = Psbt.combine(aliceSigned, bobSigned, carolSigned).right!!
+            // Alice verifies that all participants have signed.
+            val sigs = combined.inputs.first().partialSigs.filter { pubKeys.contains(it.key) }.values.toList()
+            assertEquals(sigs.size, 3)
+            combined.finalizeWitnessInput(0, Script.witnessMultiSigMofN(pubKeys, sigs.drop(1))).flatMap { it.extract() }
+        }
+
+        assertTrue(finalTx.isRight)
     }
 
     private fun readValidPsbt(hex: String): Psbt {
@@ -773,7 +1091,7 @@ class PsbtTestsCommon {
         psbt.outputs.forEach { assertTrue(it.unknown.isEmpty()) }
     }
 
-    private fun verifyEmptyOutput(output: Psbt.Companion.PartiallySignedOutput) {
+    private fun verifyEmptyOutput(output: Psbt.Companion.Output) {
         assertNull(output.redeemScript)
         assertNull(output.witnessScript)
         assertTrue(output.derivationPaths.isEmpty())

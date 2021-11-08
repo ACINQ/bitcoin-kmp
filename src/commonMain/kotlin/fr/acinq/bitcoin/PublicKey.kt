@@ -40,14 +40,16 @@ public data class PublicKey(@JvmField val value: ByteVector) {
     public fun isValid(): Boolean = Crypto.isPubKeyValid(value.toByteArray())
 
     public operator fun plus(that: PublicKey): PublicKey {
-        val pub = Secp256k1.pubKeyAdd(value.toByteArray(), that.value.toByteArray())
+        val pub = Secp256k1.pubKeyCombine(arrayOf(value.toByteArray(), that.value.toByteArray()))
         return PublicKey(compress(pub))
     }
 
-    public operator fun minus(that: PublicKey): PublicKey {
-        val pub = Secp256k1.pubKeyAdd(value.toByteArray(), Secp256k1.pubKeyNegate(that.value.toByteArray()))
+    public operator fun unaryMinus(): PublicKey {
+        val pub = Secp256k1.pubKeyNegate(value.toByteArray())
         return PublicKey(compress(pub))
     }
+
+    public operator fun minus(that: PublicKey): PublicKey = plus(-that)
 
     public operator fun times(that: PrivateKey): PublicKey {
         val pub = Secp256k1.pubKeyTweakMul(value.toByteArray(), that.value.toByteArray())

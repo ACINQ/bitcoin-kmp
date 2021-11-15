@@ -20,6 +20,7 @@ import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.*
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.getOrElse
+import kotlin.jvm.JvmStatic
 
 /**
  * A partially signed bitcoin transaction: see https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki.
@@ -790,6 +791,7 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
          * @param psbts partially signed bitcoin transactions to combine.
          * @return a psbt that contains data from all the input psbts.
          */
+        @JvmStatic
         public fun combine(vararg psbts: Psbt): Either<UpdateFailure, Psbt> {
             return when {
                 psbts.map { it.global.tx.txid }.toSet().size != 1 -> Either.Left(UpdateFailure.CannotCombine("cannot combine psbts for distinct transactions"))
@@ -846,6 +848,7 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
          * @param psbts partially signed bitcoin transactions to join.
          * @return a psbt that contains data from all the input psbts.
          */
+        @JvmStatic
         public fun join(vararg psbts: Psbt): Either<UpdateFailure, Psbt> {
             return when {
                 psbts.isEmpty() -> Either.Left(UpdateFailure.CannotJoin("no psbt provided"))
@@ -872,12 +875,14 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
             }
         }
 
+        @JvmStatic
         public fun write(psbt: Psbt): ByteVector {
             val output = ByteArrayOutput()
             write(psbt, output)
             return ByteVector(output.toByteArray())
         }
 
+        @JvmStatic
         public fun write(psbt: Psbt, out: fr.acinq.bitcoin.io.Output) {
             /********** Magic header **********/
             out.write(0x70)
@@ -967,8 +972,13 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
             public object InvalidContent : ParseFailure()
         }
 
+        @JvmStatic
         public fun read(input: ByteVector): Either<ParseFailure, Psbt> = read(ByteArrayInput(input.toByteArray()))
+
+        @JvmStatic
         public fun read(input: ByteArray): Either<ParseFailure, Psbt> = read(ByteArrayInput(input))
+
+        @JvmStatic
         public fun read(input: fr.acinq.bitcoin.io.Input): Either<ParseFailure, Psbt> {
             /********** Magic header **********/
             if (input.read() != 0x70 || input.read() != 0x73 || input.read() != 0x62 || input.read() != 0x74) {

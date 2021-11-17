@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package fr.acinq.bitcoin
+package fr.acinq.bitcoin.psbt
 
+import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.*
 import fr.acinq.bitcoin.utils.Either
@@ -532,258 +533,6 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
         /** Only version 0 is supported for now. */
         public const val Version: Long = 0
 
-        /**
-         * @param prefix extended public key version bytes.
-         * @param masterKeyFingerprint fingerprint of the master key.
-         * @param extendedPublicKey BIP32 extended public key.
-         */
-        public data class ExtendedPublicKeyWithMaster(val prefix: Long, val masterKeyFingerprint: Long, val extendedPublicKey: DeterministicWallet.ExtendedPublicKey)
-
-        /**
-         * @param masterKeyFingerprint fingerprint of the master key.
-         * @param keyPath bip 32 derivation path.
-         */
-        public data class KeyPathWithMaster(val masterKeyFingerprint: Long, val keyPath: KeyPath)
-
-        public data class DataEntry(val key: ByteVector, val value: ByteVector)
-
-        /**
-         * Global data for the PSBT.
-         *
-         * @param version psbt version.
-         * @param tx partially signed transaction. NB: the transaction must be serialized with the "old" format (without witnesses).
-         * @param extendedPublicKeys (optional) extended public keys used when signing inputs and producing outputs.
-         * @param unknown (optional) unknown global entries.
-         */
-        public data class Global(val version: Long, val tx: Transaction, val extendedPublicKeys: List<ExtendedPublicKeyWithMaster>, val unknown: List<DataEntry>)
-
-        /** A PSBT input. A valid PSBT must contain one such input per input of the [[Global.tx]]. */
-        public sealed class Input {
-            // @formatter:off
-            /** Non-witness utxo, used when spending non-segwit outputs (may also be included when spending segwit outputs). */
-            public abstract val nonWitnessUtxo: Transaction?
-            /** Witness utxo, used when spending segwit outputs. */
-            public abstract val witnessUtxo: TxOut?
-            /** Sighash type to be used when producing signatures for this output. */
-            public abstract val sighashType: Int?
-            /** Signatures as would be pushed to the stack from a scriptSig or witness. */
-            public abstract val partialSigs: Map<PublicKey, ByteVector>
-            /** Derivation paths used for the signatures. */
-            public abstract val derivationPaths: Map<PublicKey, KeyPathWithMaster>
-            /** Redeem script for this input (when using p2sh). */
-            public abstract val redeemScript: List<ScriptElt>?
-            /** Witness script for this input (when using p2wsh). */
-            public abstract val witnessScript: List<ScriptElt>?
-            /** Fully constructed scriptSig with signatures and any other scripts necessary for the input to pass validation. */
-            public abstract val scriptSig: List<ScriptElt>?
-            /** Fully constructed scriptWitness with signatures and any other scripts necessary for the input to pass validation. */
-            public abstract val scriptWitness: ScriptWitness?
-            /** RipeMD160 preimages (e.g. for miniscript hash challenges). */
-            public abstract val ripemd160: Set<ByteVector>
-            /** Sha256 preimages (e.g. for miniscript hash challenges). */
-            public abstract val sha256: Set<ByteVector>
-            /** Hash160 preimages (e.g. for miniscript hash challenges). */
-            public abstract val hash160: Set<ByteVector>
-            /** Hash256 preimages (e.g. for miniscript hash challenges). */
-            public abstract val hash256: Set<ByteVector>
-            /** (optional) Unknown global entries. */
-            public abstract val unknown: List<DataEntry>
-            // @formatter:on
-
-            /**
-             * A partially signed input without details about the utxo.
-             * More signatures may need to be added before it can be finalized.
-             */
-            public data class PartiallySignedInputWithoutUtxo(
-                override val sighashType: Int?,
-                override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
-                override val ripemd160: Set<ByteVector>,
-                override val sha256: Set<ByteVector>,
-                override val hash160: Set<ByteVector>,
-                override val hash256: Set<ByteVector>,
-                override val unknown: List<DataEntry>
-            ) : Input() {
-                override val nonWitnessUtxo: Transaction? = null
-                override val witnessUtxo: TxOut? = null
-                override val redeemScript: List<ScriptElt>? = null
-                override val witnessScript: List<ScriptElt>? = null
-                override val partialSigs: Map<PublicKey, ByteVector> = mapOf()
-                override val scriptSig: List<ScriptElt>? = null
-                override val scriptWitness: ScriptWitness? = null
-            }
-
-            /**
-             * A fully signed input without details about the utxo.
-             * Input finalizers should keep the utxo to allow transaction extractors to verify the final network serialized
-             * transaction, but it's not mandatory, so we may not have it available when parsing psbt inputs.
-             */
-            public data class FinalizedInputWithoutUtxo(
-                override val scriptWitness: ScriptWitness?,
-                override val scriptSig: List<ScriptElt>?,
-                override val ripemd160: Set<ByteVector>,
-                override val sha256: Set<ByteVector>,
-                override val hash160: Set<ByteVector>,
-                override val hash256: Set<ByteVector>,
-                override val unknown: List<DataEntry>
-            ) : Input() {
-                override val nonWitnessUtxo: Transaction? = null
-                override val witnessUtxo: TxOut? = null
-                override val sighashType: Int? = null
-                override val partialSigs: Map<PublicKey, ByteVector> = mapOf()
-                override val derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
-                override val redeemScript: List<ScriptElt>? = null
-                override val witnessScript: List<ScriptElt>? = null
-            }
-
-            /** An input spending a segwit output. */
-            public sealed class WitnessInput : Input() {
-                public abstract val txOut: TxOut
-                public val amount: Satoshi by lazy { txOut.amount }
-                override val witnessUtxo: TxOut? by lazy { txOut }
-
-                /** A partially signed segwit input. More signatures may need to be added before it can be finalized. */
-                public data class PartiallySignedWitnessInput(
-                    override val txOut: TxOut,
-                    override val nonWitnessUtxo: Transaction?,
-                    override val sighashType: Int?,
-                    override val partialSigs: Map<PublicKey, ByteVector>,
-                    override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
-                    override val redeemScript: List<ScriptElt>?,
-                    override val witnessScript: List<ScriptElt>?,
-                    override val ripemd160: Set<ByteVector>,
-                    override val sha256: Set<ByteVector>,
-                    override val hash160: Set<ByteVector>,
-                    override val hash256: Set<ByteVector>,
-                    override val unknown: List<DataEntry>
-                ) : WitnessInput() {
-                    override val scriptSig: List<ScriptElt>? = null
-                    override val scriptWitness: ScriptWitness? = null
-                }
-
-                /** A fully signed segwit input. */
-                public data class FinalizedWitnessInput(
-                    override val txOut: TxOut,
-                    override val nonWitnessUtxo: Transaction?,
-                    override val scriptWitness: ScriptWitness,
-                    override val scriptSig: List<ScriptElt>?,
-                    override val ripemd160: Set<ByteVector>,
-                    override val sha256: Set<ByteVector>,
-                    override val hash160: Set<ByteVector>,
-                    override val hash256: Set<ByteVector>,
-                    override val unknown: List<DataEntry>
-                ) : WitnessInput() {
-                    override val sighashType: Int? = null
-                    override val partialSigs: Map<PublicKey, ByteVector> = mapOf()
-                    override val derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
-                    override val redeemScript: List<ScriptElt>? = null
-                    override val witnessScript: List<ScriptElt>? = null
-                }
-            }
-
-            /** An input spending a non-segwit output. */
-            public sealed class NonWitnessInput : Input() {
-                public abstract val inputTx: Transaction
-                public abstract val outputIndex: Int
-                public val amount: Satoshi by lazy { inputTx.txOut[outputIndex].amount }
-                override val nonWitnessUtxo: Transaction? by lazy { inputTx }
-
-                // The following fields should only be present for inputs which spend segwit outputs (including P2SH embedded ones).
-                override val witnessUtxo: TxOut? = null
-                override val witnessScript: List<ScriptElt>? = null
-
-                /** A partially signed non-segwit input. More signatures may need to be added before it can be finalized. */
-                public data class PartiallySignedNonWitnessInput(
-                    override val inputTx: Transaction,
-                    override val outputIndex: Int,
-                    override val sighashType: Int?,
-                    override val partialSigs: Map<PublicKey, ByteVector>,
-                    override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
-                    override val redeemScript: List<ScriptElt>?,
-                    override val ripemd160: Set<ByteVector>,
-                    override val sha256: Set<ByteVector>,
-                    override val hash160: Set<ByteVector>,
-                    override val hash256: Set<ByteVector>,
-                    override val unknown: List<DataEntry>
-                ) : NonWitnessInput() {
-                    override val scriptSig: List<ScriptElt>? = null
-                    override val scriptWitness: ScriptWitness? = null
-                }
-
-                /** A fully signed non-segwit input. */
-                public data class FinalizedNonWitnessInput(
-                    override val inputTx: Transaction,
-                    override val outputIndex: Int,
-                    override val scriptSig: List<ScriptElt>,
-                    override val ripemd160: Set<ByteVector>,
-                    override val sha256: Set<ByteVector>,
-                    override val hash160: Set<ByteVector>,
-                    override val hash256: Set<ByteVector>,
-                    override val unknown: List<DataEntry>
-                ) : NonWitnessInput() {
-                    override val sighashType: Int? = null
-                    override val partialSigs: Map<PublicKey, ByteVector> = mapOf()
-                    override val derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
-                    override val redeemScript: List<ScriptElt>? = null
-                    override val witnessScript: List<ScriptElt>? = null
-                    override val scriptWitness: ScriptWitness? = null
-                }
-            }
-        }
-
-        /** A PSBT output. A valid PSBT must contain one such output per output of the [[Global.tx]]. */
-        public sealed class Output {
-            // @formatter:off
-            /** Redeem script for this output (when using p2sh). */
-            public abstract val redeemScript: List<ScriptElt>?
-            /** Witness script for this output (when using p2wsh). */
-            public abstract val witnessScript: List<ScriptElt>?
-            /** Derivation paths used to produce the public keys associated to this output. */
-            public abstract val derivationPaths: Map<PublicKey, KeyPathWithMaster>
-            /** (optional) Unknown global entries. */
-            public abstract val unknown: List<DataEntry>
-            // @formatter:on
-
-            /** A non-segwit output. */
-            public data class NonWitnessOutput(
-                override val redeemScript: List<ScriptElt>?,
-                override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
-                override val unknown: List<DataEntry>
-            ) : Output() {
-                override val witnessScript: List<ScriptElt>? = null
-            }
-
-            /** A segwit output. */
-            public data class WitnessOutput(
-                override val witnessScript: List<ScriptElt>?,
-                override val redeemScript: List<ScriptElt>?,
-                override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
-                override val unknown: List<DataEntry>
-            ) : Output()
-
-            /** An output for which usage of segwit is currently unknown. */
-            public data class UnspecifiedOutput(
-                override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
-                override val unknown: List<DataEntry>
-            ) : Output() {
-                override val redeemScript: List<ScriptElt>? = null
-                override val witnessScript: List<ScriptElt>? = null
-            }
-        }
-
-        public sealed class UpdateFailure {
-            public data class InvalidInput(val reason: String) : UpdateFailure()
-            public data class InvalidNonWitnessUtxo(val reason: String) : UpdateFailure()
-            public data class InvalidWitnessUtxo(val reason: String) : UpdateFailure()
-            public data class CannotCombine(val reason: String) : UpdateFailure()
-            public data class CannotJoin(val reason: String) : UpdateFailure()
-            public data class CannotUpdateInput(val index: Int, val reason: String) : UpdateFailure()
-            public data class CannotUpdateOutput(val index: Int, val reason: String) : UpdateFailure()
-            public data class CannotSignInput(val index: Int, val reason: String) : UpdateFailure()
-            public data class CannotFinalizeInput(val index: Int, val reason: String) : UpdateFailure()
-            public data class CannotExtractTx(val reason: String) : UpdateFailure()
-        }
-
-        public data class SignPsbtResult(val psbt: Psbt, val sig: ByteVector)
 
         /**
          * Implements the PSBT combiner role: combines multiple psbts for the same unsigned transaction.
@@ -956,20 +705,6 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
             output.write(entry.key.bytes)
             BtcSerializer.writeVarint(entry.value.size(), output)
             output.write(entry.value.bytes)
-        }
-
-        public sealed class ParseFailure {
-            public object InvalidMagicBytes : ParseFailure()
-            public object InvalidSeparator : ParseFailure()
-            public object DuplicateKeys : ParseFailure()
-            public data class InvalidPsbtVersion(val reason: String) : ParseFailure()
-            public data class UnsupportedPsbtVersion(val version: Long) : ParseFailure()
-            public data class InvalidGlobalTx(val reason: String) : ParseFailure()
-            public object GlobalTxMissing : ParseFailure()
-            public data class InvalidExtendedPublicKey(val reason: String) : ParseFailure()
-            public data class InvalidTxInput(val reason: String) : ParseFailure()
-            public data class InvalidTxOutput(val reason: String) : ParseFailure()
-            public object InvalidContent : ParseFailure()
         }
 
         @JvmStatic
@@ -1319,3 +1054,271 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
     }
 
 }
+
+/**
+ * @param prefix extended public key version bytes.
+ * @param masterKeyFingerprint fingerprint of the master key.
+ * @param extendedPublicKey BIP32 extended public key.
+ */
+public data class ExtendedPublicKeyWithMaster(val prefix: Long, val masterKeyFingerprint: Long, val extendedPublicKey: DeterministicWallet.ExtendedPublicKey)
+
+/**
+ * @param masterKeyFingerprint fingerprint of the master key.
+ * @param keyPath bip 32 derivation path.
+ */
+public data class KeyPathWithMaster(val masterKeyFingerprint: Long, val keyPath: KeyPath)
+
+public data class DataEntry(val key: ByteVector, val value: ByteVector)
+
+/**
+ * Global data for the PSBT.
+ *
+ * @param version psbt version.
+ * @param tx partially signed transaction. NB: the transaction must be serialized with the "old" format (without witnesses).
+ * @param extendedPublicKeys (optional) extended public keys used when signing inputs and producing outputs.
+ * @param unknown (optional) unknown global entries.
+ */
+public data class Global(val version: Long, val tx: Transaction, val extendedPublicKeys: List<ExtendedPublicKeyWithMaster>, val unknown: List<DataEntry>)
+
+/** A PSBT input. A valid PSBT must contain one such input per input of the [[Global.tx]]. */
+public sealed class Input {
+    // @formatter:off
+    /** Non-witness utxo, used when spending non-segwit outputs (may also be included when spending segwit outputs). */
+    public abstract val nonWitnessUtxo: Transaction?
+    /** Witness utxo, used when spending segwit outputs. */
+    public abstract val witnessUtxo: TxOut?
+    /** Sighash type to be used when producing signatures for this output. */
+    public abstract val sighashType: Int?
+    /** Signatures as would be pushed to the stack from a scriptSig or witness. */
+    public abstract val partialSigs: Map<PublicKey, ByteVector>
+    /** Derivation paths used for the signatures. */
+    public abstract val derivationPaths: Map<PublicKey, KeyPathWithMaster>
+    /** Redeem script for this input (when using p2sh). */
+    public abstract val redeemScript: List<ScriptElt>?
+    /** Witness script for this input (when using p2wsh). */
+    public abstract val witnessScript: List<ScriptElt>?
+    /** Fully constructed scriptSig with signatures and any other scripts necessary for the input to pass validation. */
+    public abstract val scriptSig: List<ScriptElt>?
+    /** Fully constructed scriptWitness with signatures and any other scripts necessary for the input to pass validation. */
+    public abstract val scriptWitness: ScriptWitness?
+    /** RipeMD160 preimages (e.g. for miniscript hash challenges). */
+    public abstract val ripemd160: Set<ByteVector>
+    /** Sha256 preimages (e.g. for miniscript hash challenges). */
+    public abstract val sha256: Set<ByteVector>
+    /** Hash160 preimages (e.g. for miniscript hash challenges). */
+    public abstract val hash160: Set<ByteVector>
+    /** Hash256 preimages (e.g. for miniscript hash challenges). */
+    public abstract val hash256: Set<ByteVector>
+    /** (optional) Unknown global entries. */
+    public abstract val unknown: List<DataEntry>
+    // @formatter:on
+
+    /**
+     * A partially signed input without details about the utxo.
+     * More signatures may need to be added before it can be finalized.
+     */
+    public data class PartiallySignedInputWithoutUtxo(
+        override val sighashType: Int?,
+        override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
+        override val ripemd160: Set<ByteVector>,
+        override val sha256: Set<ByteVector>,
+        override val hash160: Set<ByteVector>,
+        override val hash256: Set<ByteVector>,
+        override val unknown: List<DataEntry>
+    ) : Input() {
+        override val nonWitnessUtxo: Transaction? = null
+        override val witnessUtxo: TxOut? = null
+        override val redeemScript: List<ScriptElt>? = null
+        override val witnessScript: List<ScriptElt>? = null
+        override val partialSigs: Map<PublicKey, ByteVector> = mapOf()
+        override val scriptSig: List<ScriptElt>? = null
+        override val scriptWitness: ScriptWitness? = null
+    }
+
+    /**
+     * A fully signed input without details about the utxo.
+     * Input finalizers should keep the utxo to allow transaction extractors to verify the final network serialized
+     * transaction, but it's not mandatory, so we may not have it available when parsing psbt inputs.
+     */
+    public data class FinalizedInputWithoutUtxo(
+        override val scriptWitness: ScriptWitness?,
+        override val scriptSig: List<ScriptElt>?,
+        override val ripemd160: Set<ByteVector>,
+        override val sha256: Set<ByteVector>,
+        override val hash160: Set<ByteVector>,
+        override val hash256: Set<ByteVector>,
+        override val unknown: List<DataEntry>
+    ) : Input() {
+        override val nonWitnessUtxo: Transaction? = null
+        override val witnessUtxo: TxOut? = null
+        override val sighashType: Int? = null
+        override val partialSigs: Map<PublicKey, ByteVector> = mapOf()
+        override val derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
+        override val redeemScript: List<ScriptElt>? = null
+        override val witnessScript: List<ScriptElt>? = null
+    }
+
+    /** An input spending a segwit output. */
+    public sealed class WitnessInput : Input() {
+        public abstract val txOut: TxOut
+        public val amount: Satoshi by lazy { txOut.amount }
+        override val witnessUtxo: TxOut? by lazy { txOut }
+
+        /** A partially signed segwit input. More signatures may need to be added before it can be finalized. */
+        public data class PartiallySignedWitnessInput(
+            override val txOut: TxOut,
+            override val nonWitnessUtxo: Transaction?,
+            override val sighashType: Int?,
+            override val partialSigs: Map<PublicKey, ByteVector>,
+            override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
+            override val redeemScript: List<ScriptElt>?,
+            override val witnessScript: List<ScriptElt>?,
+            override val ripemd160: Set<ByteVector>,
+            override val sha256: Set<ByteVector>,
+            override val hash160: Set<ByteVector>,
+            override val hash256: Set<ByteVector>,
+            override val unknown: List<DataEntry>
+        ) : WitnessInput() {
+            override val scriptSig: List<ScriptElt>? = null
+            override val scriptWitness: ScriptWitness? = null
+        }
+
+        /** A fully signed segwit input. */
+        public data class FinalizedWitnessInput(
+            override val txOut: TxOut,
+            override val nonWitnessUtxo: Transaction?,
+            override val scriptWitness: ScriptWitness,
+            override val scriptSig: List<ScriptElt>?,
+            override val ripemd160: Set<ByteVector>,
+            override val sha256: Set<ByteVector>,
+            override val hash160: Set<ByteVector>,
+            override val hash256: Set<ByteVector>,
+            override val unknown: List<DataEntry>
+        ) : WitnessInput() {
+            override val sighashType: Int? = null
+            override val partialSigs: Map<PublicKey, ByteVector> = mapOf()
+            override val derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
+            override val redeemScript: List<ScriptElt>? = null
+            override val witnessScript: List<ScriptElt>? = null
+        }
+    }
+
+    /** An input spending a non-segwit output. */
+    public sealed class NonWitnessInput : Input() {
+        public abstract val inputTx: Transaction
+        public abstract val outputIndex: Int
+        public val amount: Satoshi by lazy { inputTx.txOut[outputIndex].amount }
+        override val nonWitnessUtxo: Transaction? by lazy { inputTx }
+
+        // The following fields should only be present for inputs which spend segwit outputs (including P2SH embedded ones).
+        override val witnessUtxo: TxOut? = null
+        override val witnessScript: List<ScriptElt>? = null
+
+        /** A partially signed non-segwit input. More signatures may need to be added before it can be finalized. */
+        public data class PartiallySignedNonWitnessInput(
+            override val inputTx: Transaction,
+            override val outputIndex: Int,
+            override val sighashType: Int?,
+            override val partialSigs: Map<PublicKey, ByteVector>,
+            override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
+            override val redeemScript: List<ScriptElt>?,
+            override val ripemd160: Set<ByteVector>,
+            override val sha256: Set<ByteVector>,
+            override val hash160: Set<ByteVector>,
+            override val hash256: Set<ByteVector>,
+            override val unknown: List<DataEntry>
+        ) : NonWitnessInput() {
+            override val scriptSig: List<ScriptElt>? = null
+            override val scriptWitness: ScriptWitness? = null
+        }
+
+        /** A fully signed non-segwit input. */
+        public data class FinalizedNonWitnessInput(
+            override val inputTx: Transaction,
+            override val outputIndex: Int,
+            override val scriptSig: List<ScriptElt>,
+            override val ripemd160: Set<ByteVector>,
+            override val sha256: Set<ByteVector>,
+            override val hash160: Set<ByteVector>,
+            override val hash256: Set<ByteVector>,
+            override val unknown: List<DataEntry>
+        ) : NonWitnessInput() {
+            override val sighashType: Int? = null
+            override val partialSigs: Map<PublicKey, ByteVector> = mapOf()
+            override val derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
+            override val redeemScript: List<ScriptElt>? = null
+            override val witnessScript: List<ScriptElt>? = null
+            override val scriptWitness: ScriptWitness? = null
+        }
+    }
+}
+
+/** A PSBT output. A valid PSBT must contain one such output per output of the [[Global.tx]]. */
+public sealed class Output {
+    // @formatter:off
+    /** Redeem script for this output (when using p2sh). */
+    public abstract val redeemScript: List<ScriptElt>?
+    /** Witness script for this output (when using p2wsh). */
+    public abstract val witnessScript: List<ScriptElt>?
+    /** Derivation paths used to produce the public keys associated to this output. */
+    public abstract val derivationPaths: Map<PublicKey, KeyPathWithMaster>
+    /** (optional) Unknown global entries. */
+    public abstract val unknown: List<DataEntry>
+    // @formatter:on
+
+    /** A non-segwit output. */
+    public data class NonWitnessOutput(
+        override val redeemScript: List<ScriptElt>?,
+        override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
+        override val unknown: List<DataEntry>
+    ) : Output() {
+        override val witnessScript: List<ScriptElt>? = null
+    }
+
+    /** A segwit output. */
+    public data class WitnessOutput(
+        override val witnessScript: List<ScriptElt>?,
+        override val redeemScript: List<ScriptElt>?,
+        override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
+        override val unknown: List<DataEntry>
+    ) : Output()
+
+    /** An output for which usage of segwit is currently unknown. */
+    public data class UnspecifiedOutput(
+        override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
+        override val unknown: List<DataEntry>
+    ) : Output() {
+        override val redeemScript: List<ScriptElt>? = null
+        override val witnessScript: List<ScriptElt>? = null
+    }
+}
+
+public sealed class UpdateFailure {
+    public data class InvalidInput(val reason: String) : UpdateFailure()
+    public data class InvalidNonWitnessUtxo(val reason: String) : UpdateFailure()
+    public data class InvalidWitnessUtxo(val reason: String) : UpdateFailure()
+    public data class CannotCombine(val reason: String) : UpdateFailure()
+    public data class CannotJoin(val reason: String) : UpdateFailure()
+    public data class CannotUpdateInput(val index: Int, val reason: String) : UpdateFailure()
+    public data class CannotUpdateOutput(val index: Int, val reason: String) : UpdateFailure()
+    public data class CannotSignInput(val index: Int, val reason: String) : UpdateFailure()
+    public data class CannotFinalizeInput(val index: Int, val reason: String) : UpdateFailure()
+    public data class CannotExtractTx(val reason: String) : UpdateFailure()
+}
+
+public data class SignPsbtResult(val psbt: Psbt, val sig: ByteVector)
+
+public sealed class ParseFailure {
+    public object InvalidMagicBytes : ParseFailure()
+    public object InvalidSeparator : ParseFailure()
+    public object DuplicateKeys : ParseFailure()
+    public data class InvalidPsbtVersion(val reason: String) : ParseFailure()
+    public data class UnsupportedPsbtVersion(val version: Long) : ParseFailure()
+    public data class InvalidGlobalTx(val reason: String) : ParseFailure()
+    public object GlobalTxMissing : ParseFailure()
+    public data class InvalidExtendedPublicKey(val reason: String) : ParseFailure()
+    public data class InvalidTxInput(val reason: String) : ParseFailure()
+    public data class InvalidTxOutput(val reason: String) : ParseFailure()
+    public object InvalidContent : ParseFailure()
+}
+

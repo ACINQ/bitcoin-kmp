@@ -118,4 +118,37 @@ public object Bitcoin {
             null
         }
     }
+
+    @JvmStatic
+    public fun addressToPublicKeyScript(chainHash: ByteVector32, address: String): List<ScriptElt> {
+        return runCatching { Base58Check.decode(address) }.fold(
+            onSuccess = {
+                when {
+                    it.first == Base58.Prefix.PubkeyAddressTestnet && (chainHash == Block.TestnetGenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash) -> Script.pay2pkh(it.second)
+                    it.first == Base58.Prefix.PubkeyAddress && chainHash == Block.LivenetGenesisBlock.hash -> Script.pay2pkh(it.second)
+                    it.first == Base58.Prefix.ScriptAddressTestnet && (chainHash == Block.TestnetGenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash) -> listOf(OP_HASH160, OP_PUSHDATA(it.second), OP_EQUAL)
+                    it.first == Base58.Prefix.ScriptAddress && chainHash == Block.LivenetGenesisBlock.hash -> listOf(OP_HASH160, OP_PUSHDATA(it.second), OP_EQUAL)
+                    else -> error("base58 address does not match our blockchain")
+                }
+            },
+            onFailure = {
+                val base58error = it
+                runCatching { Bech32.decodeWitnessAddress(address) }.fold(
+                    onSuccess = {
+                        when {
+                            it.second < 0.toByte() || it.second > 16.toByte() -> error("invalid version ${it.second} in bech32 address")
+                            it.third.size != 20 && it.third.size != 32 -> error("hash length in bech32 address must be either 20 or 32 bytes")
+                            it.first == "bc" && chainHash == Block.LivenetGenesisBlock.hash -> listOf(OP_0, OP_PUSHDATA(it.third))
+                            it.first == "tb" && chainHash == Block.TestnetGenesisBlock.hash -> listOf(OP_0, OP_PUSHDATA(it.third))
+                            it.first == "bcrt" && chainHash == Block.RegtestGenesisBlock.hash -> listOf(OP_0, OP_PUSHDATA(it.third))
+                            else -> error("bech32 address does not match our blockchain")
+                        }
+                    },
+                    onFailure = {
+                        error("$address is neither a valid Base58 address ($base58error) nor a valid Bech32 address ($it)")
+                    }
+                )
+            }
+        )
+    }
 }

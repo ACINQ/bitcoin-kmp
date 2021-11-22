@@ -56,4 +56,53 @@ class BitcoinTestsCommon {
             assertEquals(addressFromPublicKeyScript(it.second, Hex.decode(it.first)), it.third)
         }
     }
+
+    @Test
+    fun `decode base58 addresses`() {
+        val pub = PrivateKey.fromHex("0101010101010101010101010101010101010101010101010101010101010101").publicKey()
+
+        // p2pkh
+        // valid chain
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, pub.hash160())), Script.pay2pkh(pub))
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, pub.hash160())), Script.pay2pkh(pub))
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())), Script.pay2pkh(pub))
+
+        // wrong chain
+        assertFails { Bitcoin.addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())) }
+        assertFails { Bitcoin.addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())) }
+        assertFails { Bitcoin.addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())) }
+
+        // p2sh
+        val script = Script.write(Script.pay2wpkh(pub))
+
+        // valid chain
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, Crypto.hash160(script))), Script.pay2sh(script))
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, Crypto.hash160(script))), Script.pay2sh(script))
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))), Script.pay2sh(script))
+
+        // wrong chain
+        assertFails { Bitcoin.addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, Crypto.hash160(script))) }
+        assertFails { Bitcoin.addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))) }
+        assertFails { Bitcoin.addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))) }
+    }
+
+    @Test
+    fun `decode bech32 addresses`() {
+        val pub = PrivateKey.fromHex("0101010101010101010101010101010101010101010101010101010101010101").publicKey()
+
+        // p2wpkh
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Bech32.encodeWitnessAddress("bc", 0, pub.hash160())), Script.pay2wpkh(pub))
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Bech32.encodeWitnessAddress("tb", 0, pub.hash160())), Script.pay2wpkh(pub))
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Bech32.encodeWitnessAddress("bcrt", 0, pub.hash160())), Script.pay2wpkh(pub))
+
+        // wrong chain
+        assertFails { Bitcoin.addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Bech32.encodeWitnessAddress("bc", 0, pub.hash160())) }
+        assertFails { Bitcoin.addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Bech32.encodeWitnessAddress("tb", 0, pub.hash160())) }
+        assertFails { Bitcoin.addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Bech32.encodeWitnessAddress("bcrt", 0, pub.hash160())) }
+
+        val script = Script.write(Script.pay2wpkh(pub))
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Bech32.encodeWitnessAddress("bc", 0, Crypto.sha256(script))), Script.pay2wsh(script))
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Bech32.encodeWitnessAddress("tb", 0, Crypto.sha256(script))), Script.pay2wsh(script))
+        assertEquals(Bitcoin.addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Bech32.encodeWitnessAddress("bcrt", 0, Crypto.sha256(script))), Script.pay2wsh(script))
+    }
 }

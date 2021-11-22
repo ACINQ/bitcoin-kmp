@@ -12,7 +12,7 @@ plugins {
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.8.2"
+version = "0.8.3-SNAPSHOT"
 
 repositories {
     mavenLocal()

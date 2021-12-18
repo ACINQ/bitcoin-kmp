@@ -80,8 +80,7 @@ class ScriptTestsCommon {
         )
 
         fun parseScriptFlags(strFlags: String): Int =
-            if (strFlags.isEmpty()) 0 else strFlags.split(",").map { mapFlagNames.getValue(it) }
-                .fold(0) { a, b -> a or b }
+            if (strFlags.isEmpty()) 0 else strFlags.split(",").map { mapFlagNames.getValue(it) }.fold(0) { a, b -> a or b }
 
         fun parseFromText(input: String): ByteArray {
             fun parseInternal(tokens: List<String>, acc: ByteArray = ByteArray(0)): ByteArray {

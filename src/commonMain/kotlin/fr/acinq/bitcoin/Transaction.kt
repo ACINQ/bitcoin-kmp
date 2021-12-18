@@ -248,7 +248,7 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
 
         @JvmStatic
         override fun validate(t: TxOut) {
-            require(t.amount.sat >= 0) { "invalid txout amount: ${t.amount}" }
+            require(t.amount in Satoshi(0L)..Satoshi.MAX_MONEY) { "invalid txout amount: ${t.amount}" }
             require(t.publicKeyScript.size() < Script.MaxScriptElementSize) { "public key script is ${t.publicKeyScript.size()} bytes, limit is ${Script.MaxScriptElementSize} bytes" }
         }
     }

@@ -64,7 +64,6 @@ class TransactionTestsCommon {
             when {
                 testCase[0].jsonArray.isNotEmpty() && testCase[1].jsonPrimitive.isString && testCase[2].jsonPrimitive.isString -> {
                     val serializedTransaction = testCase[1].jsonPrimitive.content
-                    val verifyFlags = testCase[2].jsonPrimitive.content
                     val array = testCase[0].jsonArray
                     array.map {
                         when (it.jsonArray.size) {
@@ -94,13 +93,17 @@ class TransactionTestsCommon {
                     }
                     val tx = Transaction.read(serializedTransaction, Protocol.PROTOCOL_VERSION)
                     val result = try {
-                        Transaction.validate(tx)
+                        val isTxValid = kotlin.runCatching { Transaction.validate(tx) }.isSuccess
+                        if(testCase[2].jsonPrimitive.content == "BADTX") require(!isTxValid){ "$tx should be invalid"}
+                        if(testCase[2].jsonPrimitive.content != "BADTX") require(isTxValid){ "$tx should be valid"}
+                        val verifyFlags = ScriptTestsCommon.parseScriptFlags(testCase[2].jsonPrimitive.content)
+
                         for (i in 0..tx.txIn.lastIndex) {
                             if (tx.txIn[i].outPoint.isCoinbase) continue
                             val prevOutputScript = prevoutMap.getValue(tx.txIn[i].outPoint)
                             val amount = prevamountMap[tx.txIn[i].outPoint] ?: 0L.toSatoshi()
                             val ctx = Script.Context(tx, i, amount)
-                            val runner = Script.Runner(ctx, ScriptTestsCommon.parseScriptFlags(verifyFlags))
+                            val runner = Script.Runner(ctx, if (valid) verifyFlags.inv() else verifyFlags)
                             if (!runner.verifyScripts(tx.txIn[i].signatureScript, prevOutputScript, tx.txIn[i].witness)) {
                                 throw RuntimeException("tx ${tx.txid} does not spend its input #$i")
                             }
@@ -109,7 +112,7 @@ class TransactionTestsCommon {
                     } catch (t: Throwable) {
                         false
                     }
-                    assertEquals(result, valid, "failed valid=$valid test $testCase")
+                    assertEquals(valid, result, "failed valid=$valid test $testCase")
                 }
                 else -> {
                     fail("could not process test $testCase")
@@ -120,19 +123,15 @@ class TransactionTestsCommon {
 
     @Test
     fun `reference valid tx tests`() {
-        val json = """[[["60a20bd93aa49ab4b28d514ec10b06e1829ce6818ec06cd3aabd013ebcdc4bb1",0,"1 0x41 0x04cc71eb30d653c0c3163990c47b976f3fb3f37cccdcbedb169a1dfef58bbfbfaff7d8a473e7e2e6d317b87bafe8bde97e3cf8f065dec022b51d11fcdd0d348ac4 0x41 0x0461cbdcc5409fb4b4d42b51d33381354d80e550078cb532a34bfa2fcfdeb7d76519aecc62770f5b0e4ef8551946d8a540911abe3e7854a26f39f58b25c15342af 2 OP_CHECKMULTISIG"]], "0100000001b14bdcbc3e01bdaad36cc08e81e69c82e1060bc14e518db2b49aa43ad90ba26000000000490047304402203f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e780220ddc15ecdfc3507ac48e1681a33eb60996631bf6bf5bc0a0682c4db743ce7ca2b01ffffffff0140420f00000000001976a914660d4ef3a743e3e696ad990364e555c271ad504b88ac00000000", "P2SH"]"""
-        processSingle(Json { ignoreUnknownKeys = true }.parseToJsonElement(json).jsonArray, true)
-
         val tests = readData("data/tx_valid.json")
         val count = process(tests.jsonArray, true)
-        assertEquals(120, count)
+        assertEquals(119, count)
     }
 
     @Test
     fun `reference invalid tx tests`() {
         val tests = readData("data/tx_invalid.json")
         val count = process(tests.jsonArray, false)
-        assertEquals(92, count)
+        assertEquals(93, count)
     }
-
 }

@@ -48,8 +48,8 @@ Our runtime targets are:
 
 `bitcoin-kmp` is available on [maven central](https://search.maven.org/search?q=g:fr.acinq.bitcoin%20a:bitcoin-kmp*)
 
-* **Multiplatform**: Add the `fr.acinq.bitcoin-kmp:bitcoin-kmp` dependency to your common source set dependencies (you need Gradle 5.0 minimum).
-* **JVM**: Add the `fr.acinq.bitcoin-kmp:bitcoin-kmp-jvm` dependency to your project.
+* **Multiplatform**: Add the `fr.acinq.bitcoin:bitcoin-kmp` dependency to your common source set dependencies (you need Gradle 5.0 minimum).
+* **JVM**: Add the `fr.acinq.bitcoin:bitcoin-kmp-jvm` dependency to your project.
 
 ## libscp256k1 support
 

@@ -268,7 +268,8 @@ public object Script {
     @JvmStatic
     public fun isNativeWitnessScript(script: ByteVector): Boolean = runCatching { parse(script) }.map { isNativeWitnessScript(it) }.getOrDefault(false)
 
-    private fun pushSize(op: ScriptElt): Int? = when (op) {
+    @JvmStatic
+    public fun pushSize(op: ScriptElt): Int? = when (op) {
         is OP_PUSHDATA -> op.data.size()
         else -> null
     }

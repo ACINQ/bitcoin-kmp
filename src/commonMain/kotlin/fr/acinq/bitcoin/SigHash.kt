@@ -16,16 +16,21 @@
 
 package fr.acinq.bitcoin
 
+import kotlin.jvm.JvmStatic
+
 public object SigHash {
     public const val SIGHASH_ALL: Int = 1
     public const val SIGHASH_NONE: Int = 2
     public const val SIGHASH_SINGLE: Int = 3
     public const val SIGHASH_ANYONECANPAY: Int = 0x80
 
+    @JvmStatic
     public fun isAnyoneCanPay(sighashType: Int): Boolean = (sighashType and SIGHASH_ANYONECANPAY) != 0
 
+    @JvmStatic
     public fun isHashSingle(sighashType: Int): Boolean = (sighashType and 0x1f) == SIGHASH_SINGLE
 
+    @JvmStatic
     public fun isHashNone(sighashType: Int): Boolean = (sighashType and 0x1f) == SIGHASH_NONE
 }
 

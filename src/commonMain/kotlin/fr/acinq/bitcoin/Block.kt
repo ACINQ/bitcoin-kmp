@@ -169,6 +169,7 @@ public data class BlockHeader(
  * see https://en.bitcoin.it/wiki/Protocol_specification#Merkle_Trees
  */
 public object MerkleTree {
+    @JvmStatic
     public tailrec fun computeRoot(tree: List<ByteVector32>): ByteVector32 {
         return when {
             tree.size == 1 -> tree[0]
@@ -234,6 +235,7 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
          * @param block
          * @return true if the input block validates its expected proof of work
          */
+        @JvmStatic
         public fun checkProofOfWork(block: Block): Boolean = BlockHeader.checkProofOfWork(block.header)
 
         // genesis blocks

@@ -51,6 +51,7 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     public companion object : BtcSerializer<OutPoint>() {
+        @JvmStatic
         override fun read(input: Input, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input).toLong())
 
         @JvmStatic
@@ -58,6 +59,7 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
             return super.read(input)
         }
 
+        @JvmStatic
         override fun write(message: OutPoint, out: Output, protocolVersion: Long) {
             out.write(message.hash.toByteArray())
             writeUInt32(message.index.toUInt(), out)
@@ -68,8 +70,10 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
             return super.write(message)
         }
 
+        @JvmStatic
         public fun isCoinbase(input: OutPoint): Boolean = input.index == 0xffffffffL && input.hash == ByteVector32.Zeroes
 
+        @JvmStatic
         public fun isNull(input: OutPoint): Boolean = isCoinbase(input)
     }
 
@@ -95,6 +99,7 @@ public data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSeri
     public companion object : BtcSerializer<ScriptWitness>() {
         public val empty: ScriptWitness = ScriptWitness(listOf())
 
+        @JvmStatic
         override fun read(input: Input, protocolVersion: Long): ScriptWitness {
             return ScriptWitness(
                 readCollection(
@@ -106,6 +111,7 @@ public data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSeri
             )
         }
 
+        @JvmStatic
         override fun write(t: ScriptWitness, out: Output, protocolVersion: Long) {
             writeCollection(t.stack, out, { b, o, _ -> writeScript(b, o) }, protocolVersion)
         }
@@ -174,27 +180,32 @@ public data class TxIn(
          * 9 bits. */
         public const val SEQUENCE_LOCKTIME_GRANULARITY: Long = 9L
 
+        @JvmStatic
         override fun read(input: Input, protocolVersion: Long): TxIn = TxIn(
             outPoint = OutPoint.read(input),
             signatureScript = script(input),
             sequence = uint32(input).toLong()
         )
 
+        @JvmStatic
         override fun write(message: TxIn, out: Output, protocolVersion: Long) {
             OutPoint.write(message.outPoint, out)
             writeScript(message.signatureScript, out)
             writeUInt32(message.sequence.toUInt(), out)
         }
 
+        @JvmStatic
         override fun validate(input: TxIn) {
             require(input.signatureScript.size() <= Script.MaxScriptElementSize) { "signature script is ${input.signatureScript.size()} bytes, limit is $Script.MaxScriptElementSize bytes" }
         }
 
+        @JvmStatic
         public fun coinbase(script: ByteArray): TxIn {
             require(script.size in 2..100) { "coinbase script length must be between 2 and 100" }
             return TxIn(OutPoint(ByteArray(32), 0xffffffffL), script, sequence = 0xffffffffL)
         }
 
+        @JvmStatic
         public fun coinbase(script: List<ScriptElt>): TxIn = coinbase(Script.write(script))
     }
 
@@ -218,6 +229,7 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     public companion object : BtcSerializer<TxOut>() {
+        @JvmStatic
         override fun write(t: TxOut, out: Output, protocolVersion: Long) {
             writeUInt64(t.amount.toLong().toULong(), out)
             writeScript(t.publicKeyScript, out)
@@ -228,6 +240,7 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
             return super.write(message)
         }
 
+        @JvmStatic
         override fun read(input: Input, protocolVersion: Long): TxOut =
             TxOut(uint64(input).toLong().toSatoshi(), script(input))
 
@@ -236,6 +249,7 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
             return super.read(input)
         }
 
+        @JvmStatic
         override fun validate(t: TxOut) {
             require(t.amount.sat >= 0) { "invalid txout amount: ${t.amount}" }
             require(t.publicKeyScript.size() < Script.MaxScriptElementSize) { "public key script is ${t.publicKeyScript.size()} bytes, limit is ${Script.MaxScriptElementSize} bytes" }

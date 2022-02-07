@@ -40,6 +40,7 @@ public object Script {
      * @param stack initial command stack
      * @return an updated command stack
      */
+    @JvmStatic
     public tailrec fun parse(input: Input, stack: List<ScriptElt> = listOf()): List<ScriptElt> {
         val code = input.read()
         return when {
@@ -64,6 +65,7 @@ public object Script {
     @JvmStatic
     public fun parse(hex: String): List<ScriptElt> = parse(Hex.decode(hex))
 
+    @JvmStatic
     public tailrec fun write(script: List<ScriptElt>, out: Output) {
         if (script.isEmpty()) return
         else {
@@ -265,6 +267,22 @@ public object Script {
 
     @JvmStatic
     public fun isNativeWitnessScript(script: ByteVector): Boolean = runCatching { parse(script) }.map { isNativeWitnessScript(it) }.getOrDefault(false)
+
+    private fun pushSize(op: ScriptElt): Int? = when (op) {
+        is OP_PUSHDATA -> op.data.size()
+        else -> null
+    }
+
+    @JvmStatic
+    public fun getWitnessVersion(script: List<ScriptElt>): Int? = when {
+        script.size != 2 -> null
+        script[0] == OP_0 && (script[1].isPush(20) || script[1].isPush(32)) -> 0
+        simpleValue(script[0]) in 1..16 && pushSize(script[1]) in 2..40 -> simpleValue(script[0]).toInt()
+        else -> null
+    }
+
+    @JvmStatic
+    public fun getWitnessVersion(script: ByteVector): Int? = runCatching { parse(script) }.map { getWitnessVersion(it) }.getOrDefault(null)
 
     /**
      * Creates a m-of-n multisig script.

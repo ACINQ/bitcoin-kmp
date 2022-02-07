@@ -26,8 +26,8 @@ import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmStatic
 
 public object Crypto {
-    public fun sha1(input: ByteVector): ByteArray =
-        Digest.sha1().hash(input.toByteArray())
+    @JvmStatic
+    public fun sha1(input: ByteVector): ByteArray = Digest.sha1().hash(input.toByteArray())
 
     @JvmStatic
     public fun sha256(input: ByteArray, offset: Int, len: Int): ByteArray =
@@ -154,6 +154,7 @@ public object Crypto {
         )
     }
 
+    @JvmStatic
     public fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean =
         verifySignature(data.toByteArray(), signature, publicKey)
 

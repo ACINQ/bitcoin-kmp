@@ -33,7 +33,8 @@ public object Bech32 {
 
     public enum class Encoding(public val constant: Int) {
         Bech32(1),
-        Bech32m(0x2bc830a3)
+        Bech32m(0x2bc830a3),
+        Beck32WithoutChecksum(0),
     }
 
     // char -> 5 bits value
@@ -92,32 +93,39 @@ public object Bech32 {
     @JvmStatic
     public fun encode(hrp: String, int5s: ByteArray, encoding: Encoding): String {
         require(hrp.lowercase() == hrp || hrp.uppercase() == hrp) { "mixed case strings are not valid bech32 prefixes" }
-        val checksum = checksum(hrp, int5s.toTypedArray(), encoding)
+        val checksum = when (encoding) {
+            Encoding.Beck32WithoutChecksum -> arrayOf()
+            else -> checksum(hrp, int5s.toTypedArray(), encoding)
+        }
         return hrp + "1" + (int5s.toTypedArray() + checksum).map { i -> alphabet[i.toInt()] }.toCharArray().concatToString()
     }
 
     /**
      * decodes a bech32 string
      * @param bech32 bech32 string
+     * @param noChecksum if true, the bech32 string doesn't have a checksum
      * @return a (hrp, data, encoding) tuple
      */
     @JvmStatic
-    public fun decode(bech32: String): Triple<String, Array<Int5>, Encoding> {
+    public fun decode(bech32: String, noChecksum: Boolean = false): Triple<String, Array<Int5>, Encoding> {
         require(bech32.lowercase() == bech32 || bech32.uppercase() == bech32) { "mixed case strings are not valid bech32" }
         bech32.forEach { require(it.code in 33..126) { "invalid character " } }
-
         val input = bech32.lowercase()
         val pos = input.lastIndexOf('1')
         val hrp = input.take(pos)
         require(hrp.length in 1..83) { "hrp must contain 1 to 83 characters" }
         val data = Array<Int5>(input.length - pos - 1) { 0 }
         for (i in 0..data.lastIndex) data[i] = map[input[pos + 1 + i].code]
-        val encoding = when (polymod(expand(hrp), data)) {
-            Encoding.Bech32.constant -> Encoding.Bech32
-            Encoding.Bech32m.constant -> Encoding.Bech32m
-            else -> throw IllegalArgumentException("invalid checksum for $bech32")
+        return if (noChecksum) {
+            Triple(hrp, data, Encoding.Beck32WithoutChecksum)
+        } else {
+            val encoding = when (polymod(expand(hrp), data)) {
+                Encoding.Bech32.constant -> Encoding.Bech32
+                Encoding.Bech32m.constant -> Encoding.Bech32m
+                else -> throw IllegalArgumentException("invalid checksum for $bech32")
+            }
+            Triple(hrp, data.dropLast(6).toTypedArray(), encoding)
         }
-        return Triple(hrp, data.dropLast(6).toTypedArray(), encoding)
     }
 
     /**

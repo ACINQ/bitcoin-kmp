@@ -18,6 +18,7 @@ package fr.acinq.bitcoin
 
 import fr.acinq.secp256k1.Hex
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 
@@ -42,8 +43,15 @@ class Bech32TestsCommon {
             "split1checkupstagehandshakeupstreamerranterredcaperredlc445v",
             "?1v759aa",
         )
-        val outputs = inputs.map(Bech32::decode)
-        assertEquals(outputs.size, inputs.size)
+        inputs.forEach {
+            val (hrp1, data1, encoding1) = Bech32.decode(it)
+            val (hrp2, data2, encoding2) = Bech32.decode(it.dropLast(6), noChecksum = true)
+            assertEquals(hrp1, hrp2)
+            assertContentEquals(data1, data2)
+            assertEquals(encoding2, Bech32.Encoding.Beck32WithoutChecksum)
+            assertEquals(it.lowercase(), Bech32.encode(hrp1, data1.toByteArray(), encoding1))
+            assertEquals(it.lowercase().dropLast(6), Bech32.encode(hrp2, data2.toByteArray(), encoding2))
+        }
     }
 
     @Test

@@ -17,8 +17,10 @@ This is a simple Kotlin Multiplatform library which implements most of the bitco
 * pay to script tx / multisig tx
 * BIP 32 (deterministic wallets)
 * BIP 39 (mnemonic code for generating deterministic keys)
+* BIP 86 (key derivation for p2tr outputs)
 * BIP 173 (Base32 address format for native v0-16 witness outputs)
 * BIP 174 (Partially Signed Bitcoin Transaction Format v0)
+* BIP 341 and 342 (taproot and tapscript transactions)
 * BIP 350 (Bech32m format)
 
 ## Objectives

@@ -63,6 +63,8 @@ public data class PrivateKey(@JvmField val value: ByteVector32) {
         return PublicKey(PublicKey.compress(pub))
     }
 
+    public fun xOnlyPublicKey(): XonlyPublicKey = XonlyPublicKey(publicKey())
+
     public fun compress(): ByteArray = value.toByteArray() + 1.toByte()
 
     public fun toBase58(prefix: Byte): String = Base58Check.encode(prefix, compress())

@@ -17,6 +17,10 @@ package fr.acinq.bitcoin
 
 import kotlin.jvm.JvmField
 
+/**
+ * x-only pubkey, used with Schnorr signatures (see https://github.com/bitcoin/bips/tree/master/bip-0340)
+ * we only store the x coordinate of the pubkey, the y coordinate is always even
+ */
 public data class XonlyPublicKey(@JvmField val value: ByteVector32) {
     public constructor(pub: PublicKey) : this(pub.value.drop(1).toByteArray().byteVector32())
 
@@ -26,10 +30,20 @@ public data class XonlyPublicKey(@JvmField val value: ByteVector32) {
         return Crypto.taggedHash(this.value.toByteArray() + (merkleRoot?.toByteArray() ?: ByteArray(0)), "TapTweak")
     }
 
-    public fun outputKey(merkleRoot: ByteVector32?): XonlyPublicKey = this + PrivateKey(tweak(merkleRoot)).publicKey()
+    /**
+     * "tweaks" this key with an optional merkle root
+     * @param merkleRoot tapscript tree merkle root
+     * @return an (x-pnly pubkey, parity) pair
+     */
+    public fun outputKey(merkleRoot: ByteVector32?): Pair<XonlyPublicKey, Boolean> = this + PrivateKey(tweak(merkleRoot)).publicKey()
 
-    public operator fun plus(that: PublicKey): XonlyPublicKey {
+    /**
+     * add a public key to this x-only key
+     * @param that public key
+     * @return a (key, parity) pair where `key` is the x-only-pubkey for `this` + `that` and `parity` is true if `this` + `that` is odd
+     */
+    public operator fun plus(that: PublicKey): Pair<XonlyPublicKey, Boolean> {
         val pub = publicKey + that
-        return XonlyPublicKey(pub)
+        return Pair(XonlyPublicKey(pub), pub.isOdd())
     }
 }

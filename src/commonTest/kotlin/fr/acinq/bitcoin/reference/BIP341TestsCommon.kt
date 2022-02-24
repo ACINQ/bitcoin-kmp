@@ -1,3 +1,18 @@
+/*
+ * Copyright 2020 ACINQ SAS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package fr.acinq.bitcoin.reference
 
 import fr.acinq.bitcoin.*
@@ -39,29 +54,100 @@ class BIP341TestsCommon {
                 val internalPubkey = XonlyPublicKey(internalPrivkey.publicKey())
                 val intermediary = it.jsonObject["intermediary"]!!.jsonObject
                 assertEquals(ByteVector32(intermediary["internalPubkey"]!!.jsonPrimitive.content), internalPubkey.value)
-                assertEquals(ByteVector32(intermediary["tweak"]!!.jsonPrimitive.content), internalPubkey.tweak(merkleRoot))
+                assertEquals(ByteVector32(intermediary["tweak"]!!.jsonPrimitive.content), internalPubkey.tweak(if (merkleRoot == ByteVector32.Zeroes) null else merkleRoot))
 
-                val tweakedPrivateKey = internalPrivkey.tweak(internalPubkey.tweak(merkleRoot))
+                val tweakedPrivateKey = internalPrivkey.tweak(internalPubkey.tweak(if (merkleRoot == ByteVector32.Zeroes) null else merkleRoot))
                 assertEquals(ByteVector32(intermediary["tweakedPrivkey"]!!.jsonPrimitive.content), tweakedPrivateKey.value)
 
-                val hash = Transaction.hashForSigningSchnorr(rawUnsignedTx, txinIndex, utxosSpent, hashType)
+                val hash = Transaction.hashForSigningSchnorr(rawUnsignedTx, txinIndex, utxosSpent, hashType, 0, null)
                 assertEquals(ByteVector32(intermediary["sigHash"]!!.jsonPrimitive.content), hash)
 
-                val sig = Secp256k1.signSchnorr(hash.toByteArray(), tweakedPrivateKey.value.toByteArray(), Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))
+                val sig = Crypto.signSchnorr(hash, internalPrivkey, merkleRoot, ByteVector32.Zeroes)
                 val witness = when (hashType) {
-                    SigHash.SIGHASH_DEFAULT -> sig.byteVector()
-                    else -> (sig + byteArrayOf(hashType.toByte())).byteVector()
+                    SigHash.SIGHASH_DEFAULT -> sig
+                    else -> (sig + byteArrayOf(hashType.toByte()))
                 }
                 val expected = it.jsonObject["expected"]!!.jsonObject
-                val witnessStack = expected["witness"]!!.jsonArray.map { ByteVector(it.jsonPrimitive.content) }
+                val witnessStack = expected["witness"]!!.jsonArray.map { jsonElt -> ByteVector(jsonElt.jsonPrimitive.content) }
                 assertEquals(1, witnessStack.size)
                 assertEquals(witnessStack.first(), witness)
             }
         }
     }
 
-    fun nullOrBytes(input: String?): ByteVector32? = when (input) {
-        null, "null" -> null
+    @Test
+    fun `BIP341 reference tests (script path spending)`() {
+        val tests = TransactionTestsCommon.readData("data/bip341_wallet_vectors.json").jsonObject["scriptPubKey"]!!
+        tests.jsonArray.forEach { it ->
+            val given = it.jsonObject["given"]!!.jsonObject
+            val internalPubkey = XonlyPublicKey(ByteVector32.fromValidHex(given["internalPubkey"]!!.jsonPrimitive.content))
+            val scriptTree = when (val json = it.jsonObject["given"]!!.jsonObject["scriptTree"]) {
+                null, JsonNull -> null
+                else -> read(json) { fromJson(it) }
+            }
+
+            val intermediary = it.jsonObject["intermediary"]!!.jsonObject
+            val merkleRoot = scriptTree?.let { ScriptTree.hash(it) }
+            val (tweakedKey, parity) = internalPubkey.outputKey(merkleRoot)
+            merkleRoot?.let { assertEquals(ByteVector32(intermediary["merkleRoot"]!!.jsonPrimitive.content), it) }
+            assertEquals(ByteVector32(intermediary["tweakedPubkey"]!!.jsonPrimitive.content), tweakedKey.value)
+
+            val expected = it.jsonObject["expected"]!!.jsonObject
+            val script = Script.write(listOf(OP_1, OP_PUSHDATA(tweakedKey.value))).byteVector()
+            assertEquals(ByteVector(expected["scriptPubKey"]!!.jsonPrimitive.content), script)
+            val bip350Address = Bech32.encodeWitnessAddress("bc", 1.toByte(), tweakedKey.value.toByteArray())
+            assertEquals(expected["bip350Address"]!!.jsonPrimitive.content, bip350Address)
+
+            when (expected["scriptPathControlBlocks"]) {
+                null, JsonNull -> Unit
+                else -> {
+                    // when control blocks are provided, recomputed them for each script tree leaf and check that they match
+                    // for each leaf in the script tree the control block is:
+                    // leaf version + parity (1 byte) || internal pub key (32 bytes) || merkle path for this leaf (N * 32 bytes)
+                    val controlBlocks = expected["scriptPathControlBlocks"]!!.jsonArray.map { ByteVector.fromHex(it.jsonPrimitive.content) }
+                    val paths = mutableListOf<Pair<Int, ByteArray>>()
+                    merklePath(scriptTree!!) { leafVersion, hashes -> paths.add(Pair(leafVersion, hashes)) }
+                    val computed = paths.map {
+                        (byteArrayOf((if (parity) it.first + 1 else it.first).toByte()) + internalPubkey.value.toByteArray() + it.second).byteVector()
+                    }
+                    assertEquals(controlBlocks, computed)
+                }
+            }
+        }
+    }
+
+    private fun nullOrBytes(input: String?): ByteVector32? = when (input) {
+        null, "null" -> ByteVector32.Zeroes
         else -> ByteVector32(input)
+    }
+
+    companion object {
+        fun fromJson(json: JsonElement): ScriptLeaf = ScriptLeaf(
+            id = json.jsonObject["id"]!!.jsonPrimitive.int,
+            script = ByteVector.fromHex(json.jsonObject["script"]!!.jsonPrimitive.content),
+            leafVersion = json.jsonObject["leafVersion"]!!.jsonPrimitive.int
+        )
+
+        fun <T> read(json: JsonElement, f: (JsonElement) -> T): ScriptTree<T> = when (json) {
+            is JsonObject -> ScriptTree.Leaf(f(json))
+            is JsonArray -> ScriptTree.Branch(read(json[0], f), read(json[1], f))
+            else -> error("unexpected $json")
+        }
+
+        /**
+         * computes the merkle paths for each leaf in the merkle tree.
+         *
+         * the input tree is traversed down and each time we reach a leaf. `onLeaf` will be call with the leaf version and the merkle path for this leaf (i.e. the concatenated
+         * list of hashes you have to provide to recompute the tree hash from this leaf)
+         */
+        fun merklePath(tree: ScriptTree<ScriptLeaf>, hashes: ByteArray = byteArrayOf(), onLeaf: (Int, ByteArray) -> Unit) {
+            when (tree) {
+                is ScriptTree.Leaf -> onLeaf(tree.value.leafVersion, hashes)
+                is ScriptTree.Branch -> {
+                    merklePath(tree.left, ScriptTree.hash(tree.right).toByteArray() + hashes, onLeaf)
+                    merklePath(tree.right, ScriptTree.hash(tree.left).toByteArray() + hashes, onLeaf)
+                }
+            }
+        }
     }
 }

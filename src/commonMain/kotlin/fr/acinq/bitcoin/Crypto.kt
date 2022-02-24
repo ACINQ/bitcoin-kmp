@@ -154,9 +154,31 @@ public object Crypto {
         )
     }
 
+    /**
+     * @param data data to sigm (32 bytes)
+     * @param privateKey private key
+     * @param merkleRoot optional merkle root, which will be used to tweak the private key.
+     * if `null`, the input private key will be used as is.
+     * if set to all zeroes, the private key wil be tweaked with an empty byte array.
+     * @return the Schnorr signature of data with private key (optionally tweaked with the merkle root)
+     */
     @JvmStatic
-    public fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean =
-        verifySignature(data.toByteArray(), signature, publicKey)
+    public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey, merkleRoot: ByteVector32?, auxrand32: ByteVector32? = null): ByteVector64 {
+        val priv = when (merkleRoot) {
+            null -> privateKey
+            ByteVector32.Zeroes -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(null))
+            else -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(merkleRoot))
+        }
+        val sig = Secp256k1.signSchnorr(data.toByteArray(), priv.value.toByteArray(), auxrand32?.let { it.toByteArray() }).byteVector64()
+        require(verifySignatureSchnorr(data, sig, priv.xOnlyPublicKey())) { "Cannot create Schnorr signature" }
+        return sig
+    }
+
+    @JvmStatic
+    public fun verifySignatureSchnorr(data: ByteVector32, signature: ByteVector, publicKey: XonlyPublicKey): Boolean {
+        return Secp256k1.verifySchnorr(signature.toByteArray(), data.toByteArray(), publicKey.value.toByteArray())
+    }
+
 
     private fun padLeft(data: ByteArray, size: Int): ByteArray = when {
         data.size == size -> data

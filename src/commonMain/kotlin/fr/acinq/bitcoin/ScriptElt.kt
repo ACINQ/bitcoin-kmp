@@ -143,6 +143,8 @@ public object OP_HASH256 : ScriptElt()
 public object OP_CODESEPARATOR : ScriptElt()
 public object OP_CHECKSIG : ScriptElt()
 public object OP_CHECKSIGVERIFY : ScriptElt()
+// Opcode added by BIP 342 (Tapscript)
+public object OP_CHECKSIGADD: ScriptElt()
 public object OP_CHECKMULTISIG : ScriptElt()
 public object OP_CHECKMULTISIGVERIFY : ScriptElt()
 public object OP_NOP1 : ScriptElt()
@@ -169,6 +171,8 @@ public data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val code
     public constructor(data: ByteVector32) : this(data, codeFromDataLength(data.size()))
 
     public constructor(publicKey: PublicKey) : this(publicKey.value)
+
+    public constructor(publicKey: XonlyPublicKey) : this(publicKey.value)
 
     public companion object {
         @JvmStatic
@@ -319,6 +323,7 @@ public object ScriptEltMapping {
         0xb7 to OP_NOP8,
         0xb8 to OP_NOP9,
         0xb9 to OP_NOP10,
+        0xba to OP_CHECKSIGADD,
         0xfa to OP_SMALLINTEGER,
         0xff to OP_INVALIDOPCODE
     )
@@ -330,6 +335,13 @@ public object ScriptEltMapping {
         val name = elt.toString().removePrefix("fr.acinq.bitcoin.OP_")
         val name1 = name.take(name.lastIndexOf('@'))
         return name1
+    }
+
+    public fun opCode(elt: ScriptElt): Int = when {
+        elt2code.containsKey(elt) -> elt2code[elt]!!
+        elt is OP_PUSHDATA -> elt.code
+        elt is OP_INVALID -> elt.code
+        else -> error("invalid script element $elt")
     }
 
     public val name2code: Map<String, Int> = elt2code.map { name(it.key) to it.value }.toMap() + mapOf<String, Int>("NOP2" to 0xb1, "NOP3" to 0xb2)

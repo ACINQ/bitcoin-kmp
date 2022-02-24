@@ -194,7 +194,7 @@ public data class TxIn(
 
         @JvmStatic
         override fun validate(input: TxIn) {
-            require(input.signatureScript.size() <= Script.MaxScriptElementSize) { "signature script is ${input.signatureScript.size()} bytes, limit is $Script.MaxScriptElementSize bytes" }
+            require(input.signatureScript.size() <= Script.MAX_SCRIPT_ELEMENT_SIZE) { "signature script is ${input.signatureScript.size()} bytes, limit is $Script.MaxScriptElementSize bytes" }
         }
 
         @JvmStatic
@@ -249,7 +249,7 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
         @JvmStatic
         override fun validate(t: TxOut) {
             require(t.amount in Satoshi(0L)..Satoshi.MAX_MONEY) { "invalid txout amount: ${t.amount}" }
-            require(t.publicKeyScript.size() < Script.MaxScriptElementSize) { "public key script is ${t.publicKeyScript.size()} bytes, limit is ${Script.MaxScriptElementSize} bytes" }
+            require(t.publicKeyScript.size() < Script.MAX_SCRIPT_ELEMENT_SIZE) { "public key script is ${t.publicKeyScript.size()} bytes, limit is ${Script.MAX_SCRIPT_ELEMENT_SIZE} bytes" }
         }
     }
 
@@ -318,7 +318,7 @@ public data class Transaction(
 
     public fun weight(): Int = weight(this)
 
-    public fun transactionData(inputs: List<TxOut>, sighashType: Int) : ByteArray {
+    public fun transactionData(inputs: List<TxOut>, sighashType: Int): ByteArray {
         val out = ByteArrayOutput()
         BtcSerializer.writeUInt32(version.toUInt(), out)
         BtcSerializer.writeUInt32(lockTime.toUInt(), out)
@@ -680,14 +680,40 @@ public data class Transaction(
         public fun signInput(tx: Transaction, inputIndex: Int, previousOutputScript: List<ScriptElt>, sighashType: Int, privateKey: PrivateKey): ByteArray =
             signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, privateKey)
 
+        /**
+         * @param tx transaction to sign
+         * @param inputIndex index of the transaction input being signed
+         * @param inputs UTXOs spent by this transaction
+         * @param sighashType signature hash type
+         * @param sigVersion signature version
+         * @param annex optional annex (used for tapscript transactions)
+         * @param tapleafHash optional tapleaf hash (used for tapscript transactions)
+         * @param codeSeparatorPos position of the last OP_CODESEPARATOR operation in the script that is being executed
+         */
         @JvmStatic
-        public fun hashForSigningSchnorr(tx: Transaction, inputIndex: Int, inputs: List<TxOut>, sighashType: Int): ByteVector32 {
+        public fun hashForSigningSchnorr(
+            tx: Transaction,
+            inputIndex: Int,
+            inputs: List<TxOut>,
+            sighashType: Int,
+            sigVersion: Int,
+            annex: ByteVector? = null,
+            tapleafHash: ByteVector32? = null,
+            codeSeparatorPos: Long = 0xFFFFFFFFL
+        ): ByteVector32 {
             val out = ByteArrayOutput()
             out.write(0)
+            require(sighashType <= 0x03 || (sighashType in 0x81..0x83))
+
             out.write(sighashType)
             val txData = tx.transactionData(inputs, sighashType)
             out.write(txData)
-            out.write(0)
+            val (extFlag, keyVersion) = when (sigVersion) {
+                SigVersion.SIGVERSION_TAPSCRIPT -> Pair(1, 0)
+                else -> Pair(0, 0)
+            }
+            val spendType = 2 * extFlag + (if (annex != null) 1 else 0)
+            out.write(spendType)
             if ((sighashType and 0x80) == SigHash.SIGHASH_ANYONECANPAY) {
                 OutPoint.write(tx.txIn[inputIndex].outPoint, out)
                 writeUInt64(inputs[inputIndex].amount.toULong(), out)
@@ -696,9 +722,20 @@ public data class Transaction(
             } else {
                 writeUInt32(inputIndex.toUInt(), out)
             }
+            if (annex != null) {
+                val buffer = ByteArrayOutput()
+                writeScript(annex, buffer)
+                val annexHash = Crypto.sha256(buffer.toByteArray())
+                out.write(annexHash)
+            }
             if ((sighashType and 3) == SigHash.SIGHASH_SINGLE) {
                 val ser = TxOut.write(tx.txOut[inputIndex])
                 out.write(Crypto.sha256(ser))
+            }
+            if (sigVersion == SigVersion.SIGVERSION_TAPSCRIPT) {
+                out.write(tapleafHash!!.toByteArray())
+                out.write(keyVersion)
+                writeUInt32(codeSeparatorPos.toUInt(), out)
             }
             val preimage = out.toByteArray()
             return Crypto.taggedHash(preimage, "TapSighash")

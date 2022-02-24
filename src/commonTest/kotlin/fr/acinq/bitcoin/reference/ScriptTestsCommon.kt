@@ -33,6 +33,7 @@ import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_NULLFAIL
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_P2SH
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_SIGPUSHONLY
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_STRICTENC
+import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_TAPROOT
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_WITNESS
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_WITNESS_PUBKEYTYPE
 import fr.acinq.secp256k1.Hex
@@ -76,7 +77,8 @@ class ScriptTestsCommon {
             "CHECKSEQUENCEVERIFY" to SCRIPT_VERIFY_CHECKSEQUENCEVERIFY,
             "WITNESS" to SCRIPT_VERIFY_WITNESS,
             "WITNESS_PUBKEYTYPE" to SCRIPT_VERIFY_WITNESS_PUBKEYTYPE,
-            "CONST_SCRIPTCODE" to SCRIPT_VERIFY_CONST_SCRIPTCODE
+            "CONST_SCRIPTCODE" to SCRIPT_VERIFY_CONST_SCRIPTCODE,
+            "TAPROOT" to SCRIPT_VERIFY_TAPROOT
         )
 
         fun parseScriptFlags(strFlags: String): Int =
@@ -90,14 +92,8 @@ class ScriptTestsCommon {
                     when {
                         head.matches(Regex("^-?[0-9]*$")) -> {
                             when {
-                                head.toLong() == -1L -> parseInternal(
-                                    tail,
-                                    acc + ScriptEltMapping.elt2code.getValue(OP_1NEGATE).toByte()
-                                )
-                                head.toLong() == 0L -> parseInternal(
-                                    tail,
-                                    acc + ScriptEltMapping.elt2code.getValue(OP_0).toByte()
-                                )
+                                head.toLong() == -1L -> parseInternal(tail, acc + ScriptEltMapping.elt2code.getValue(OP_1NEGATE).toByte())
+                                head.toLong() == 0L -> parseInternal(tail, acc + ScriptEltMapping.elt2code.getValue(OP_0).toByte())
                                 head.toLong() in 1..16 -> {
                                     val byte = (ScriptEltMapping.elt2code.getValue(OP_1) - 1 + head.toInt()).toByte()
                                     val bytes = arrayOf(byte).toByteArray()
@@ -109,21 +105,9 @@ class ScriptTestsCommon {
                                 }
                             }
                         }
-                        ScriptEltMapping.name2code.containsKey(head) -> parseInternal(
-                            tail,
-                            acc + ScriptEltMapping.name2code.getValue(head).toByte()
-                        )
+                        ScriptEltMapping.name2code.containsKey(head) -> parseInternal(tail, acc + ScriptEltMapping.name2code.getValue(head).toByte())
                         head.startsWith("0x") -> parseInternal(tail, acc + Hex.decode(head))
-                        head.startsWith("'") && head.endsWith("'") -> parseInternal(
-                            tail,
-                            acc + Script.write(
-                                listOf(
-                                    OP_PUSHDATA(
-                                        head.drop(1).dropLast(1).encodeToByteArray()
-                                    )
-                                )
-                            )
-                        )
+                        head.startsWith("'") && head.endsWith("'") -> parseInternal(tail, acc + Script.write(listOf(OP_PUSHDATA(head.drop(1).dropLast(1).encodeToByteArray()))))
                         else -> {
                             throw IllegalArgumentException("cannot parse $head")
                         }
@@ -132,8 +116,7 @@ class ScriptTestsCommon {
             }
 
             try {
-                val tokens =
-                    input.split(' ').filterNot { it.isEmpty() }.map { it.removePrefix("OP_") }.toList()
+                val tokens = input.split(' ').filterNot { it.isEmpty() }.map { it.removePrefix("OP_") }.toList()
                 val bytes = parseInternal(tokens)
                 return bytes
 

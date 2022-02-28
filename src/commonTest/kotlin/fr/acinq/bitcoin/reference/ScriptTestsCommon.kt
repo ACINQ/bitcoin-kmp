@@ -92,10 +92,10 @@ class ScriptTestsCommon {
                     when {
                         head.matches(Regex("^-?[0-9]*$")) -> {
                             when {
-                                head.toLong() == -1L -> parseInternal(tail, acc + ScriptEltMapping.elt2code.getValue(OP_1NEGATE).toByte())
-                                head.toLong() == 0L -> parseInternal(tail, acc + ScriptEltMapping.elt2code.getValue(OP_0).toByte())
+                                head.toLong() == -1L -> parseInternal(tail, acc + OP_1NEGATE.code.toByte())
+                                head.toLong() == 0L -> parseInternal(tail, acc + OP_0.code.toByte())
                                 head.toLong() in 1..16 -> {
-                                    val byte = (ScriptEltMapping.elt2code.getValue(OP_1) - 1 + head.toInt()).toByte()
+                                    val byte = (OP_1.code - 1 + head.toInt()).toByte()
                                     val bytes = arrayOf(byte).toByteArray()
                                     parseInternal(tail, acc + bytes)
                                 }

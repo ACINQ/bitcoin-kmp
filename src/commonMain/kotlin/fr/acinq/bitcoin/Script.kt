@@ -1529,7 +1529,7 @@ public object Script {
                         if (leafVersion == TAPROOT_LEAF_TAPSCRIPT) {
                             this.context.validationWeightLeft = ScriptWitness.write(witness).size + VALIDATION_WEIGHT_OFFSET
 
-                            tailrec fun hasOpSuccess(it: Iterator<ScriptElt>) : Boolean = when {
+                            tailrec fun hasOpSuccess(it: Iterator<ScriptElt>): Boolean = when {
                                 !it.hasNext() -> false
                                 isOpSuccess(it.next().code) -> true
                                 else -> hasOpSuccess(it)
@@ -1574,17 +1574,16 @@ public object Script {
          * @return true if the scripts were successfully verified
          */
         public fun verifyScripts(scriptSig: ByteArray, scriptPubKey: ByteArray, witness: ScriptWitness): Boolean {
-            fun checkStack(stack: List<ByteVector>): Boolean {
-                return when {
-                    stack.isEmpty() -> false
-                    !castToBoolean(stack.first()) -> false
-                    (scriptFlag and ScriptFlags.SCRIPT_VERIFY_CLEANSTACK) != 0 -> {
-                        if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) == 0) throw RuntimeException("illegal script flag")
-                        stack.size == 1
-                    }
-                    else -> true
+            fun checkStack(stack: List<ByteVector>): Boolean = when {
+                stack.isEmpty() -> false
+                !castToBoolean(stack.first()) -> false
+                (scriptFlag and ScriptFlags.SCRIPT_VERIFY_CLEANSTACK) != 0 -> {
+                    if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) == 0) throw RuntimeException("illegal script flag")
+                    stack.size == 1
                 }
+                else -> true
             }
+
 
             if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_WITNESS) != 0) {
                 // We can't check for correct unexpected witness data if P2SH was off, so require
@@ -1602,24 +1601,24 @@ public object Script {
             require(castToBoolean(stack0.first())) { "Script verification failed, stack starts with 'false'" }
 
             var hadWitness = false
-            val stack1 = if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_WITNESS) != 0) {
+
+            fun isWitnessProgram(script: List<ScriptElt>): Boolean =
+                script.size == 2 && isSimpleValue(script[0]) && simpleValue(script[0]).toInt() in 0..16 && script[1] is OP_PUSHDATA
+
+            val stack1 = if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_WITNESS) != 0 && isWitnessProgram(spub)) {
+                val witnessVersion = simpleValue(spub[0])
+                val program = spub[1] as OP_PUSHDATA
                 when {
-                    spub.size == 2 && isSimpleValue(spub[0]) && spub[1] is OP_PUSHDATA -> {
-                        val witnessVersion = simpleValue(spub[0])
-                        val program = spub[1] as OP_PUSHDATA
-                        when {
-                            OP_PUSHDATA.isMinimal(program.data.toByteArray(), program.code) && program.data.size() in 2..40 -> {
-                                hadWitness = true
-                                require(ssig.isEmpty()) { "Malleated segwit script" }
-                                verifyWitnessProgram(witness, witnessVersion.toLong(), program.data.toByteArray(), isP2sh = false)
-                                stack0.take(1)
-                            }
-                            else -> stack0
-                        }
+                    OP_PUSHDATA.isMinimal(program.data.toByteArray(), program.code) && program.data.size() in 2..40 -> {
+                        hadWitness = true
+                        require(ssig.isEmpty()) { "Malleated segwit script" }
+                        verifyWitnessProgram(witness, witnessVersion.toLong(), program.data.toByteArray(), isP2sh = false)
+                        stack0.take(1)
                     }
                     else -> stack0
                 }
             } else stack0
+
 
             val stack2 = if (((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) != 0) && isPayToScript(scriptPubKey)) {
                 // scriptSig must be literals-only or validation fails

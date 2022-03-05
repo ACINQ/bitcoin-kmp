@@ -37,10 +37,7 @@ import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_TAPROOT
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_WITNESS
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_WITNESS_PUBKEYTYPE
 import fr.acinq.secp256k1.Hex
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.double
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -55,7 +52,7 @@ class ScriptTestsCommon {
             runTest(it.jsonArray)
             count += 1
         }
-        assertEquals(1203, count)
+        assertEquals(1207, count)
     }
 
     companion object {

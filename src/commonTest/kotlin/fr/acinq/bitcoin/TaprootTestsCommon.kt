@@ -180,7 +180,7 @@ class TaprootTestsCommon {
         val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, annex = null, tapleafHash = merkleRoot)
 
         // compute all 3 signatures
-        val sigs = privs.map { Crypto.signSchnorr(hash, it, null) }
+        val sigs = privs.map { Crypto.signSchnorr(hash, it) }
 
         // control is the same for everyone since there are no specific merkle hashes to provide
         val controlBlock = byteArrayOf((Script.TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte()) + internalPubkey.value.toByteArray()
@@ -268,7 +268,7 @@ class TaprootTestsCommon {
                     ScriptTree.hash(leaves[1]).toByteArray() +
                     ScriptTree.hash(leaves[2]).toByteArray()
             val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, null, ScriptTree.hash(leaves[0]), 0xFFFFFFFFL)
-            val sig = Crypto.signSchnorr(hash, privs[0], null)
+            val sig = Crypto.signSchnorr(hash, privs[0])
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[0]).byteVector(), controlBlock.byteVector())))
         }
         Transaction.correctlySpends(tx1, fundingTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
@@ -288,7 +288,7 @@ class TaprootTestsCommon {
                     ScriptTree.hash(leaves[0]).toByteArray() +
                     ScriptTree.hash(leaves[2]).toByteArray()
             val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, null, ScriptTree.hash(leaves[1]), 0xFFFFFFFFL)
-            val sig = Crypto.signSchnorr(hash, privs[1], null)
+            val sig = Crypto.signSchnorr(hash, privs[1])
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[1]).byteVector(), controlBlock.byteVector())))
         }
         Transaction.correctlySpends(tx2, fundingTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
@@ -306,7 +306,7 @@ class TaprootTestsCommon {
                     internalPubkey.value.toByteArray() +
                     ScriptTree.hash(ScriptTree.Branch(leaves[0], leaves[1])).toByteArray()
             val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, null, ScriptTree.hash(leaves[2]), 0xFFFFFFFFL)
-            val sig = Crypto.signSchnorr(hash, privs[2], null)
+            val sig = Crypto.signSchnorr(hash, privs[2])
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[2]).byteVector(), controlBlock.byteVector())))
         }
         Transaction.correctlySpends(tx3, fundingTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)

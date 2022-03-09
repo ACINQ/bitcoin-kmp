@@ -116,7 +116,7 @@ class BIP341TestsCommon {
         }
     }
 
-    private fun nullOrBytes(input: String?): ByteVector32? = when (input) {
+    private fun nullOrBytes(input: String?): ByteVector32 = when (input) {
         null, "null" -> ByteVector32.Zeroes
         else -> ByteVector32(input)
     }

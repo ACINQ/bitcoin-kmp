@@ -155,17 +155,26 @@ public object Crypto {
     }
 
     /**
-     * @param data data to sigm (32 bytes)
+     * @param data data to sign (32 bytes)
      * @param privateKey private key
-     * @param merkleRoot optional merkle root, which will be used to tweak the private key.
-     * if `null`, the input private key will be used as is.
-     * if set to all zeroes, the private key wil be tweaked with an empty byte array.
-     * @return the Schnorr signature of data with private key (optionally tweaked with the merkle root)
+     * @return the Schnorr signature of data with private key
      */
     @JvmStatic
-    public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey, merkleRoot: ByteVector32?, auxrand32: ByteVector32? = null): ByteVector64 {
+    public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey, auxrand32: ByteVector32? = null): ByteVector64 {
+        val sig = Secp256k1.signSchnorr(data.toByteArray(), privateKey.value.toByteArray(), auxrand32?.let { it.toByteArray() }).byteVector64()
+        require(verifySignatureSchnorr(data, sig, privateKey.xOnlyPublicKey())) { "Cannot create Schnorr signature" }
+        return sig
+    }
+
+    /**
+     * @param data data to sign (32 bytes)
+     * @param privateKey private key
+     * @param merkleRoot tapscript merkle root, which will be used to tweak the private key. if set to all zeroes, the private key wil be tweaked with an empty byte array.
+     * @return the Schnorr signature of data with private key tweaked with the tapscript merkle root
+     */
+    @JvmStatic
+    public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey, merkleRoot: ByteVector32, auxrand32: ByteVector32? = null): ByteVector64 {
         val priv = when (merkleRoot) {
-            null -> privateKey
             ByteVector32.Zeroes -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(null))
             else -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(merkleRoot))
         }
@@ -397,5 +406,4 @@ public object Crypto {
         val hashedTag = sha256(tag.encodeToByteArray())
         return sha256(hashedTag + hashedTag + input).byteVector32()
     }
-
 }

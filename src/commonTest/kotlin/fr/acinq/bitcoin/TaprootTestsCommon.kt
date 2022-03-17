@@ -49,7 +49,7 @@ class TaprootTestsCommon {
         }
 
         // check that tx1's signature is valid
-        val hash = hashForSigningSchnorr(tx1, 0, listOf(tx.txOut.first()), sighashType, SigVersion.SIGVERSION_TAPROOT, null)
+        val hash = hashForSigningSchnorr(tx1, 0, listOf(tx.txOut.first()), sighashType, SigVersion.SIGVERSION_TAPROOT)
         assertTrue(Crypto.verifySignatureSchnorr(hash, sig, outputKey))
 
         // re-create signature
@@ -88,7 +88,7 @@ class TaprootTestsCommon {
             0
         )
         val sigHashType = 0
-        val hash = hashForSigningSchnorr(tx1, 0, listOf(tx.txOut[1]), sigHashType, 0, null)
+        val hash = hashForSigningSchnorr(tx1, 0, listOf(tx.txOut[1]), sigHashType, 0)
         val sig = Crypto.signSchnorr(hash, privateKey, ByteVector32.Zeroes)
         val tx2 = tx1.updateWitness(0, ScriptWitness(listOf(sig)))
         Transaction.correctlySpends(tx2, tx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
@@ -177,7 +177,7 @@ class TaprootTestsCommon {
             txOut = listOf(TxOut(fundingTx.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, "bcrt1qdtu5cwyngza8hw8s5uk2erlrkh8ceh3msp768v"))),
             lockTime = 0
         )
-        val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, annex = null, tapleafHash = merkleRoot)
+        val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(annex = null, tapleafHash = merkleRoot))
 
         // compute all 3 signatures
         val sigs = privs.map { Crypto.signSchnorr(hash, it) }
@@ -246,7 +246,7 @@ class TaprootTestsCommon {
                 txOut = listOf(TxOut(fundingTx.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, "bcrt1qdtu5cwyngza8hw8s5uk2erlrkh8ceh3msp768v"))),
                 lockTime = 0
             )
-            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, 0, null)
+            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, 0)
             // we still need to know the merkle root of the tapscript tree
             val sig = Crypto.signSchnorr(hash, privs[0], merkleRoot)
             tmp.updateWitness(0, ScriptWitness(listOf(sig)))
@@ -267,7 +267,7 @@ class TaprootTestsCommon {
                     internalPubkey.value.toByteArray() +
                     ScriptTree.hash(leaves[1]).toByteArray() +
                     ScriptTree.hash(leaves[2]).toByteArray()
-            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, null, ScriptTree.hash(leaves[0]), 0xFFFFFFFFL)
+            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[0])))
             val sig = Crypto.signSchnorr(hash, privs[0])
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[0]).byteVector(), controlBlock.byteVector())))
         }
@@ -287,7 +287,7 @@ class TaprootTestsCommon {
                     internalPubkey.value.toByteArray() +
                     ScriptTree.hash(leaves[0]).toByteArray() +
                     ScriptTree.hash(leaves[2]).toByteArray()
-            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, null, ScriptTree.hash(leaves[1]), 0xFFFFFFFFL)
+            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[1])))
             val sig = Crypto.signSchnorr(hash, privs[1])
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[1]).byteVector(), controlBlock.byteVector())))
         }
@@ -305,7 +305,7 @@ class TaprootTestsCommon {
             val controlBlock = byteArrayOf((Script.TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte()) +
                     internalPubkey.value.toByteArray() +
                     ScriptTree.hash(ScriptTree.Branch(leaves[0], leaves[1])).toByteArray()
-            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, null, ScriptTree.hash(leaves[2]), 0xFFFFFFFFL)
+            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[2])))
             val sig = Crypto.signSchnorr(hash, privs[2])
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[2]).byteVector(), controlBlock.byteVector())))
         }

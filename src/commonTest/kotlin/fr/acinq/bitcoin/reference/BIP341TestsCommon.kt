@@ -59,7 +59,7 @@ class BIP341TestsCommon {
                 val tweakedPrivateKey = internalPrivkey.tweak(internalPubkey.tweak(if (merkleRoot == ByteVector32.Zeroes) null else merkleRoot))
                 assertEquals(ByteVector32(intermediary["tweakedPrivkey"]!!.jsonPrimitive.content), tweakedPrivateKey.value)
 
-                val hash = Transaction.hashForSigningSchnorr(rawUnsignedTx, txinIndex, utxosSpent, hashType, 0, null)
+                val hash = Transaction.hashForSigningSchnorr(rawUnsignedTx, txinIndex, utxosSpent, hashType, 0)
                 assertEquals(ByteVector32(intermediary["sigHash"]!!.jsonPrimitive.content), hash)
 
                 val sig = Crypto.signSchnorr(hash, internalPrivkey, merkleRoot, ByteVector32.Zeroes)

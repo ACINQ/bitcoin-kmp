@@ -589,13 +589,19 @@ public object Script {
      * @param tx         transaction that is being verified
      * @param inputIndex 0-based index of the tx input that is being processed
      */
-    public data class Context(val tx: Transaction, val inputIndex: Int, val amount: Satoshi, val prevouts: List<TxOut>, var annex: ByteVector? = null, var tapleafHash: ByteVector32? = null, var validationWeightLeft: Int? = null) {
+    public data class Context(val tx: Transaction, val inputIndex: Int, val amount: Satoshi, val prevouts: List<TxOut>) {
+        internal var executionData: ExecutionData = ExecutionData.empty
+
         init {
             require(inputIndex >= 0 && inputIndex < tx.txIn.count()) { "invalid input index" }
         }
     }
 
-    public data class ExecutionData(val annex: ByteVector?, val tapleafHash: ByteVector32?)
+    public data class ExecutionData(val annex: ByteVector?, val tapleafHash: ByteVector32?, val validationWeightLeft: Int? = null, val codeSeparatorPos: Long = 0xFFFFFFFFL) {
+        public companion object {
+            public val empty: ExecutionData = ExecutionData(null, null, null, 0xFFFFFFFFL)
+        }
+    }
 
     public class Runner(
         public val context: Context,
@@ -615,8 +621,7 @@ public object Script {
                 val conditions: List<Boolean>,
                 val altstack: List<ByteVector>,
                 val opCount: Int,
-                val scriptCode: List<ScriptElt>,
-                val codeSeparatorPos: Long = 0xFFFFFFFFL
+                val scriptCode: List<ScriptElt>
             )
         }
 
@@ -643,14 +648,14 @@ public object Script {
             }
         }
 
-        public fun checkSignatureSchnorr(pubKey: ByteArray, sigBytes: ByteArray, @Suppress("UNUSED_PARAMETER") scriptCode: ByteArray, signatureVersion: Int, codeSeparatorPos: Long): Boolean {
+        public fun checkSignatureSchnorr(pubKey: ByteArray, sigBytes: ByteArray, @Suppress("UNUSED_PARAMETER") scriptCode: ByteArray, signatureVersion: Int): Boolean {
             require(signatureVersion == SigVersion.SIGVERSION_TAPSCRIPT)
             val success = sigBytes.isNotEmpty()
             if (success) {
-                require(context.validationWeightLeft != null)
-                context.validationWeightLeft?.let {
+                require(context.executionData.validationWeightLeft != null)
+                context.executionData.validationWeightLeft?.let {
                     val weightLeft = it - VALIDATION_WEIGHT_PER_SIGOP_PASSED
-                    context.validationWeightLeft = weightLeft
+                    context.executionData = context.executionData.copy(validationWeightLeft = weightLeft)
                     require(weightLeft >= 0) { "tapscript weight validation failed" }
                 }
             }
@@ -659,7 +664,7 @@ public object Script {
                 pubKey.size == 32 && sigBytes.isEmpty() -> false
                 pubKey.size == 32 -> {
                     val sighashType = sigHashType(sigBytes)
-                    val hash = Transaction.hashForSigningSchnorr(context.tx, context.inputIndex, context.prevouts, sighashType, signatureVersion, this.context.annex, this.context.tapleafHash, codeSeparatorPos)
+                    val hash = Transaction.hashForSigningSchnorr(context.tx, context.inputIndex, context.prevouts, sighashType, signatureVersion, this.context.executionData)
                     val result = Secp256k1.verifySchnorr(sigBytes.take(64).toByteArray(), hash.toByteArray(), pubKey)
                     require(result) { "Invalid Schnorr signature" }
                     result
@@ -678,25 +683,25 @@ public object Script {
          * @param signatureVersion version (legacy or segwit)
          * @return true if the signature is valid
          */
-        public fun checkSignature(pubKey: ByteArray, sigBytes: ByteArray, scriptCode: ByteArray, signatureVersion: Int, codeSeparatorPos: Long): Boolean {
+        public fun checkSignature(pubKey: ByteArray, sigBytes: ByteArray, scriptCode: ByteArray, signatureVersion: Int): Boolean {
             return when (signatureVersion) {
                 SigVersion.SIGVERSION_BASE, SigVersion.SIGVERSION_WITNESS_V0 -> checkSignatureLegacy(pubKey, sigBytes, scriptCode, signatureVersion)
                 SigVersion.SIGVERSION_TAPROOT -> false // Key path spending in Taproot has no script, so this is unreachable.
-                SigVersion.SIGVERSION_TAPSCRIPT -> checkSignatureSchnorr(pubKey, sigBytes, scriptCode, signatureVersion, codeSeparatorPos)
+                SigVersion.SIGVERSION_TAPSCRIPT -> checkSignatureSchnorr(pubKey, sigBytes, scriptCode, signatureVersion)
                 else -> error("invalid signature version")
             }
         }
 
-        public fun checkSignature(pubKey: ByteVector, sigBytes: ByteVector, scriptCode: ByteVector, signatureVersion: Int, codeSeparatorPos: Long): Boolean =
-            checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), scriptCode.toByteArray(), signatureVersion, codeSeparatorPos)
+        public fun checkSignature(pubKey: ByteVector, sigBytes: ByteVector, scriptCode: ByteVector, signatureVersion: Int): Boolean =
+            checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), scriptCode.toByteArray(), signatureVersion)
 
-        public tailrec fun checkSignatures(pubKeys: List<ByteVector>, sigs: List<ByteVector>, scriptCode: ByteVector, signatureVersion: Int, codeSeparatorPos: Long): Boolean {
+        public tailrec fun checkSignatures(pubKeys: List<ByteVector>, sigs: List<ByteVector>, scriptCode: ByteVector, signatureVersion: Int): Boolean {
             return when {
                 sigs.isEmpty() -> true
                 sigs.count() > pubKeys.count() -> false
                 !Crypto.checkSignatureEncoding(sigs.first().toByteArray(), scriptFlag) -> throw RuntimeException("invalid signature")
-                checkSignature(pubKeys.first(), sigs.first(), scriptCode, signatureVersion, codeSeparatorPos) -> checkSignatures(pubKeys.tail(), sigs.tail(), scriptCode, signatureVersion, codeSeparatorPos)
-                else -> checkSignatures(pubKeys.tail(), sigs, scriptCode, signatureVersion, codeSeparatorPos)
+                checkSignature(pubKeys.first(), sigs.first(), scriptCode, signatureVersion) -> checkSignatures(pubKeys.tail(), sigs.tail(), scriptCode, signatureVersion)
+                else -> checkSignatures(pubKeys.tail(), sigs, scriptCode, signatureVersion)
             }
         }
 
@@ -999,7 +1004,7 @@ public object Script {
                         }
                         scriptCode1
                     } else state.scriptCode
-                    val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), write(scriptCode1), signatureVersion, state.codeSeparatorPos)
+                    val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), write(scriptCode1), signatureVersion)
                     if (!success && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_NULLFAIL) != 0) {
                         require(sigBytes.isEmpty()) { "Signature must be zero for failed CHECKSIG operation" }
                     }
@@ -1023,7 +1028,7 @@ public object Script {
                     val pubKey = stack[0]
                     val num = decodeNumber(stack[1])
                     val sigBytes = stack[2]
-                    val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), write(state.scriptCode), signatureVersion, state.codeSeparatorPos)
+                    val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), write(state.scriptCode), signatureVersion)
                     runInternal(
                         tail,
                         listOf(encodeNumber(num + (if (success) 1 else 0))) + stack.dropCheck(3),
@@ -1062,7 +1067,7 @@ public object Script {
                     } else {
                         state.scriptCode
                     }
-                    val success = checkSignatures(pubKeys, sigs, write(scriptCode1).byteVector(), signatureVersion, state.codeSeparatorPos)
+                    val success = checkSignatures(pubKeys, sigs, write(scriptCode1).byteVector(), signatureVersion)
                     if (!success && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_NULLFAIL) != 0) {
                         sigs.forEach { require(it.isEmpty()) { "Signature must be zero for failed CHECKMULTISIG operation" } }
                     }
@@ -1079,12 +1084,15 @@ public object Script {
                     state.copy(opCount = state.opCount - 1),
                     signatureVersion
                 )
-                head == OP_CODESEPARATOR -> runInternal(
-                    tail,
-                    stack,
-                    state.copy(opCount = state.opCount + 1, scriptCode = tail.map { it.value }, codeSeparatorPos = currentPos.toLong()),
-                    signatureVersion
-                )
+                head == OP_CODESEPARATOR -> {
+                    this.context.executionData = this.context.executionData.copy(codeSeparatorPos = currentPos.toLong())
+                    runInternal(
+                        tail,
+                        stack,
+                        state.copy(opCount = state.opCount + 1, scriptCode = tail.map { it.value }),
+                        signatureVersion
+                    )
+                }
                 head == OP_DEPTH -> runInternal(
                     tail,
                     listOf(encodeNumber(stack.size)) + stack,
@@ -1461,9 +1469,7 @@ public object Script {
             }
 
             // reset taproot execution data
-            this.context.annex = null
-            this.context.validationWeightLeft = null
-            this.context.tapleafHash = null
+            this.context.executionData = ExecutionData.empty
 
             when {
                 witnessVersion == 0L && program.size == WITNESS_V0_KEYHASH_SIZE -> {
@@ -1488,13 +1494,13 @@ public object Script {
                         witness.stack.size >= 2 && witness.stack.last()[0] == 0x50.toByte() -> Pair(witness.stack.dropLast(1), witness.stack.last())
                         else -> Pair(witness.stack, null)
                     }
-                    this.context.annex = annex
+                    this.context.executionData = this.context.executionData.copy(annex = annex)
                     // Key path spending (stack size is 1 after removing optional annex)
                     if (stack.size == 1) {
                         val sig = stack.first()
                         val pub = XonlyPublicKey(program.byteVector32())
                         val hashType = sigHashType(sig)
-                        val hash = Transaction.hashForSigningSchnorr(context.tx, context.inputIndex, context.prevouts, hashType, SigVersion.SIGVERSION_TAPROOT, annex, null)
+                        val hash = Transaction.hashForSigningSchnorr(context.tx, context.inputIndex, context.prevouts, hashType, SigVersion.SIGVERSION_TAPROOT, context.executionData)
                         require(Secp256k1.verifySchnorr(sig.take(64).toByteArray(), hash.toByteArray(), pub.value.toByteArray())) { " invalid Schnorr signature " }
                         return
                     } else {
@@ -1511,7 +1517,7 @@ public object Script {
                             BtcSerializer.writeScript(script, buffer)
                             Crypto.taggedHash(buffer.toByteArray(), "TapLeaf")
                         }
-                        this.context.tapleafHash = tapleafHash
+                        this.context.executionData = this.context.executionData.copy(tapleafHash = tapleafHash)
 
                         // split input buffer into 32 bytes chunks (input buffer size MUST be a multiple of 32 !!)
                         tailrec fun split32(input: ByteVector, acc: List<ByteVector32> = listOf()): List<ByteVector32> = when {
@@ -1527,7 +1533,7 @@ public object Script {
                         require(Pair(outputKey, parity) == internalKey.outputKey(merkleRoot))
 
                         if (leafVersion == TAPROOT_LEAF_TAPSCRIPT) {
-                            this.context.validationWeightLeft = ScriptWitness.write(witness).size + VALIDATION_WEIGHT_OFFSET
+                            this.context.executionData = this.context.executionData.copy(validationWeightLeft = ScriptWitness.write(witness).size + VALIDATION_WEIGHT_OFFSET)
 
                             tailrec fun hasOpSuccess(it: Iterator<ScriptElt>): Boolean = when {
                                 !it.hasNext() -> false

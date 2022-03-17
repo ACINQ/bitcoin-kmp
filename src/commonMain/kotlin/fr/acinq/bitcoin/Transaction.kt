@@ -697,9 +697,7 @@ public data class Transaction(
             inputs: List<TxOut>,
             sighashType: Int,
             sigVersion: Int,
-            annex: ByteVector? = null,
-            tapleafHash: ByteVector32? = null,
-            codeSeparatorPos: Long = 0xFFFFFFFFL
+            executionData: Script.ExecutionData = Script.ExecutionData.empty
         ): ByteVector32 {
             val out = ByteArrayOutput()
             out.write(0)
@@ -712,7 +710,7 @@ public data class Transaction(
                 SigVersion.SIGVERSION_TAPSCRIPT -> Pair(1, 0)
                 else -> Pair(0, 0)
             }
-            val spendType = 2 * extFlag + (if (annex != null) 1 else 0)
+            val spendType = 2 * extFlag + (if (executionData.annex != null) 1 else 0)
             out.write(spendType)
             if ((sighashType and 0x80) == SigHash.SIGHASH_ANYONECANPAY) {
                 OutPoint.write(tx.txIn[inputIndex].outPoint, out)
@@ -722,9 +720,9 @@ public data class Transaction(
             } else {
                 writeUInt32(inputIndex.toUInt(), out)
             }
-            if (annex != null) {
+            if (executionData.annex != null) {
                 val buffer = ByteArrayOutput()
-                writeScript(annex, buffer)
+                writeScript(executionData.annex, buffer)
                 val annexHash = Crypto.sha256(buffer.toByteArray())
                 out.write(annexHash)
             }
@@ -733,9 +731,10 @@ public data class Transaction(
                 out.write(Crypto.sha256(ser))
             }
             if (sigVersion == SigVersion.SIGVERSION_TAPSCRIPT) {
-                out.write(tapleafHash!!.toByteArray())
+                require(executionData.tapleafHash != null)
+                out.write(executionData.tapleafHash.toByteArray())
                 out.write(keyVersion)
-                writeUInt32(codeSeparatorPos.toUInt(), out)
+                writeUInt32(executionData.codeSeparatorPos.toUInt(), out)
             }
             val preimage = out.toByteArray()
             return Crypto.taggedHash(preimage, "TapSighash")

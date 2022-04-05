@@ -85,20 +85,30 @@ public object Bech32 {
     }
 
     /**
-     * @param hrp   human readable prefix
+     * @param hrp human readable prefix
      * @param int5s 5-bit data
      * @param encoding encoding to use (bech32 or bech32m)
      * @return hrp + data encoded as a Bech32 string
      */
     @JvmStatic
-    public fun encode(hrp: String, int5s: ByteArray, encoding: Encoding): String {
+    public fun encode(hrp: String, int5s: Array<Int5>, encoding: Encoding): String {
         require(hrp.lowercase() == hrp || hrp.uppercase() == hrp) { "mixed case strings are not valid bech32 prefixes" }
+        val data = int5s.toByteArray().toTypedArray()
         val checksum = when (encoding) {
             Encoding.Beck32WithoutChecksum -> arrayOf()
-            else -> checksum(hrp, int5s.toTypedArray(), encoding)
+            else -> checksum(hrp, data, encoding)
         }
-        return hrp + "1" + (int5s.toTypedArray() + checksum).map { i -> alphabet[i.toInt()] }.toCharArray().concatToString()
+        return hrp + "1" + (data + checksum).map { i -> alphabet[i.toInt()] }.toCharArray().concatToString()
     }
+
+    /**
+     * @param hrp human readable prefix
+     * @param data data to encode
+     * @param encoding encoding to use (bech32 or bech32m)
+     * @return hrp + data encoded as a Bech32 string
+     */
+    @JvmStatic
+    public fun encodeBytes(hrp: String, data: ByteArray, encoding: Encoding): String = encode(hrp, eight2five(data), encoding)
 
     /**
      * decodes a bech32 string
@@ -126,6 +136,18 @@ public object Bech32 {
             }
             Triple(hrp, data.dropLast(6).toTypedArray(), encoding)
         }
+    }
+
+    /**
+     * decodes a bech32 string
+     * @param bech32 bech32 string
+     * @param noChecksum if true, the bech32 string doesn't have a checksum
+     * @return a (hrp, data, encoding) tuple
+     */
+    @JvmStatic
+    public fun decodeBytes(bech32: String, noChecksum: Boolean = false): Triple<String, ByteArray, Encoding> {
+        val (hrp, int5s, encoding) = decode(bech32, noChecksum)
+        return Triple(hrp, five2eight(int5s, 0), encoding)
     }
 
     /**

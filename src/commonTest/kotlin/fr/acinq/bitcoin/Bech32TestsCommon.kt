@@ -49,8 +49,8 @@ class Bech32TestsCommon {
             assertEquals(hrp1, hrp2)
             assertContentEquals(data1, data2)
             assertEquals(encoding2, Bech32.Encoding.Beck32WithoutChecksum)
-            assertEquals(it.lowercase(), Bech32.encode(hrp1, data1.toByteArray(), encoding1))
-            assertEquals(it.lowercase().dropLast(6), Bech32.encode(hrp2, data2.toByteArray(), encoding2))
+            assertEquals(it.lowercase(), Bech32.encode(hrp1, data1, encoding1))
+            assertEquals(it.lowercase().dropLast(6), Bech32.encode(hrp2, data2, encoding2))
         }
     }
 
@@ -156,6 +156,25 @@ class Bech32TestsCommon {
             assertFails {
                 Bech32.decodeWitnessAddress(it)
             }
+        }
+    }
+
+    @Test
+    fun `encode and decode arbitrary data`() {
+        val bin = listOf(
+            Hex.decode("00"),
+            Hex.decode("ff"),
+            Hex.decode("0102030405"),
+            Hex.decode("01ff02a12abc"),
+            Hex.decode("20000000c4a5cad46221b2a187905e5266362b99d5e91c6ce24d165dab93e86433"),
+            Hex.decode("28751e76e8199196d454941c45d1b3a323f1433bd6751e76e8199196d454941c45d1b3a323f1433bd6")
+        )
+        bin.forEach {
+            val encoded = Bech32.encodeBytes("hrp", it, Bech32.Encoding.Beck32WithoutChecksum)
+            val (hrp, decoded, encoding) = Bech32.decodeBytes(encoded, noChecksum = true)
+            assertEquals("hrp", hrp)
+            assertEquals(Bech32.Encoding.Beck32WithoutChecksum, encoding)
+            assertContentEquals(it, decoded)
         }
     }
 }

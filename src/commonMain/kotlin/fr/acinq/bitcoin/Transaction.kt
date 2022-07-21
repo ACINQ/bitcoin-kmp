@@ -30,7 +30,6 @@ import kotlin.jvm.JvmStatic
  * @param hash  reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
  * @param index index of the output in tx that we want to refer to
  */
-@OptIn(ExperimentalUnsignedTypes::class)
 public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index: Long) : BtcSerializable<OutPoint> {
     public constructor(hash: ByteArray, index: Long) : this(hash.byteVector32(), index)
 
@@ -129,7 +128,6 @@ public data class ScriptWitness(@JvmField val stack: List<ByteVector>) : BtcSeri
  *                        information is updated before inclusion into a block. Repurposed for OP_CSV (see BIPs 68 & 112)
  * @param witness         Transaction witness (i.e. what is in sig script for standard transactions).
  */
-@OptIn(ExperimentalUnsignedTypes::class)
 public data class TxIn(
     @JvmField val outPoint: OutPoint,
     @JvmField val signatureScript: ByteVector,
@@ -212,7 +210,6 @@ public data class TxIn(
     override fun serializer(): BtcSerializer<TxIn> = TxIn
 }
 
-@OptIn(ExperimentalUnsignedTypes::class)
 public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeyScript: ByteVector) : BtcSerializable<TxOut> {
 
     public constructor(amount: Satoshi, publicKeyScript: ByteArray) : this(amount, publicKeyScript.byteVector())
@@ -259,7 +256,6 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
     override fun serializer(): BtcSerializer<TxOut> = TxOut
 }
 
-@OptIn(ExperimentalUnsignedTypes::class)
 public data class Transaction(
     @JvmField val version: Long,
     @JvmField val txIn: List<TxIn>,

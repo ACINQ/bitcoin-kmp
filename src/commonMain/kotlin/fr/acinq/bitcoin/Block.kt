@@ -32,7 +32,6 @@ import kotlin.jvm.JvmStatic
  * @param bits              The calculated difficulty target being used for this block
  * @param nonce             The nonce used to generate this block… to allow variations of the header and compute different hashes
  */
-@OptIn(ExperimentalUnsignedTypes::class)
 public data class BlockHeader(
     @JvmField val version: Long,
     @JvmField val hashPreviousBlock: ByteVector32,
@@ -103,7 +102,6 @@ public data class BlockHeader(
         }
 
         @JvmStatic
-        @OptIn(ExperimentalUnsignedTypes::class)
         public fun getDifficulty(header: BlockHeader): UInt256 {
             val (diff, neg, _) = UInt256.decodeCompact(header.bits)
             return if (neg) -diff else diff
@@ -116,7 +114,6 @@ public data class BlockHeader(
          *         by bitcoin core
          */
         @JvmStatic
-        @OptIn(ExperimentalUnsignedTypes::class)
         public fun blockProof(bits: Long): UInt256 {
             val (target, negative, overflow) = UInt256.decodeCompact(bits)
             return if (target == UInt256.Zero || negative || overflow) UInt256.Zero else {
@@ -186,7 +183,6 @@ public object MerkleTree {
     }
 }
 
-@OptIn(ExperimentalUnsignedTypes::class, ExperimentalStdlibApi::class)
 public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Transaction>) {
     @JvmField
     val hash: ByteVector32 = header.hash

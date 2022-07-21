@@ -30,7 +30,6 @@ import kotlin.jvm.JvmStatic
  * @param inputs signing data for each input of the transaction to be signed (order matches the unsigned tx).
  * @param outputs signing data for each output of the transaction to be signed (order matches the unsigned tx).
  */
-@OptIn(ExperimentalUnsignedTypes::class)
 public data class Psbt(val global: Global, val inputs: List<Input>, val outputs: List<Output>) {
 
     init {

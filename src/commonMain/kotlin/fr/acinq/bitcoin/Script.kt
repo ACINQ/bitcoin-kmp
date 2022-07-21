@@ -25,7 +25,6 @@ import kotlin.jvm.JvmStatic
 
 public typealias RunnerCallback = (List<ScriptElt>, List<ByteVector>, Script.Runner.Companion.State) -> Boolean
 
-@OptIn(ExperimentalUnsignedTypes::class)
 public object Script {
     public const val MaxScriptElementSize: Int = 520
     public const val LockTimeThreshold: Long = 500000000L

@@ -20,7 +20,6 @@ import fr.acinq.secp256k1.Hex
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalStdlibApi::class)
 class Ripemd160TestsCommon {
     @Test // from https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
     fun `reference tests`() {

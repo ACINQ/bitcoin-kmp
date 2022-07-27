@@ -18,7 +18,9 @@ package fr.acinq.bitcoin.psbt
 
 import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.crypto.Pack
-import fr.acinq.bitcoin.io.*
+import fr.acinq.bitcoin.io.ByteArrayInput
+import fr.acinq.bitcoin.io.ByteArrayOutput
+import fr.acinq.bitcoin.io.readNBytes
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.getOrElse
 import kotlin.jvm.JvmStatic
@@ -30,7 +32,6 @@ import kotlin.jvm.JvmStatic
  * @param inputs signing data for each input of the transaction to be signed (order matches the unsigned tx).
  * @param outputs signing data for each output of the transaction to be signed (order matches the unsigned tx).
  */
-@OptIn(ExperimentalUnsignedTypes::class)
 public data class Psbt(val global: Global, val inputs: List<Input>, val outputs: List<Output>) {
 
     init {
@@ -574,15 +575,15 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
 
         private fun combineInput(txIn: TxIn, inputs: List<Input>): Input = createInput(
             txIn,
-            inputs.mapNotNull { it.nonWitnessUtxo }.firstOrNull(),
-            inputs.mapNotNull { it.witnessUtxo }.firstOrNull(),
-            inputs.mapNotNull { it.sighashType }.firstOrNull(),
+            inputs.firstNotNullOfOrNull { it.nonWitnessUtxo },
+            inputs.firstNotNullOfOrNull { it.witnessUtxo },
+            inputs.firstNotNullOfOrNull { it.sighashType },
             inputs.flatMap { it.partialSigs.toList() }.toMap(),
             inputs.flatMap { it.derivationPaths.toList() }.toMap(),
-            inputs.mapNotNull { it.redeemScript }.firstOrNull(),
-            inputs.mapNotNull { it.witnessScript }.firstOrNull(),
-            inputs.mapNotNull { it.scriptSig }.firstOrNull(),
-            inputs.mapNotNull { it.scriptWitness }.firstOrNull(),
+            inputs.firstNotNullOfOrNull { it.redeemScript },
+            inputs.firstNotNullOfOrNull { it.witnessScript },
+            inputs.firstNotNullOfOrNull { it.scriptSig },
+            inputs.firstNotNullOfOrNull { it.scriptWitness },
             inputs.flatMap { it.ripemd160 }.toSet(),
             inputs.flatMap { it.sha256 }.toSet(),
             inputs.flatMap { it.hash160 }.toSet(),
@@ -591,8 +592,8 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
         )
 
         private fun combineOutput(outputs: List<Output>): Output = createOutput(
-            outputs.mapNotNull { it.redeemScript }.firstOrNull(),
-            outputs.mapNotNull { it.witnessScript }.firstOrNull(),
+            outputs.firstNotNullOfOrNull { it.redeemScript },
+            outputs.firstNotNullOfOrNull { it.witnessScript },
             outputs.flatMap { it.derivationPaths.toList() }.toMap(),
             combineUnknown(outputs.map { it.unknown })
         )

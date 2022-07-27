@@ -1079,17 +1079,35 @@ class PsbtTestsCommon {
 
         assertTrue(finalTx.isRight)
     }
+
     @Test
     fun `sign p2wpkh inputs`() {
         val priv = PrivateKey.fromHex("0101010101010101010101010101010101010101010101010101010101010101")
         val pub = priv.publicKey()
-        val spent = Transaction(2, listOf(), listOf(TxOut(Satoshi(100000), Script.pay2wpkh(pub))), 0)
-        val tx = Transaction(2, listOf(TxIn(OutPoint(spent, 0), TxIn.SEQUENCE_FINAL)), listOf(TxOut(Satoshi(100000), Script.pay2wpkh(pub))), 0)
-        val psbt = Psbt(tx).updateWitnessInput(outPoint = tx.txIn[0].outPoint, txOut = spent.txOut[0]).right!!
-        val signedTx = psbt.sign(priv, 0)
-            .flatMap { it.psbt.finalizeWitnessInput(0, ScriptWitness(listOf(it.sig, pub.value)))         }
-            .flatMap { it.extract() }
-        assertTrue { signedTx.isRight }
+        val spent = Transaction(2, listOf(), listOf(TxOut(100000.sat(), Script.pay2wpkh(pub))), 0)
+        val tx = Transaction(2, listOf(TxIn(OutPoint(spent, 0), TxIn.SEQUENCE_FINAL)), listOf(TxOut(100000.sat(), Script.pay2wpkh(pub))), 0)
+        run {
+            // No need to explicitly provide the witnessScript, it will be automatically derived from the publicKeyScript.
+            val psbt = Psbt(tx).updateWitnessInput(tx.txIn[0].outPoint, spent.txOut[0]).right!!
+            val signedTx = psbt.sign(priv, 0)
+                .flatMap { it.psbt.finalizeWitnessInput(0, ScriptWitness(listOf(it.sig, pub.value))) }
+                .flatMap { it.extract() }
+            assertTrue(signedTx.isRight)
+        }
+        run {
+            // We can explicitly provide the witnessScript.
+            val psbt = Psbt(tx).updateWitnessInput(tx.txIn[0].outPoint, spent.txOut[0], null, Script.pay2pkh(pub)).right!!
+            val signedTx = psbt.sign(priv, 0)
+                .flatMap { it.psbt.finalizeWitnessInput(0, ScriptWitness(listOf(it.sig, pub.value))) }
+                .flatMap { it.extract() }
+            assertTrue(signedTx.isRight)
+        }
+        run {
+            // Invalid witnessScripts are detected.
+            val otherPub = PrivateKey.fromHex("0202020202020202020202020202020202020202020202020202020202020202").publicKey()
+            val psbt = Psbt(tx).updateWitnessInput(tx.txIn[0].outPoint, spent.txOut[0], null, Script.pay2pkh(otherPub)).right!!
+            assertEquals(psbt.sign(priv, 0), Either.Left(UpdateFailure.InvalidWitnessUtxo("witness script does not match redeemScript or scriptPubKey")))
+        }
     }
 
     private fun readValidPsbt(hex: String): Psbt {

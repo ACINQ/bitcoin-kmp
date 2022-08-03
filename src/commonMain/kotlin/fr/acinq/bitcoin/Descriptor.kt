@@ -45,7 +45,7 @@ public object Descriptor {
             if (pos == -1) return "";
             c = polyMod(c, pos and 31); // Emit a symbol for the position inside the group, for every character.
             cls = cls * 3 + (pos shr 5); // Accumulate the group numbers
-            clscount = clscount + 1
+            clscount += 1
             if (clscount == 3) {
                 // Emit an extra symbol representing the group numbers, for every 3 characters.
                 c = polyMod(c, cls)
@@ -57,16 +57,16 @@ public object Descriptor {
         for (j in 0 until 8) c = polyMod(c, 0) // Shift further to determine the checksum.
         c = c xor 1 // Prevent appending zeroes from not affecting the checksum.
 
-        var ret = StringBuilder("        ")
+        val ret = StringBuilder("        ")
         for (j in 0 until 8) {
             val pos1 = (c shr (5 * (7 - j))) and 31
-            val char = CHECKSUM_CHARSET.get(pos1.toInt())
-            ret.set(j, char)
+            val char = CHECKSUM_CHARSET[pos1.toInt()]
+            ret[j] = char
         }
         return ret.toString()
     }
 
-    private fun getKeyPath(chainHash: ByteVector32): Pair<String, Int> = when (chainHash) {
+    private fun getBIP84KeyPath(chainHash: ByteVector32): Pair<String, Int> = when (chainHash) {
         Block.RegtestGenesisBlock.hash, Block.TestnetGenesisBlock.hash -> "84'/1'/0'/0" to DeterministicWallet.tpub
         Block.LivenetGenesisBlock.hash -> "84'/0'/0'/0" to DeterministicWallet.xpub
         else -> error("invalid chain hash $chainHash")
@@ -74,7 +74,7 @@ public object Descriptor {
 
     @JvmStatic
     public fun BIP84Descriptors(chainHash: ByteVector32, master: DeterministicWallet.ExtendedPrivateKey): Pair<String, String> {
-        val (keyPath, _) = getKeyPath(chainHash)
+        val (keyPath, _) = getBIP84KeyPath(chainHash)
         val accountPub = publicKey(derivePrivateKey(master, KeyPath(keyPath)))
         val fingerprint = DeterministicWallet.fingerprint(master) and 0xFFFFFFFFL
         return BIP84Descriptors(chainHash, fingerprint, accountPub)
@@ -82,7 +82,7 @@ public object Descriptor {
 
     @JvmStatic
     public fun BIP84Descriptors(chainHash: ByteVector32, fingerprint: Long, accountPub: DeterministicWallet.ExtendedPublicKey): Pair<String, String> {
-        val (keyPath, prefix) = getKeyPath(chainHash)
+        val (keyPath, prefix) = getBIP84KeyPath(chainHash)
         val accountDesc = "wpkh([${fingerprint.toString(16)}/$keyPath]${DeterministicWallet.encode(accountPub, prefix)}/0/*)"
         val changeDesc = "wpkh([${fingerprint.toString(16)}/$keyPath]${DeterministicWallet.encode(accountPub, prefix)}/1/*)"
         return Pair(

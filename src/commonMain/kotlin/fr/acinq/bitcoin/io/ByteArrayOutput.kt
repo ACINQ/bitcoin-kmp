@@ -20,7 +20,6 @@ public class ByteArrayOutput : Output {
     private var array: ByteArray = ByteArray(32)
     private var position: Int = 0
 
-    @OptIn(ExperimentalStdlibApi::class)
     private fun ensureCapacity(elementsToAppend: Int) {
         if (position + elementsToAppend <= array.size) return
         val newArray = ByteArray((position + elementsToAppend).takeHighestOneBit() shl 1)

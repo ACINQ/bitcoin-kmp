@@ -20,7 +20,6 @@ import fr.acinq.secp256k1.Hex
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalStdlibApi::class)
 class Sha1TestsCommon {
     val testVectors = arrayOf(
         "" to "da39a3ee5e6b4b0d3255bfef95601890afd80709",

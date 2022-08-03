@@ -24,7 +24,6 @@ import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
 import kotlin.jvm.JvmStatic
 
-@OptIn(ExperimentalUnsignedTypes::class)
 public abstract class BtcSerializer<T> {
     /**
      * write a message to a stream
@@ -196,7 +195,6 @@ public abstract class BtcSerializer<T> {
         }
 
         @JvmStatic
-        @OptIn(ExperimentalStdlibApi::class)
         public fun writeVarstring(input: String, out: Output) {
             writeVarint(input.length, out)
             writeBytes(input.encodeToByteArray(), out)

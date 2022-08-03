@@ -19,7 +19,6 @@ package fr.acinq.bitcoin
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-@OptIn(ExperimentalStdlibApi::class)
 class Base58TestsCommon {
     @Test
     fun `basic encode-decode tests`() {

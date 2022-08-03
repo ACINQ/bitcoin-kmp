@@ -27,7 +27,6 @@ import kotlin.jvm.JvmStatic
 /**
  * see https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
  */
-@OptIn(ExperimentalUnsignedTypes::class)
 public object DeterministicWallet {
     public const val hardenedKeyIndex: Long = 0x80000000L
 

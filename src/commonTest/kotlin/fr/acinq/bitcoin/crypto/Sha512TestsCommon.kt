@@ -20,7 +20,6 @@ import fr.acinq.secp256k1.Hex
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalStdlibApi::class)
 class Sha512TestsCommon {
     @Test
     fun `reference tests`() {

@@ -286,14 +286,14 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
             // return the hash of the node at (height, pos)
             fun traverseAndExtract(height: Int, pos: Int): ByteVector32 {
                 // check if the current node is a tx for which we have a proof or one of its ancestors
-                val fParentOfMatch = bit(bits, bitsUsed++)
+                val parentOfMatch = bit(bits, bitsUsed++)
                 return when {
                     height == 0 -> {
                         val hash = hashes[hashUsed++]
-                        if (fParentOfMatch) matched = matched + Pair(hash, pos)
+                        if (parentOfMatch) matched = matched + Pair(hash, pos)
                         hash
                     }
-                    !fParentOfMatch -> hashes[hashUsed++]
+                    !parentOfMatch -> hashes[hashUsed++]
                     else -> {
                         // otherwise, descend into the subtrees to extract matched txids and hashes
                         val left = traverseAndExtract(height - 1, pos * 2)

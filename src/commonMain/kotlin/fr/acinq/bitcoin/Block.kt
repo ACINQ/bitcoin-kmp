@@ -238,6 +238,8 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
 
         /**
          * Verify a tx inclusion proof (a merkle proof that a set of transactions are included in a given block)
+         * Note that this method doesn't validate the header's proof of work.
+         *
          * @param proof tx inclusion proof, in the format used by bitcoin core's 'verifytxoutproof' RPC call
          * @return a (block header, matched tx ids and positions in the block) tuple
          */
@@ -246,7 +248,7 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
             // a txout proof is generated for a given block and a given list of transactions, and contains a merkle proof that these transactions
             // were indeed in the block. The format of a proof is:
             // block header | number of transactions in the block | merkle node hashes | flag bits
-            // a flag bit is set if the current node is a parent of a tx for which this proof was generated
+            // a flag bit is set if the current node is one of the leaf tx for which this proof was generated or one of its ancestors
             // see https://en.bitcoin.it/wiki/BIP_0037#Partial_Merkle_branch_format for more details
             val header = BlockHeader.read(proof.take(80).toByteArray())
             val inputStream = ByteArrayInput(proof.drop(80).toByteArray())
@@ -275,7 +277,7 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
             var matched: List<Pair<ByteVector32, Int>> = listOf() // list of (txids, index) that we've matched so far
             var height = 0 // current height
 
-            // find the height of the tree (bottom is at height = 0)
+            // find the height of the tree (leaves are at height = 0)
             while (calcTreeWidth(height) > 1) {
                 height++
             }
@@ -283,7 +285,7 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
             // traverse the tree and update the list of matched txids and positions
             // return the hash of the node at (height, pos)
             fun traverseAndExtract(height: Int, pos: Int): ByteVector32 {
-                // check if the current node is a parent of a tx for which we have a proof
+                // check if the current node is a tx for which we have a proof or one of its ancestors
                 val fParentOfMatch = bit(bits, bitsUsed++)
                 return when {
                     height == 0 -> {
@@ -312,7 +314,7 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
             }
 
             val root = traverseAndExtract(height, 0)
-            require(root == header.hashMerkleRoot) { "invalid merkle root" }
+            require(root == header.hashMerkleRoot) { "invalid merkle root: expected ${header.hashMerkleRoot.toHex()}, got ${root.toHex()}" }
             return Pair(header, matched)
         }
 

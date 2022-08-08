@@ -16,16 +16,18 @@
 
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
+import kotlin.experimental.and
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 /**
  *
  * @param version           Block version information, based upon the software version creating this block
- * @param hashPreviousBlock The hash value of the previous block this particular block references. Please not that
+ * @param hashPreviousBlock The hash value of the previous block this particular block references. Please note that
  *                          this hash is not reversed (as opposed to Block.hash)
  * @param hashMerkleRoot    The reference to a Merkle tree collection which is a hash of all transactions related to this block
  * @param time              A timestamp recording when this block was created (Will overflow in 2106[2])
@@ -233,6 +235,88 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
          */
         @JvmStatic
         public fun checkProofOfWork(block: Block): Boolean = BlockHeader.checkProofOfWork(block.header)
+
+        /**
+         * Verify a tx inclusion proof (a merkle proof that a set of transactions are included in a given block)
+         * Note that this method doesn't validate the header's proof of work.
+         *
+         * @param proof tx inclusion proof, in the format used by bitcoin core's 'verifytxoutproof' RPC call
+         * @return a (block header, matched tx ids and positions in the block) tuple
+         */
+        @JvmStatic
+        public fun verifyTxOutProof(proof: ByteArray): Pair<BlockHeader, List<Pair<ByteVector32, Int>>> {
+            // a txout proof is generated for a given block and a given list of transactions, and contains a merkle proof that these transactions
+            // were indeed in the block. The format of a proof is:
+            // block header | number of transactions in the block | merkle node hashes | flag bits
+            // a flag bit is set if the current node is one of the leaf tx for which this proof was generated or one of its ancestors
+            // see https://en.bitcoin.it/wiki/BIP_0037#Partial_Merkle_branch_format for more details
+            val header = BlockHeader.read(proof.take(80).toByteArray())
+            val inputStream = ByteArrayInput(proof.drop(80).toByteArray())
+            val txCount = uint32(inputStream).toInt()
+            val hashes = readCollection(inputStream, { i, _ -> hash(i).byteVector32() }, null, Protocol.PROTOCOL_VERSION)
+            val bits = script(inputStream)
+
+            /**
+             * @param bits array of bytes
+             * @param pos position
+             * @return the bit value in the input byte array at position `pos`
+             */
+            fun bit(bits: ByteArray, pos: Int): Boolean {
+                val elt = bits[pos / 8]
+                return (elt.and((1.shl(pos % 8)).toByte()) != 0.toByte())
+            }
+
+            /**
+             * @param height height for which we want to know the width of the tree (0 is the bottom of the tree)
+             * @return the width of a merkle tree at a given height
+             */
+            fun calcTreeWidth(height: Int): Int = (txCount + (1.shl(height)) - 1).shr(height)
+
+            var bitsUsed = 0 // number of bits that we've used so far
+            var hashUsed = 0 // number of hashes that we've used so far
+            var matched: List<Pair<ByteVector32, Int>> = listOf() // list of (txids, index) that we've matched so far
+            var height = 0 // current height
+
+            // find the height of the tree (leaves are at height = 0)
+            while (calcTreeWidth(height) > 1) {
+                height++
+            }
+
+            // traverse the tree and update the list of matched txids and positions
+            // return the hash of the node at (height, pos)
+            fun traverseAndExtract(height: Int, pos: Int): ByteVector32 {
+                // check if the current node is a tx for which we have a proof or one of its ancestors
+                val parentOfMatch = bit(bits, bitsUsed++)
+                return when {
+                    height == 0 -> {
+                        val hash = hashes[hashUsed++]
+                        if (parentOfMatch) matched = matched + Pair(hash, pos)
+                        hash
+                    }
+                    !parentOfMatch -> hashes[hashUsed++]
+                    else -> {
+                        // otherwise, descend into the subtrees to extract matched txids and hashes
+                        val left = traverseAndExtract(height - 1, pos * 2)
+                        val right = if ((pos * 2 + 1) < calcTreeWidth(height - 1)) {
+                            val hash = traverseAndExtract(height - 1, pos * 2 + 1)
+                            // The left and right branches should never be identical, as the transaction
+                            // hashes covered by them must each be unique.
+                            require(hash != left) { "invalid leaf hash" }
+                            hash
+                        } else {
+                            // if we don't have enough leaves we duplicate the last one
+                            left
+                        }
+                        // and combine them before returning
+                        left.concat(right).sha256().sha256()
+                    }
+                }
+            }
+
+            val root = traverseAndExtract(height, 0)
+            require(root == header.hashMerkleRoot) { "invalid merkle root: expected ${header.hashMerkleRoot.toHex()}, got ${root.toHex()}" }
+            return Pair(header, matched)
+        }
 
         // genesis blocks
         @JvmField

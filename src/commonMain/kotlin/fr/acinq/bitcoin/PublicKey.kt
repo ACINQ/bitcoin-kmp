@@ -71,7 +71,7 @@ public data class PublicKey(@JvmField val value: ByteVector) {
      * @return the "legacy" p2pkh address for this key
      */
     public fun p2pkhAddress(chainHash: ByteVector32): String = when (chainHash) {
-        Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash -> Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, hash160())
+        Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, hash160())
         Block.LivenetGenesisBlock.hash -> Base58Check.encode(Base58.Prefix.PubkeyAddress, hash160())
         else -> error("invalid chain hash $chainHash")
     }
@@ -85,7 +85,7 @@ public data class PublicKey(@JvmField val value: ByteVector) {
         val script = Script.pay2wpkh(this)
         val hash = Crypto.hash160(Script.write(script))
         return when (chainHash) {
-            Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash -> Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, hash)
+            Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, hash)
             Block.LivenetGenesisBlock.hash -> Base58Check.encode(Base58.Prefix.ScriptAddress, hash)
             else -> error("invalid chain hash $chainHash")
         }

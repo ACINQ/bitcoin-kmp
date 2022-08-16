@@ -373,5 +373,13 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
             )
         )
 
+        @JvmField
+        public val SignetGenesisBlock: Block = LivenetGenesisBlock.copy(
+            header = LivenetGenesisBlock.header.copy(
+                bits = 503543726,
+                time = 1598918400,
+                nonce = 52613770
+            )
+        )
     }
 }

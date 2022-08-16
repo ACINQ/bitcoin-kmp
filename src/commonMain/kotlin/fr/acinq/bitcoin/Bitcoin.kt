@@ -63,7 +63,7 @@ public object Bitcoin {
                 Script.isPay2pkh(pubkeyScript) -> {
                     val prefix = when (chainHash) {
                         Block.LivenetGenesisBlock.hash -> Base58.Prefix.PubkeyAddress
-                        Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash -> Base58.Prefix.PubkeyAddressTestnet
+                        Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> Base58.Prefix.PubkeyAddressTestnet
                         else -> error("invalid chain hash")
                     }
                     Base58Check.encode(prefix, (pubkeyScript[2] as OP_PUSHDATA).data)
@@ -71,7 +71,7 @@ public object Bitcoin {
                 Script.isPay2sh(pubkeyScript) -> {
                     val prefix = when (chainHash) {
                         Block.LivenetGenesisBlock.hash -> Base58.Prefix.ScriptAddress
-                        Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash -> Base58.Prefix.ScriptAddressTestnet
+                        Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> Base58.Prefix.ScriptAddressTestnet
                         else -> error("invalid chain hash")
                     }
                     Base58Check.encode(prefix, (pubkeyScript[1] as OP_PUSHDATA).data)
@@ -124,9 +124,9 @@ public object Bitcoin {
         return runCatching { Base58Check.decode(address) }.fold(
             onSuccess = {
                 when {
-                    it.first == Base58.Prefix.PubkeyAddressTestnet && (chainHash == Block.TestnetGenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash) -> Script.pay2pkh(it.second)
+                    it.first == Base58.Prefix.PubkeyAddressTestnet && (chainHash == Block.TestnetGenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash || chainHash == Block.SignetGenesisBlock.hash) -> Script.pay2pkh(it.second)
                     it.first == Base58.Prefix.PubkeyAddress && chainHash == Block.LivenetGenesisBlock.hash -> Script.pay2pkh(it.second)
-                    it.first == Base58.Prefix.ScriptAddressTestnet && (chainHash == Block.TestnetGenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash) -> listOf(OP_HASH160, OP_PUSHDATA(it.second), OP_EQUAL)
+                    it.first == Base58.Prefix.ScriptAddressTestnet && (chainHash == Block.TestnetGenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash || chainHash == Block.SignetGenesisBlock.hash) -> listOf(OP_HASH160, OP_PUSHDATA(it.second), OP_EQUAL)
                     it.first == Base58.Prefix.ScriptAddress && chainHash == Block.LivenetGenesisBlock.hash -> listOf(OP_HASH160, OP_PUSHDATA(it.second), OP_EQUAL)
                     else -> error("base58 address does not match our blockchain")
                 }
@@ -140,6 +140,7 @@ public object Bitcoin {
                             it.third.size != 20 && it.third.size != 32 -> error("hash length in bech32 address must be either 20 or 32 bytes")
                             it.first == "bc" && chainHash == Block.LivenetGenesisBlock.hash -> listOf(OP_0, OP_PUSHDATA(it.third))
                             it.first == "tb" && chainHash == Block.TestnetGenesisBlock.hash -> listOf(OP_0, OP_PUSHDATA(it.third))
+                            it.first == "tb" && chainHash == Block.SignetGenesisBlock.hash -> listOf(OP_0, OP_PUSHDATA(it.third))
                             it.first == "bcrt" && chainHash == Block.RegtestGenesisBlock.hash -> listOf(OP_0, OP_PUSHDATA(it.third))
                             else -> error("bech32 address does not match our blockchain")
                         }

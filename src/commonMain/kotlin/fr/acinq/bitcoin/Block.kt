@@ -365,13 +365,12 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
         )
 
         @JvmField
-        public val SegnetGenesisBlock: Block = LivenetGenesisBlock.copy(
+        public val SignetGenesisBlock: Block = LivenetGenesisBlock.copy(
             header = LivenetGenesisBlock.header.copy(
-                bits = 503447551,
-                time = 1452831101,
-                nonce = 0
+                bits = 503543726,
+                time = 1598918400,
+                nonce = 52613770
             )
         )
-
     }
 }

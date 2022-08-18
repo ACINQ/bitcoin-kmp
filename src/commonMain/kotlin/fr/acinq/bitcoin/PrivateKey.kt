@@ -82,7 +82,7 @@ public data class PrivateKey(@JvmField val value: ByteVector32) {
 
         @JvmStatic
         public fun fromBase58(value: String, prefix: Byte): Pair<PrivateKey, Boolean> {
-            require(setOf(Base58.Prefix.SecretKey, Base58.Prefix.SecretKeyTestnet, Base58.Prefix.SecretKeySegnet).contains(prefix)) { "invalid base 58 prefix for a private key" }
+            require(setOf(Base58.Prefix.SecretKey, Base58.Prefix.SecretKeyTestnet).contains(prefix)) { "invalid base 58 prefix for a private key" }
             val (prefix1, data) = Base58Check.decode(value)
             require(prefix1 == prefix) { "prefix $prefix1 does not match expected prefix $prefix" }
             return Pair(PrivateKey(data), isCompressed(data))

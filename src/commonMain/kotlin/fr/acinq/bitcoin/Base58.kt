@@ -27,9 +27,6 @@ public object Base58 {
         public const val PubkeyAddressTestnet: Byte = 111.toByte()
         public const val ScriptAddressTestnet: Byte = 196.toByte()
         public const val SecretKeyTestnet: Byte = 239.toByte()
-        public const val PubkeyAddressSegnet: Byte = 30.toByte()
-        public const val ScriptAddressSegnet: Byte = 50.toByte()
-        public const val SecretKeySegnet: Byte = 158.toByte()
     }
 
     private const val pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"

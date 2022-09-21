@@ -27,7 +27,7 @@ import kotlin.test.assertFails
 class DeterministicWalletTestsCommon {
 
     @Test
-    fun `generate and derive keys (test vector #1)`() {
+    fun `generate and derive keys -- test vector no1`() {
         val m = DeterministicWallet.generate(Hex.decode("000102030405060708090a0b0c0d0e0f"))
         assertEquals(
             DeterministicWallet.encode(m, testnet = false),
@@ -123,7 +123,7 @@ class DeterministicWalletTestsCommon {
     }
 
     @Test
-    fun `generate and derive keys (test vector #2)`() {
+    fun `generate and derive keys -- test vector no2`() {
         val m = DeterministicWallet.generate(Hex.decode("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542"))
         assertEquals(
             DeterministicWallet.encode(m, testnet = false),
@@ -195,7 +195,7 @@ class DeterministicWalletTestsCommon {
     }
 
     @Test
-    fun `generate and derive keys (test vector #3)`() {
+    fun `generate and derive keys -- test vector no3`() {
         val m = DeterministicWallet.generate(ByteVector("4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be"))
         assertEquals(
             DeterministicWallet.encode(m, testnet = false),
@@ -216,7 +216,7 @@ class DeterministicWalletTestsCommon {
     }
 
     @Test
-    fun `generate and derive keys (test vector #4)`() {
+    fun `generate and derive keys -- test vector no4`() {
         val m = DeterministicWallet.generate(ByteVector("3ddd5602285899a946114506157c7997e5444528f3003f6134712147db19b678"))
         assertEquals(
             DeterministicWallet.encode(m, testnet = false),
@@ -250,7 +250,7 @@ class DeterministicWalletTestsCommon {
     }
 
     @Test
-    fun `generate and derive keys (test vector #5)`() {
+    fun `generate and derive keys -- test vector no5`() {
         val testCases = listOf(
             "xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6LBpB85b3D2yc8sfvZU521AAwdZafEz7mnzBBsz4wKY5fTtTQBm", // pubkey version / prvkey mismatch
             "xprv9s21ZrQH143K24Mfq5zL5MhWK9hUhhGbd45hLXo2Pq2oqzMMo63oStZzFGTQQD3dC4H2D5GBj7vWvSQaaBv5cxi9gafk7NF3pnBju6dwKvH", // prvkey version / pubkey mismatch

@@ -54,7 +54,7 @@ class MnemonicCodeTestsCommon {
     }
 
     @Test
-    fun `validate mnemonics (valid)`() {
+    fun `validate mnemonics -- valid`() {
         val random = Random
 
         for (i in 0..99) {
@@ -68,7 +68,7 @@ class MnemonicCodeTestsCommon {
     }
 
     @Test
-    fun `validate mnemonics (invalid)`() {
+    fun `validate mnemonics -- invalid`() {
         val invalidMnemonics = listOf(
             "",
             "gravity machine north sort system female filter attitude volume fold club stay feature office ecology stable narrow", // one word missing

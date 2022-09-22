@@ -231,7 +231,7 @@ class CryptoTestsCommon {
     }
 
     @Test
-    fun `recover public keys from signatures (random tests)`() {
+    fun `recover public keys from signatures -- random tests`() {
         val random = Random
         val privbytes = ByteArray(32)
         val message = ByteArray(32)
@@ -251,7 +251,7 @@ class CryptoTestsCommon {
     }
 
     @Test
-    fun `recover public keys from signatures (secp256k1 test)`() {
+    fun `recover public keys from signatures -- secp256k1 test`() {
         var priv: PrivateKey? = null
         var message: ByteVector? = null
         var pub: PublicKey? = null

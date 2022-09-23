@@ -24,7 +24,7 @@ import kotlin.test.assertEquals
 
 class BIP341TestsCommon {
     @Test
-    fun `BIP341 reference tests (key path spending)`() {
+    fun `BIP341 reference tests -- key path spending`() {
         val tests = TransactionTestsCommon.readData("data/bip341_wallet_vectors.json").jsonObject["keyPathSpending"]!!
         tests.jsonArray.forEach { it ->
             //val fulledSignedTx = Transaction.read(it.jsonObject["auxiliary"]!!.jsonObject["fulledSignedTx"]!!.jsonPrimitive.content)
@@ -76,7 +76,7 @@ class BIP341TestsCommon {
     }
 
     @Test
-    fun `BIP341 reference tests (script path spending)`() {
+    fun `BIP341 reference tests -- script path spending`() {
         val tests = TransactionTestsCommon.readData("data/bip341_wallet_vectors.json").jsonObject["scriptPubKey"]!!
         tests.jsonArray.forEach { it ->
             val given = it.jsonObject["given"]!!.jsonObject

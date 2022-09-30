@@ -27,13 +27,12 @@ public data class ScriptLeaf(val id: Int, val script: ByteVector, val leafVersio
     /**
      * tapleaf hash of this leaf
      */
-    val hash: ByteVector32
-        get() = run {
-            val buffer = ByteArrayOutput()
-            buffer.write(leafVersion)
-            BtcSerializer.writeScript(script, buffer)
-            Crypto.taggedHash(buffer.toByteArray(), "TapLeaf")
-        }
+    val hash: ByteVector32 = run {
+        val buffer = ByteArrayOutput()
+        buffer.write(leafVersion)
+        BtcSerializer.writeScript(script, buffer)
+        Crypto.taggedHash(buffer.toByteArray(), "TapLeaf")
+    }
 }
 
 /**

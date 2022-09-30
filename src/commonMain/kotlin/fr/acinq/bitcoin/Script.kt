@@ -77,10 +77,6 @@ public object Script {
 
     /**
      * parse a script from a input stream of binary data
-     *
-     * @param input input stream
-     * @param stack initial command stack
-     * @return an updated command stack
      */
     @JvmStatic
     public fun parse(input: Input): List<ScriptElt> = scriptIterator(input).asSequence().toList()
@@ -571,7 +567,6 @@ public object Script {
 
     public fun sigHashType(sig: ByteVector): Int = sigHashType(sig.toByteArray())
 
-
     public fun <T> List<T>.tail(): List<T> {
         require(this.isNotEmpty()) { "tail of empty list" }
         return this.drop(1)
@@ -625,7 +620,7 @@ public object Script {
             )
         }
 
-        public fun checkSignatureLegacy(pubKey: ByteArray, sigBytes: ByteArray, scriptCode: ByteArray, signatureVersion: Int): Boolean {
+        public fun checkSignatureEcdsa(pubKey: ByteArray, sigBytes: ByteArray, scriptCode: ByteArray, signatureVersion: Int): Boolean {
             return when {
                 sigBytes.isEmpty() -> false
                 !Crypto.checkSignatureEncoding(sigBytes, scriptFlag) -> throw RuntimeException("invalid signature encoding")
@@ -648,10 +643,9 @@ public object Script {
             }
         }
 
-        public fun checkSignatureSchnorr(pubKey: ByteArray, sigBytes: ByteArray, @Suppress("UNUSED_PARAMETER") scriptCode: ByteArray, signatureVersion: Int): Boolean {
+        public fun checkSignatureSchnorr(pubKey: ByteArray, sigBytes: ByteArray, signatureVersion: Int): Boolean {
             require(signatureVersion == SigVersion.SIGVERSION_TAPSCRIPT)
-            val success = sigBytes.isNotEmpty()
-            if (success) {
+            if (sigBytes.isNotEmpty()) {
                 require(context.executionData.validationWeightLeft != null)
                 context.executionData.validationWeightLeft?.let {
                     val weightLeft = it - VALIDATION_WEIGHT_PER_SIGOP_PASSED
@@ -685,9 +679,9 @@ public object Script {
          */
         public fun checkSignature(pubKey: ByteArray, sigBytes: ByteArray, scriptCode: ByteArray, signatureVersion: Int): Boolean {
             return when (signatureVersion) {
-                SigVersion.SIGVERSION_BASE, SigVersion.SIGVERSION_WITNESS_V0 -> checkSignatureLegacy(pubKey, sigBytes, scriptCode, signatureVersion)
+                SigVersion.SIGVERSION_BASE, SigVersion.SIGVERSION_WITNESS_V0 -> checkSignatureEcdsa(pubKey, sigBytes, scriptCode, signatureVersion)
                 SigVersion.SIGVERSION_TAPROOT -> false // Key path spending in Taproot has no script, so this is unreachable.
-                SigVersion.SIGVERSION_TAPSCRIPT -> checkSignatureSchnorr(pubKey, sigBytes, scriptCode, signatureVersion)
+                SigVersion.SIGVERSION_TAPSCRIPT -> checkSignatureSchnorr(pubKey, sigBytes, signatureVersion)
                 else -> error("invalid signature version")
             }
         }
@@ -1511,12 +1505,7 @@ public object Script {
                         require((control.size() - 33) / 32 in 0..128) { "invalid control block size" }
                         val leafVersion = control[0].toInt() and TAPROOT_LEAF_MASK
                         val internalKey = XonlyPublicKey(control.slice(1, 33).toByteArray().byteVector32())
-                        val tapleafHash = run {
-                            val buffer = ByteArrayOutput()
-                            buffer.write(leafVersion)
-                            BtcSerializer.writeScript(script, buffer)
-                            Crypto.taggedHash(buffer.toByteArray(), "TapLeaf")
-                        }
+                        val tapleafHash = ScriptLeaf(0, script, leafVersion).hash
                         this.context.executionData = this.context.executionData.copy(tapleafHash = tapleafHash)
 
                         // split input buffer into 32 bytes chunks (input buffer size MUST be a multiple of 32 !!)
@@ -1624,7 +1613,6 @@ public object Script {
                     else -> stack0
                 }
             } else stack0
-
 
             val stack2 = if (((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) != 0) && isPayToScript(scriptPubKey)) {
                 // scriptSig must be literals-only or validation fails

@@ -17,7 +17,6 @@ package fr.acinq.bitcoin.reference
 
 import fr.acinq.bitcoin.*
 import fr.acinq.secp256k1.Hex
-import fr.acinq.secp256k1.Secp256k1
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -54,15 +53,15 @@ class BIP341TestsCommon {
                 val internalPubkey = XonlyPublicKey(internalPrivkey.publicKey())
                 val intermediary = it.jsonObject["intermediary"]!!.jsonObject
                 assertEquals(ByteVector32(intermediary["internalPubkey"]!!.jsonPrimitive.content), internalPubkey.value)
-                assertEquals(ByteVector32(intermediary["tweak"]!!.jsonPrimitive.content), internalPubkey.tweak(if (merkleRoot == ByteVector32.Zeroes) null else merkleRoot))
+                assertEquals(ByteVector32(intermediary["tweak"]!!.jsonPrimitive.content), internalPubkey.tweak(merkleRoot))
 
-                val tweakedPrivateKey = internalPrivkey.tweak(internalPubkey.tweak(if (merkleRoot == ByteVector32.Zeroes) null else merkleRoot))
+                val tweakedPrivateKey = internalPrivkey.tweak(internalPubkey.tweak(merkleRoot))
                 assertEquals(ByteVector32(intermediary["tweakedPrivkey"]!!.jsonPrimitive.content), tweakedPrivateKey.value)
 
                 val hash = Transaction.hashForSigningSchnorr(rawUnsignedTx, txinIndex, utxosSpent, hashType, 0)
                 assertEquals(ByteVector32(intermediary["sigHash"]!!.jsonPrimitive.content), hash)
 
-                val sig = Crypto.signSchnorr(hash, internalPrivkey, merkleRoot, ByteVector32.Zeroes)
+                val sig = Crypto.signSchnorr(hash, internalPrivkey, merkleRoot ?: ByteVector32.Zeroes)
                 val witness = when (hashType) {
                     SigHash.SIGHASH_DEFAULT -> sig
                     else -> (sig + byteArrayOf(hashType.toByte()))
@@ -101,13 +100,13 @@ class BIP341TestsCommon {
             when (expected["scriptPathControlBlocks"]) {
                 null, JsonNull -> Unit
                 else -> {
-                    // when control blocks are provided, recomputed them for each script tree leaf and check that they match
-                    // for each leaf in the script tree the control block is:
-                    // leaf version + parity (1 byte) || internal pub key (32 bytes) || merkle path for this leaf (N * 32 bytes)
+                    // when control blocks are provided, recompute them for each script tree leaf and check that they match
                     val controlBlocks = expected["scriptPathControlBlocks"]!!.jsonArray.map { ByteVector.fromHex(it.jsonPrimitive.content) }
                     val paths = mutableListOf<Pair<Int, ByteArray>>()
                     merklePath(scriptTree!!) { leafVersion, hashes -> paths.add(Pair(leafVersion, hashes)) }
                     val computed = paths.map {
+                        // for each leaf in the script tree the control block is:
+                        // leaf version + parity (1 byte) || internal pub key (32 bytes) || merkle path for this leaf (N * 32 bytes)
                         (byteArrayOf((if (parity) it.first + 1 else it.first).toByte()) + internalPubkey.value.toByteArray() + it.second).byteVector()
                     }
                     assertEquals(controlBlocks, computed)
@@ -116,8 +115,8 @@ class BIP341TestsCommon {
         }
     }
 
-    private fun nullOrBytes(input: String?): ByteVector32 = when (input) {
-        null, "null" -> ByteVector32.Zeroes
+    private fun nullOrBytes(input: String?): ByteVector32? = when (input) {
+        null, "null" -> null
         else -> ByteVector32(input)
     }
 

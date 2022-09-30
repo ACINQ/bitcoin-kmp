@@ -48,7 +48,6 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
 
     public val isCoinbase: Boolean get() = isCoinbase(this)
 
-    @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     public companion object : BtcSerializer<OutPoint>() {
         @JvmStatic
         override fun read(input: Input, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input).toLong())
@@ -322,13 +321,15 @@ public data class Transaction(
         val out = ByteArrayOutput()
         BtcSerializer.writeUInt32(version.toUInt(), out)
         BtcSerializer.writeUInt32(lockTime.toUInt(), out)
-        if ((sighashType and 0x80) != SigHash.SIGHASH_ANYONECANPAY) {
+        val inputType = sighashType and SigHash.SIGHASH_INPUT_MASK
+        if (inputType != SigHash.SIGHASH_ANYONECANPAY) {
             out.write(prevoutsSha256(this))
             out.write(amountsSha256(inputs))
             out.write(scriptPubkeysSha256(inputs))
             out.write(sequencesSha256(this))
         }
-        if ((sighashType and 3) != SigHash.SIGHASH_NONE && (sighashType and 3) != SigHash.SIGHASH_SINGLE) {
+        val outputType = if (sighashType == SigHash.SIGHASH_DEFAULT) SigHash.SIGHASH_ALL else sighashType and SigHash.SIGHASH_OUTPUT_MASK
+        if (outputType == SigHash.SIGHASH_ALL) {
             out.write(outputsSha256(this))
         }
         return out.toByteArray()
@@ -448,37 +449,37 @@ public data class Transaction(
 
         @JvmStatic
         public fun prevoutsSha256(tx: Transaction): ByteArray {
-            val arrays = tx.txIn.map { it.outPoint }.map { OutPoint.write(it, Protocol.PROTOCOL_VERSION) }
-            val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
-            return Crypto.sha256(concatenated)
+            val buffer = ByteArrayOutput()
+            tx.txIn.forEach { OutPoint.write(it.outPoint, buffer) }
+            return Crypto.sha256(buffer.toByteArray())
         }
 
         @JvmStatic
         public fun amountsSha256(inputs: List<TxOut>): ByteArray {
-            val arrays = inputs.map { it.amount }.map { BtcSerializer.writeUInt64(it.toLong().toULong()) }
-            val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
-            return Crypto.sha256(concatenated)
+            val buffer = ByteArrayOutput()
+            inputs.forEach { writeUInt64(it.amount.toULong(), buffer) }
+            return Crypto.sha256(buffer.toByteArray())
         }
 
         @JvmStatic
         public fun scriptPubkeysSha256(inputs: List<TxOut>): ByteArray {
             val buffer = ByteArrayOutput()
-            inputs.forEach { BtcSerializer.writeScript(it.publicKeyScript, buffer) }
+            inputs.forEach { writeScript(it.publicKeyScript, buffer) }
             return Crypto.sha256(buffer.toByteArray())
         }
 
         @JvmStatic
         public fun sequencesSha256(tx: Transaction): ByteArray {
-            val arrays = tx.txIn.map { it.sequence }.map { BtcSerializer.writeUInt32(it.toUInt()) }
-            val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
-            return Crypto.sha256(concatenated)
+            val buffer = ByteArrayOutput()
+            tx.txIn.forEach { writeUInt32(it.sequence.toUInt(), buffer) }
+            return Crypto.sha256(buffer.toByteArray())
         }
 
         @JvmStatic
         public fun outputsSha256(tx: Transaction): ByteArray {
-            val arrays = tx.txOut.map { TxOut.write(it) }
-            val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
-            return Crypto.sha256(concatenated)
+            val buffer = ByteArrayOutput()
+            tx.txOut.forEach { TxOut.write(it, buffer) }
+            return Crypto.sha256(buffer.toByteArray())
         }
 
         /**
@@ -686,9 +687,6 @@ public data class Transaction(
          * @param inputs UTXOs spent by this transaction
          * @param sighashType signature hash type
          * @param sigVersion signature version
-         * @param annex optional annex (used for tapscript transactions)
-         * @param tapleafHash optional tapleaf hash (used for tapscript transactions)
-         * @param codeSeparatorPos position of the last OP_CODESEPARATOR operation in the script that is being executed
          */
         @JvmStatic
         public fun hashForSigningSchnorr(
@@ -712,10 +710,10 @@ public data class Transaction(
             }
             val spendType = 2 * extFlag + (if (executionData.annex != null) 1 else 0)
             out.write(spendType)
-            if ((sighashType and 0x80) == SigHash.SIGHASH_ANYONECANPAY) {
+            val inputType = sighashType and SigHash.SIGHASH_INPUT_MASK
+            if (inputType == SigHash.SIGHASH_ANYONECANPAY) {
                 OutPoint.write(tx.txIn[inputIndex].outPoint, out)
-                writeUInt64(inputs[inputIndex].amount.toULong(), out)
-                writeScript(inputs[inputIndex].publicKeyScript, out)
+                TxOut.write(inputs[inputIndex], out)
                 writeUInt32(tx.txIn[inputIndex].sequence.toUInt(), out)
             } else {
                 writeUInt32(inputIndex.toUInt(), out)
@@ -726,12 +724,12 @@ public data class Transaction(
                 val annexHash = Crypto.sha256(buffer.toByteArray())
                 out.write(annexHash)
             }
-            if ((sighashType and 3) == SigHash.SIGHASH_SINGLE) {
-                val ser = TxOut.write(tx.txOut[inputIndex])
-                out.write(Crypto.sha256(ser))
+            val outputType = if (sighashType == SigHash.SIGHASH_DEFAULT) SigHash.SIGHASH_ALL else sighashType and SigHash.SIGHASH_OUTPUT_MASK
+            if (outputType == SigHash.SIGHASH_SINGLE) {
+                out.write(Crypto.sha256(TxOut.write(tx.txOut[inputIndex])))
             }
             if (sigVersion == SigVersion.SIGVERSION_TAPSCRIPT) {
-                require(executionData.tapleafHash != null)
+                require(executionData.tapleafHash != null) { "tapleaf hash is missing" }
                 out.write(executionData.tapleafHash.toByteArray())
                 out.write(keyVersion)
                 writeUInt32(executionData.codeSeparatorPos.toUInt(), out)

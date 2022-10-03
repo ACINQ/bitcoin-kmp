@@ -44,7 +44,6 @@ public data class Satoshi(val sat: Long) : Comparable<Satoshi> {
     }
 }
 
-
 public fun Long.sat(): Satoshi = Satoshi(this)
 public fun Long.toSatoshi(): Satoshi = Satoshi(this)
 public fun Int.sat(): Satoshi = Satoshi(this.toLong())

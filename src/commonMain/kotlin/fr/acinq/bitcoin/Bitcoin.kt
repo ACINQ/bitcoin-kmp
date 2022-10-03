@@ -151,8 +151,7 @@ public object Bitcoin {
                     else -> error("base58 address does not match our blockchain")
                 }
             },
-            onFailure = {
-                val base58error = it
+            onFailure = { base58error ->
                 runCatching { Bech32.decodeWitnessAddress(address) }.fold(
                     onSuccess = {
                         val witnessVersion = witnessVersions[it.second]

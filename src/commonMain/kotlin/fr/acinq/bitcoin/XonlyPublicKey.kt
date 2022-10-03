@@ -24,16 +24,16 @@ import kotlin.jvm.JvmField
 public data class XonlyPublicKey(@JvmField val value: ByteVector32) {
     public constructor(pub: PublicKey) : this(pub.value.drop(1).toByteArray().byteVector32())
 
-    val publicKey: PublicKey get() = PublicKey(byteArrayOf(2) + value.toByteArray())
+    val publicKey: PublicKey = PublicKey(byteArrayOf(2) + value.toByteArray())
 
     public fun tweak(merkleRoot: ByteVector32?): ByteVector32 {
-        return Crypto.taggedHash(this.value.toByteArray() + (merkleRoot?.toByteArray() ?: ByteArray(0)), "TapTweak")
+        return Crypto.taggedHash(value.toByteArray() + (merkleRoot?.toByteArray() ?: ByteArray(0)), "TapTweak")
     }
 
     /**
      * "tweaks" this key with an optional merkle root
      * @param merkleRoot tapscript tree merkle root
-     * @return an (x-pnly pubkey, parity) pair
+     * @return an (x-only pubkey, parity) pair
      */
     public fun outputKey(merkleRoot: ByteVector32?): Pair<XonlyPublicKey, Boolean> = this + PrivateKey(tweak(merkleRoot)).publicKey()
 

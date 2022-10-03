@@ -27,7 +27,10 @@ public data class XonlyPublicKey(@JvmField val value: ByteVector32) {
     val publicKey: PublicKey = PublicKey(byteArrayOf(2) + value.toByteArray())
 
     public fun tweak(merkleRoot: ByteVector32?): ByteVector32 {
-        return Crypto.taggedHash(value.toByteArray() + (merkleRoot?.toByteArray() ?: ByteArray(0)), "TapTweak")
+        return when(merkleRoot) {
+            null -> Crypto.taggedHash(value.toByteArray(), "TapTweak")
+            else -> Crypto.taggedHash(value.toByteArray() + merkleRoot.toByteArray(), "TapTweak")
+        }
     }
 
     /**

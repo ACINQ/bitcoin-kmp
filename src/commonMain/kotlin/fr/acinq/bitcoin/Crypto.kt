@@ -157,57 +157,23 @@ public object Crypto {
     /**
      * @param data data to sign (32 bytes)
      * @param privateKey private key
-     * @return the Schnorr signature of data with private key
+     * @param merkleRoot optional tapscript merkle root, which will be used to tweak the private key.
+     * if merkleRoot is null, no tweaking is done, sign with key directly (this is used for signatures in BIP342 script)
+     * if merkleRoot is all zeroes, sign with privateKey + H_TapTweak(public key) (this is used for key path spending when no scripts are present).
+     * Otherwise, sign with key + H_TapTweak(public key || merkle_root) (this is used for key path spending, with specific Merkle root of the script tree).
+     * @param auxrand32 optional auxiliary random data
+     * @return the Schnorr signature of data with private key (optionally tweaked with the tapscript merkle root)
      */
     @JvmStatic
-    public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey): ByteVector64 {
-        val sig = Secp256k1.signSchnorr(data.toByteArray(), privateKey.value.toByteArray(), null).byteVector64()
-        require(verifySignatureSchnorr(data, sig, privateKey.xOnlyPublicKey())) { "Cannot create Schnorr signature" }
-        return sig
-    }
-
-    /**
-     * @param data data to sign (32 bytes)
-     * @param privateKey private key
-     * @param merkleRoot tapscript merkle root, which will be used to tweak the private key. if set to all zeroes, the private key wil be tweaked with an empty byte array.
-     * @return the Schnorr signature of data with private key tweaked with the tapscript merkle root
-     */
-    @JvmStatic
-    public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey, merkleRoot: ByteVector32): ByteVector64 {
+    public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey, merkleRoot: ByteVector32?, auxrand32: ByteVector32? = null): ByteVector64 {
         val priv = when (merkleRoot) {
+            null -> privateKey
             ByteVector32.Zeroes -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(null))
             else -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(merkleRoot))
         }
-        return signSchnorr(data, priv)
-    }
-
-    /**
-     * @param data data to sign (32 bytes)
-     * @param privateKey private key
-     * @param auxrand32 auxiliary random data
-     * @return the Schnorr signature of data with private key
-     */
-    @JvmStatic
-    public fun signSchnorrWithRand(data: ByteVector32, privateKey: PrivateKey, auxrand32: ByteVector32): ByteVector64 {
-        val sig = Secp256k1.signSchnorr(data.toByteArray(), privateKey.value.toByteArray(), auxrand32.toByteArray()).byteVector64()
-        require(verifySignatureSchnorr(data, sig, privateKey.xOnlyPublicKey())) { "Cannot create Schnorr signature" }
+        val sig = Secp256k1.signSchnorr(data.toByteArray(), priv.value.toByteArray(), auxrand32?.toByteArray()).byteVector64()
+        require(verifySignatureSchnorr(data, sig, priv.xOnlyPublicKey())) { "Cannot create Schnorr signature" }
         return sig
-    }
-
-    /**
-     * @param data data to sign (32 bytes)
-     * @param privateKey private key
-     * @param merkleRoot tapscript merkle root, which will be used to tweak the private key. if set to all zeroes, the private key wil be tweaked with an empty byte array.
-     * @param auxrand32 auxiliary random data
-     * @return the Schnorr signature of data with private key tweaked with the tapscript merkle root
-     */
-    @JvmStatic
-    public fun signSchnorrWithRand(data: ByteVector32, privateKey: PrivateKey, merkleRoot: ByteVector32, auxrand32: ByteVector32): ByteVector64 {
-        val priv = when (merkleRoot) {
-            ByteVector32.Zeroes -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(null))
-            else -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(merkleRoot))
-        }
-        return signSchnorrWithRand(data, priv, auxrand32)
     }
 
     @JvmStatic

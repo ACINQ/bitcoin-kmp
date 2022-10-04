@@ -26,7 +26,7 @@ class BIP341TestsCommon {
     fun `BIP341 reference tests -- key path spending`() {
         val tests = TransactionTestsCommon.readData("data/bip341_wallet_vectors.json").jsonObject["keyPathSpending"]!!
         tests.jsonArray.forEach { it ->
-            //val fulledSignedTx = Transaction.read(it.jsonObject["auxiliary"]!!.jsonObject["fulledSignedTx"]!!.jsonPrimitive.content)
+            val fullySignedTx = Transaction.read(it.jsonObject["auxiliary"]!!.jsonObject["fullySignedTx"]!!.jsonPrimitive.content)
             val rawUnsignedTx = Transaction.read(it.jsonObject["given"]!!.jsonObject["rawUnsignedTx"]!!.jsonPrimitive.content)
             val utxosSpent = it.jsonObject["given"]!!.jsonObject["utxosSpent"]!!.jsonArray.map {
                 TxOut(it.jsonObject["amountSats"]!!.jsonPrimitive.long.sat(), Hex.decode(it.jsonObject["scriptPubKey"]!!.jsonPrimitive.content))
@@ -42,6 +42,9 @@ class BIP341TestsCommon {
             assertEquals(hashPrevouts, Hex.encode(Transaction.prevoutsSha256(rawUnsignedTx)))
             assertEquals(hashScriptPubkeys, Hex.encode(Transaction.scriptPubkeysSha256(utxosSpent)))
             assertEquals(hashSequences, Hex.encode(Transaction.sequencesSha256(rawUnsignedTx)))
+
+            val previousOutputs = (fullySignedTx.txIn.map {it.outPoint}).zip(utxosSpent).toMap()
+            Transaction.correctlySpends(fullySignedTx, previousOutputs, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
             it.jsonObject["inputSpending"]!!.jsonArray.forEach {
                 val given = it.jsonObject["given"]!!.jsonObject

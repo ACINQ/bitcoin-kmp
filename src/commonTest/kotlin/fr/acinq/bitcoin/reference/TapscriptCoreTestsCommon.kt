@@ -6,7 +6,10 @@ import kotlinx.serialization.json.*
 import org.kodein.memory.file.*
 import org.kodein.memory.text.readString
 import org.kodein.memory.use
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * this is a "port" of https://github.com/bitcoin/bitcoin/blob/master/test/functional/feature_taproot.py
@@ -46,11 +49,15 @@ class TapscriptCoreTestsCommon {
     }
 
     fun run(json: JsonObject, name: String) {
+        json["success"]?.let { runInternal(json, it.jsonObject, name, shouldSucceed = true) }
+        json["failure"]?.let { runInternal(json, it.jsonObject, name, shouldSucceed = false) }
+    }
+
+    private fun runInternal(json: JsonObject, inputData: JsonObject, name: String, shouldSucceed: Boolean) {
         val tx = Transaction.read(json["tx"]!!.jsonPrimitive.content)
         val prevouts = json["prevouts"]!!.jsonArray.map { TxOut.read(it.jsonPrimitive.content) }
-        val testCase = (json["success"] ?: json["failure"])!!.jsonObject
-        val witness = testCase.jsonObject["witness"]!!.jsonArray.map { ByteVector.fromHex(it.jsonPrimitive.content) }
-        val scriptSig = Hex.decode(testCase.jsonObject["scriptSig"]!!.jsonPrimitive.content)
+        val witness = inputData.jsonObject["witness"]!!.jsonArray.map { ByteVector.fromHex(it.jsonPrimitive.content) }
+        val scriptSig = Hex.decode(inputData.jsonObject["scriptSig"]!!.jsonPrimitive.content)
         val i = json["index"]!!.jsonPrimitive.int
         val tx1 = tx
             .updateWitness(i, ScriptWitness(witness))
@@ -61,17 +68,14 @@ class TapscriptCoreTestsCommon {
         val scriptFlags = ScriptTestsCommon.parseScriptFlags(json["flags"]!!.jsonPrimitive.content)
         val ctx = Script.Context(tx1, i, amount, prevouts)
         val runner = Script.Runner(ctx, scriptFlags, null)
-        when (json["success"]) {
-            null -> {
-                val result = kotlin.runCatching {
-                    runner.verifyScripts(tx1.txIn[i].signatureScript, prevOutputScript, tx1.txIn[i].witness)
-                }.getOrDefault(false)
-                assertFalse(result, "failure test $name failed")
-            }
-            else -> {
-                val result = runner.verifyScripts(tx1.txIn[i].signatureScript, prevOutputScript, tx1.txIn[i].witness)
-                assertTrue(result, "success test $name failed")
-            }
+        if (shouldSucceed) {
+            val result = runner.verifyScripts(tx1.txIn[i].signatureScript, prevOutputScript, tx1.txIn[i].witness)
+            assertTrue(result, "success test $name failed")
+        } else {
+            val result = kotlin.runCatching {
+                runner.verifyScripts(tx1.txIn[i].signatureScript, prevOutputScript, tx1.txIn[i].witness)
+            }.getOrDefault(false)
+            assertFalse(result, "failure test $name failed")
         }
     }
 }

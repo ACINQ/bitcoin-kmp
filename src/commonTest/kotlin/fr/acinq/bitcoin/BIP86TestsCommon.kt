@@ -57,12 +57,26 @@ class BIP86TestsCommon {
 
     @Test
     fun `compute more taproot addresses`() {
+        // addresses created by bitcoin core with a wallet imported with descriptor "tr(tprv8ZgxMBicQKsPdyyuveRPhVYogdPXBDqRiUXDo5TcLKe3f9YfonipqbgJD7pCXdovZTfTyj6SjZ928SkPunnDTiXV7Y2HSsG9XAGki6n8dRF/86h/1h/0h/0/*)"
+        val expected = listOf(
+            "tb1pufpxa6zyvkdrz52qhtt9r5hl7pts7r3a5anndeupt0yqys8s8s6q662987",
+            "tb1pa978mqd3rfj0k33ef4u7nrc7qh3s08wy9fd3sfl770c9fqc5mh5qzgpymf",
+            "tb1pm3xkwh3av3mlsr25mvk320lq94xpjzkv9l3u8x5w8ppwz5nfpqgqpjaehc",
+            "tb1pdyzhpg5yletzl07yks0eqwgxkddf23cy6vj64wd42tpc0xnglsvs7xd0zd",
+            "tb1pks4qar2hlhvpzcuw6tj77x3xunt9jcgnm4lk6eu5d765vxv94sfsjw8qp2",
+            "tb1pdtjstl80rtl7lwuhktfw86sv0g65079sh6gsaa9qg6lcrph6xmsqtcn70y",
+            "tb1p6tlajumgdvlhfm6m8h3v5zche4dvfk3ey60vpux5wqeaysm6apuqm987j9",
+            "tb1pn0w8e85ml8chl2vda83euynvrxtelpww8m2mnzf3ugpc7w6zl3lqdd7afu",
+            "tb1px03j0r6kru2nrwtq04m8v54q8t3shkfk7vgh704as5kfd0fanalqygu53c",
+            "tb1ps0qzx37ckd0cx209qa65q4kxha7kcr8vx63hgv6wk2y7jwqxq6lsnz4wue"
+
+        )
         val (_, master) = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPdyyuveRPhVYogdPXBDqRiUXDo5TcLKe3f9YfonipqbgJD7pCXdovZTfTyj6SjZ928SkPunnDTiXV7Y2HSsG9XAGki6n8dRF")
-        for (i in 0..10) {
+        for (i in 0 until  10) {
             val key = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0/$i")
             val internalKey = XonlyPublicKey(key.publicKey)
             val outputKey = internalKey.outputKey(null).first
-            println(Bech32.encodeWitnessAddress("bcrt", 1, outputKey.value.toByteArray()))
+            assertEquals(expected[i], Bech32.encodeWitnessAddress("tb", 1, outputKey.value.toByteArray()))
         }
     }
 }

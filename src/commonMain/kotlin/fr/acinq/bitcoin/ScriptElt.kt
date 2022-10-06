@@ -383,9 +383,7 @@ public object OP_NOP10 : ScriptElt() {
 public object OP_CHECKSIGADD: ScriptElt() {
     override val code: Int get() = 0xba
 }
-public object OP_SMALLINTEGER : ScriptElt() {
-    override val code: Int get() = 0xfa
-}
+
 public object OP_INVALIDOPCODE : ScriptElt() {
     override val code: Int get() = 0xff
 }
@@ -554,7 +552,6 @@ public object ScriptEltMapping {
         OP_NOP9,
         OP_NOP10,
         OP_CHECKSIGADD,
-        OP_SMALLINTEGER,
         OP_INVALIDOPCODE
     )
     // code -> ScriptElt

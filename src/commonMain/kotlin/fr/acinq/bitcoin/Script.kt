@@ -1485,7 +1485,7 @@ public object Script {
                     if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_TAPROOT) == 0) return
                     require(witness.stack.isNotEmpty()) { "Witness program cannot be empty" }
                     val (stack, annex) = when {
-                        witness.stack.size >= 2 && witness.stack.last()[0] == 0x50.toByte() -> Pair(witness.stack.dropLast(1), witness.stack.last())
+                        witness.stack.size >= 2 && !witness.stack.last().isEmpty() && witness.stack.last()[0] == 0x50.toByte() -> Pair(witness.stack.dropLast(1), witness.stack.last())
                         else -> Pair(witness.stack, null)
                     }
                     this.context.executionData = this.context.executionData.copy(annex = annex)

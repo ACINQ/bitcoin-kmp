@@ -64,7 +64,7 @@ class BIP341TestsCommon {
                 val hash = Transaction.hashForSigningSchnorr(rawUnsignedTx, txinIndex, utxosSpent, hashType, 0)
                 assertEquals(ByteVector32(intermediary["sigHash"]!!.jsonPrimitive.content), hash)
 
-                val sig = Crypto.signSchnorr(hash, internalPrivkey, merkleRoot ?: ByteVector32.Zeroes)
+                val sig = Crypto.signSchnorr(hash, internalPrivkey, if (merkleRoot == null) Crypto.SchnorrTweak.NoScriptTweak else Crypto.SchnorrTweak.ScriptTweak(merkleRoot))
                 val witness = when (hashType) {
                     SigHash.SIGHASH_DEFAULT -> sig
                     else -> (sig + byteArrayOf(hashType.toByte()))

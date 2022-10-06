@@ -744,7 +744,7 @@ public object Script {
 
         /**
          * internal execution loop.
-         * it uses an indexed list of script elements because we may need o know the exact position of an element in the original script
+         * it uses an indexed list of script elements because we may need to know the exact position of an element in the original script
          */
         private tailrec fun runInternal(
             script: List<IndexedValue<ScriptElt>>,

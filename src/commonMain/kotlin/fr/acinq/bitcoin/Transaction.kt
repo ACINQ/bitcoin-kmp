@@ -687,6 +687,7 @@ public data class Transaction(
          * @param inputs UTXOs spent by this transaction
          * @param sighashType signature hash type
          * @param sigVersion signature version
+         * @param executionData execution context of a transaction script
          */
         @JvmStatic
         public fun hashForSigningSchnorr(

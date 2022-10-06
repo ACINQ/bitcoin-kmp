@@ -15,6 +15,7 @@
  */
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.Bech32.hrp
 import fr.acinq.bitcoin.Bitcoin.addressToPublicKeyScript
 import fr.acinq.bitcoin.Transaction.Companion.hashForSigningSchnorr
 import fr.acinq.secp256k1.Secp256k1
@@ -214,7 +215,7 @@ class TaprootTestsCommon {
     }
 
     @Test
-    fun `create pay-to-script transactions`() {
+    fun `create pay-to-script transactions on signet`() {
         // we create 3 private keys, and simple scripts: pay to key #1, pay to key #2, pay to key #3
         val privs = arrayOf(
             PrivateKey(ByteVector32("0101010101010101010101010101010101010101010101010101010101010101")),
@@ -232,6 +233,7 @@ class TaprootTestsCommon {
             leaves[2]
         )
         val merkleRoot = ScriptTree.hash(scriptTree)
+        val blockchain = Block.SignetGenesisBlock.hash
 
         // we use key #1 as our internal key
         val internalPubkey = XonlyPublicKey(privs[0].publicKey())
@@ -239,35 +241,45 @@ class TaprootTestsCommon {
 
         // this is the tapscript we send funds to
         val script = Script.write(listOf(OP_1, OP_PUSHDATA(tweakedKey.value))).byteVector()
-        val bip350Address = Bech32.encodeWitnessAddress("bcrt", 1.toByte(), tweakedKey.value.toByteArray())
+        val bip350Address = Bech32.encodeWitnessAddress(hrp(blockchain), 1.toByte(), tweakedKey.value.toByteArray())
+        assertEquals(bip350Address, "tb1p78gx95syx0qz8w5nftk8t7nce78zlpqpsxugcvq5xpfy4tvn6rasd7wk0y")
+        val sweepPublicKeyScript = addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7")
 
-        val fundingTx = Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(Satoshi(1000000), listOf(OP_1, OP_PUSHDATA(tweakedKey)))), lockTime = 0)
+        // see https://mempool.space/signet/tx/c284010f06b5182e9f4722ce3474980339b1fc76e5ff29ece812f5d2162595c1
+        val fundingTx = Transaction.read("020000000001017034061243a7770f791aa2afdb118be900f4f8fc755a36d8632213acc139bab20100000000feffffff0200e1f50500000000225120f1d062d20433c023ba934aec75fa78cf8e2f840181b88c301430524aad93d0fbc192ac1700000000160014b66f2e807b9f4adecb99ad811dde501ca3f0fd5f02473044022046a2fd077e12b1d7ba74f6e7ac469deb3e3755c100216abad667980fc39463dc022018b63cfaf72fde0b5ca10c617aeaa0015013bd06ef08f82eea500c6467d963cc0121030b50ec81d958ae79d34d3579faf72456213d7d581a908e2b64d21b96777882043ab10100")
 
         // output #1 is the one we want to spend
         assertEquals(fundingTx.txOut[0].publicKeyScript, script)
-        assertEquals(addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, bip350Address), listOf(OP_1, OP_PUSHDATA(tweakedKey.value)))
+        assertEquals(addressToPublicKeyScript(blockchain, bip350Address), listOf(OP_1, OP_PUSHDATA(tweakedKey.value)))
 
         // spending with the key path: no need to provide any script
         val tx = run {
             val tmp = Transaction(
                 version = 2,
                 txIn = listOf(TxIn(OutPoint(fundingTx, 0), TxIn.SEQUENCE_FINAL)),
-                txOut = listOf(TxOut(fundingTx.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, "bcrt1qdtu5cwyngza8hw8s5uk2erlrkh8ceh3msp768v"))),
+                txOut = listOf(TxOut(fundingTx.txOut[0].amount - Satoshi(5000), sweepPublicKeyScript)),
                 lockTime = 0
             )
             val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, 0)
             // we still need to know the merkle root of the tapscript tree
-            val sig = Crypto.signSchnorr(hash, privs[0], merkleRoot)
+            val sig = Crypto.signSchnorr(hash, privs[0], merkleRoot) // signature for key spend
             tmp.updateWitness(0, ScriptWitness(listOf(sig)))
         }
+
+        // see: https://mempool.space/signet/tx/de3e4dcf07e68c7b237269eee75b926b9d147869f6317031b0550dcbf509ff5b
+        assertEquals(tx.toString(), "02000000000101c1952516d2f512e8ec29ffe576fcb13903987434ce22479f2e18b5060f0184c20000000000ffffffff0178cdf50500000000160014310b7b9acef217ed007ba904eac9fa45ad5cb064014004174022193d585759ce094bbe47ff23eef0238aaa89a89a0d04c80fa321c9b9056623282c49cfa7388409af5ef9a1ab7e3733b72637edcfb15019018d4d7f5a00000000")
         Transaction.correctlySpends(tx, fundingTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+
+        // see https://mempool.space/signet/tx/193962bdc619a1c6f28e3989603a229055b544ee9e12c5ca8cc0a694babd8506
+        val fundingTx1 = Transaction.read("020000000001032c94e663cbee0edbdb4375bb2e79be60f8ecfa4e936a14e9a054b1c8923928570000000000feffffff308788df38f369e33bcd70765c171a9796d910b02525a550bfe4d2a2cf8a710c0100000000feffffff94dc10cd523655b0323e90428d720b378b91de312e56908325df6878c530d30d0000000000feffffff0200e1f50500000000225120f1d062d20433c023ba934aec75fa78cf8e2f840181b88c301430524aad93d0fb8b4f174e020000001600140e361914cb87862fb6ea24193331d6591b59859002463043021f5dcc64a2fef28bdd2b88b5d10851079cc98663a1284d0569bdde5afc558fb202205c2bcdcf1dae62b2c32e8cf6ac6cb2534b70b1889be893da170564a8c4d40f2001210270b71142cd209ddd686ef013adaeb12b641fde95d589a5a607ee0b6c95cc086202473044022034121d55d61376aee90f6b975522b6bad85491448d527b83f6dacbdddcd9548202201a0a9405542ae06239fabdc01069fe2518ee7340ed400d4db2d92604f9d454d601210319b3ad1b37d95ab41034cd810799149501e62ab6d009a6a4eca6034f78ca725b024730440220487663d7740eaa5370673f4807497970feb2d69c83cae281d89fef8aa616259a02200a21dc493e455c2980bc245224eb67aba576f732f77af0fd555a5f44fa205e4d0121023a34e31279a234431b349fd229790038c95c837a8139862df9cbb1226d63c4003eb10100")
+        assertEquals(fundingTx1.txOut[0].publicKeyScript, script)
 
         // spending with script #1
         val tx1 = run {
             val tmp = Transaction(
                 version = 2,
-                txIn = listOf(TxIn(OutPoint(fundingTx, 0), TxIn.SEQUENCE_FINAL)),
-                txOut = listOf(TxOut(fundingTx.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, "bcrt1qdtu5cwyngza8hw8s5uk2erlrkh8ceh3msp768v"))),
+                txIn = listOf(TxIn(OutPoint(fundingTx1, 0), TxIn.SEQUENCE_FINAL)),
+                txOut = listOf(TxOut(fundingTx1.txOut[0].amount - Satoshi(5000), sweepPublicKeyScript)),
                 lockTime = 0
             )
             // to re-compute the merkle root we need to provide leaves #2 and #3
@@ -276,18 +288,25 @@ class TaprootTestsCommon {
                     ScriptTree.hash(leaves[1]).toByteArray() +
                     ScriptTree.hash(leaves[2]).toByteArray()
             val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[0])))
-            val sig = Crypto.signSchnorr(hash, privs[0], null)
+            val sig = Crypto.signSchnorr(hash, privs[0], null) // signature for script spend of leaf #1
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[0]).byteVector(), controlBlock.byteVector())))
         }
-        Transaction.correctlySpends(tx1, fundingTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+
+        // see: https://mempool.space/signet/tx/5586515f9ed7fce8b7e8be97a8681c298a94166ff95e15edd94226edec50d9ea
+        assertEquals(tx1.toString(), "020000000001010685bdba94a6c08ccac5129eee44b55590223a6089398ef2c6a119c6bd6239190000000000ffffffff0178cdf50500000000160014310b7b9acef217ed007ba904eac9fa45ad5cb0640340c6aaa48614bfa03b8cb3c56c84df6214ca223d11b63a7d2dbd67ad4dbb13ccc5ee26890e68b655dfa371fefe8e0117eee854fc3538cbe453ebe6c9ae9d12111022201b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078fac61c01b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f4b756b9676af737379eb8b2767da3e68df7b59757b9f67cb0d21bb5a63ccc1a8a7b49fc07e0495843b92705136c98e1e64d19bf40303f0c2e32d9c58413b770200000000")
+        Transaction.correctlySpends(tx1, fundingTx1, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+
+        // see https://mempool.space/signet/tx/b4dfa342b434709e1b4fd46a2caf7661a195267445ba4402bb2364b174edc5a6
+        val fundingTx2 = Transaction.read("02000000000101c1952516d2f512e8ec29ffe576fcb13903987434ce22479f2e18b5060f0184c20100000000feffffff0200e1f50500000000225120f1d062d20433c023ba934aec75fa78cf8e2f840181b88c301430524aad93d0fb28b1b61100000000160014665ea2d5f8f03b7edc82472baed5ba28dcd22a9f024730440220014381ea4fc0e96733231b84bf9d24ee6d197147c2d2842c896530103c9c23310220384d174f4578767f2117c558671e592ea497f0680cedbacc73dc3f4c316f6b73012102d2212f3a1ef1a797be1fbe8ac784eb81158957339cab89e32faa6f73cc9bf6713fb10100")
+        assertEquals(fundingTx2.txOut[0].publicKeyScript, script)
 
         // spending with script #2
         // it's basically the same as for key #1
         val tx2 = run {
             val tmp = Transaction(
                 version = 2,
-                txIn = listOf(TxIn(OutPoint(fundingTx, 0), TxIn.SEQUENCE_FINAL)),
-                txOut = listOf(TxOut(fundingTx.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, "bcrt1qdtu5cwyngza8hw8s5uk2erlrkh8ceh3msp768v"))),
+                txIn = listOf(TxIn(OutPoint(fundingTx2, 0), TxIn.SEQUENCE_FINAL)),
+                txOut = listOf(TxOut(fundingTx2.txOut[0].amount - Satoshi(5000), sweepPublicKeyScript)),
                 lockTime = 0
             )
             // to re-compute the merkle root we need to provide leaves #1 and #3
@@ -295,28 +314,38 @@ class TaprootTestsCommon {
                     internalPubkey.value.toByteArray() +
                     ScriptTree.hash(leaves[0]).toByteArray() +
                     ScriptTree.hash(leaves[2]).toByteArray()
-            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[1])))
-            val sig = Crypto.signSchnorr(hash, privs[1], null)
+            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx2.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[1])))
+            val sig = Crypto.signSchnorr(hash, privs[1], null) // signature for script spend of leaf #2
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[1]).byteVector(), controlBlock.byteVector())))
         }
-        Transaction.correctlySpends(tx2, fundingTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+
+        // see: https://mempool.space/signet/tx/5586515f9ed7fce8b7e8be97a8681c298a94166ff95e15edd94226edec50d9ea
+        assertEquals(tx2.toString(), "02000000000101a6c5ed74b16423bb0244ba45742695a16176af2c6ad44f1b9e7034b442a3dfb40000000000ffffffff0178cdf50500000000160014310b7b9acef217ed007ba904eac9fa45ad5cb06403409ded7b5094a959650a725f4c1d87f5ba17904a14085ad5ec65c4b2ebb817c8e9193a31091ad3c9ac393bc394dd2a85f2456908cc2209760540e5094b32ccec392220c050c3f0b8d45b9e093a91cb96d097b24100e66585d0d8561e01c1231837493fac61c01b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078fb3377ed08656d10020a2669defa10b1493771fbd61be8e3dbe2d8232a6b9805ca7b49fc07e0495843b92705136c98e1e64d19bf40303f0c2e32d9c58413b770200000000")
+        Transaction.correctlySpends(tx2, fundingTx2, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+
+        // see https://mempool.space/signet/tx/97196e1dc3ee089955d2a738143a66a34166d0c7f0a85d8ad4ba2c972dc0555c
+        val fundingTx3 = Transaction.read("020000000001025bff09f5cb0d55b0317031f66978149d6b925be7ee6972237b8ce607cf4d3ede0000000000feffffffead950eced2642d9ed155ef96f16948a291c68a897bee8b7e8fcd79e5f5186550000000000feffffff0214b9f50500000000160014faf51bb67e3e35a93aa549cf2c8d24763d8162ce00e1f50500000000225120f1d062d20433c023ba934aec75fa78cf8e2f840181b88c301430524aad93d0fb0247304402201989eb9d1f4d976a9f0bf512e7f1fa784c45eee369a6c13511162a463c89935002201a1d41e53c56600137a851d0c26daaffd6aa30197fbf9221daf6cbca458fb40f012102238ee9a8b833398e3421c809e7ac75089e4e738841577273fe87d3cd14a22cf202473044022035e887ced3bb03f54cce39e4cdecf93b787765c51de2545a16c97fec67d3085b02200bd15d5497d1a9be37ad29142673ef2cdc0cee69f6a9cf5643c376a4b4f81489012102238ee9a8b833398e3421c809e7ac75089e4e738841577273fe87d3cd14a22cf290b10100")
+        assertEquals(fundingTx3.txOut[1].publicKeyScript, script)
 
         // spending with script #3
         val tx3 = run {
             val tmp = Transaction(
                 version = 2,
-                txIn = listOf(TxIn(OutPoint(fundingTx, 0), TxIn.SEQUENCE_FINAL)),
-                txOut = listOf(TxOut(fundingTx.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, "bcrt1qdtu5cwyngza8hw8s5uk2erlrkh8ceh3msp768v"))),
+                txIn = listOf(TxIn(OutPoint(fundingTx3, 1), TxIn.SEQUENCE_FINAL)),
+                txOut = listOf(TxOut(fundingTx3.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7"))),
                 lockTime = 0
             )
             // to re-compute the merkle root we need to provide branch(#1, #2)
             val controlBlock = byteArrayOf((Script.TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte()) +
                     internalPubkey.value.toByteArray() +
                     ScriptTree.hash(ScriptTree.Branch(leaves[0], leaves[1])).toByteArray()
-            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[2])))
-            val sig = Crypto.signSchnorr(hash, privs[2], null)
+            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx3.txOut[1]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[2])))
+            val sig = Crypto.signSchnorr(hash, privs[2], null) // signature for script spend of leaf #3
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[2]).byteVector(), controlBlock.byteVector())))
         }
-        Transaction.correctlySpends(tx3, fundingTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+
+        // see: https://mempool.space/signet/tx/2eb421e044de0535aa3d14a5a4c325ba8b5181440bbd911b5b43718b686b09a8
+        assertEquals(tx3.toString(), "020000000001015c55c02d972cbad48a5da8f0c7d06641a3663a1438a7d2559908eec31d6e19970100000000ffffffff018ca5f50500000000160014310b7b9acef217ed007ba904eac9fa45ad5cb0640340c10da2636457db468385345303e984ee949d0815745f5dcba67cde603ef02738b6f26f6c44beef0a93d9fcbb82571d215ca2cf04a1894ce01d2eaf7b6068260a2220a4fbd2c1822592c0ae8afa0e63a0d4c56a571179e93fd61615627f419fd0be9aac41c01b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f35b9c8be6dc0c33d6ce3cc9d3ba04c509b3f5b0139254f67d3184a5a238901f400000000")
+        Transaction.correctlySpends(tx3, fundingTx3, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
 }

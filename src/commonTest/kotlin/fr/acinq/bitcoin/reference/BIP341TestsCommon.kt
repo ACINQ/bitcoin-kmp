@@ -56,15 +56,16 @@ class BIP341TestsCommon {
                 val internalPubkey = XonlyPublicKey(internalPrivkey.publicKey())
                 val intermediary = it.jsonObject["intermediary"]!!.jsonObject
                 assertEquals(ByteVector32(intermediary["internalPubkey"]!!.jsonPrimitive.content), internalPubkey.value)
-                assertEquals(ByteVector32(intermediary["tweak"]!!.jsonPrimitive.content), internalPubkey.tweak(merkleRoot))
+                val tweak = internalPubkey.tweak(if (merkleRoot == null) Crypto.SchnorrTweak.NoScriptTweak else Crypto.SchnorrTweak.ScriptTweak(merkleRoot))
+                assertEquals(ByteVector32(intermediary["tweak"]!!.jsonPrimitive.content), tweak)
 
-                val tweakedPrivateKey = internalPrivkey.tweak(internalPubkey.tweak(merkleRoot))
+                val tweakedPrivateKey = internalPrivkey.tweak(tweak)
                 assertEquals(ByteVector32(intermediary["tweakedPrivkey"]!!.jsonPrimitive.content), tweakedPrivateKey.value)
 
                 val hash = Transaction.hashForSigningSchnorr(rawUnsignedTx, txinIndex, utxosSpent, hashType, 0)
                 assertEquals(ByteVector32(intermediary["sigHash"]!!.jsonPrimitive.content), hash)
 
-                val sig = Crypto.signSchnorr(hash, internalPrivkey, merkleRoot ?: ByteVector32.Zeroes)
+                val sig = Crypto.signSchnorr(hash, internalPrivkey, if (merkleRoot == null) Crypto.SchnorrTweak.NoScriptTweak else Crypto.SchnorrTweak.ScriptTweak(merkleRoot))
                 val witness = when (hashType) {
                     SigHash.SIGHASH_DEFAULT -> sig
                     else -> (sig + byteArrayOf(hashType.toByte()))
@@ -90,7 +91,7 @@ class BIP341TestsCommon {
 
             val intermediary = it.jsonObject["intermediary"]!!.jsonObject
             val merkleRoot = scriptTree?.let { ScriptTree.hash(it) }
-            val (tweakedKey, parity) = internalPubkey.outputKey(merkleRoot)
+            val (tweakedKey, parity) = internalPubkey.outputKey(if (merkleRoot == null) Crypto.SchnorrTweak.NoScriptTweak else Crypto.SchnorrTweak.ScriptTweak(merkleRoot))
             merkleRoot?.let { assertEquals(ByteVector32(intermediary["merkleRoot"]!!.jsonPrimitive.content), it) }
             assertEquals(ByteVector32(intermediary["tweakedPubkey"]!!.jsonPrimitive.content), tweakedKey.value)
 

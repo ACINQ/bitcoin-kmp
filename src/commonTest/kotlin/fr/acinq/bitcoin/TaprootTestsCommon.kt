@@ -28,7 +28,7 @@ class TaprootTestsCommon {
         val (_, master) = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPeQQADibg4WF7mEasy3piWZUHyThAzJCPNgMHDVYhTCVfev3jFbDhcYm4GimeFMbbi9z1d9rfY1aL5wfJ9mNebQ4thJ62EJb")
         val key = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0/1")
         val internalKey = XonlyPublicKey(key.publicKey)
-        val outputKey = internalKey.outputKey(null).first
+        val outputKey = internalKey.outputKey(Crypto.SchnorrTweak.NoScriptTweak).first
         assertEquals("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c", Bech32.encodeWitnessAddress("tb", 1, outputKey.value.toByteArray()))
 
         // tx sends to tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c
@@ -69,7 +69,7 @@ class TaprootTestsCommon {
     fun `send to and spend from taproot addresses`() {
         val privateKey = PrivateKey(ByteVector32("0101010101010101010101010101010101010101010101010101010101010101"))
         val internalKey = XonlyPublicKey(privateKey.publicKey())
-        val outputKey = internalKey.outputKey(null).first
+        val outputKey = internalKey.outputKey(Crypto.SchnorrTweak.NoScriptTweak).first
         val address = Bech32.encodeWitnessAddress("tb", 1, outputKey.value.toByteArray())
         assertEquals("tb1p33wm0auhr9kkahzd6l0kqj85af4cswn276hsxg6zpz85xe2r0y8snwrkwy", address)
 
@@ -175,7 +175,7 @@ class TaprootTestsCommon {
         val merkleRoot = ScriptTree.hash(scriptTree)
         // we choose a pubkey that does not have a corresponding private key: our funding tx can only be spent through the script path, not the key path
         val internalPubkey = XonlyPublicKey(PublicKey.fromHex("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"))
-        val (tweakedKey, parity) = internalPubkey.outputKey(merkleRoot)
+        val (tweakedKey, parity) = internalPubkey.outputKey(Crypto.SchnorrTweak.ScriptTweak(merkleRoot))
 
         // funding tx sends to our tapscript
         val fundingTx = Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(Satoshi(1000000), listOf(OP_1, OP_PUSHDATA(tweakedKey)))), lockTime = 0)
@@ -237,7 +237,7 @@ class TaprootTestsCommon {
 
         // we use key #1 as our internal key
         val internalPubkey = XonlyPublicKey(privs[0].publicKey())
-        val (tweakedKey, parity) = internalPubkey.outputKey(merkleRoot)
+        val (tweakedKey, parity) = internalPubkey.outputKey(Crypto.SchnorrTweak.ScriptTweak(merkleRoot))
 
         // this is the tapscript we send funds to
         val script = Script.write(listOf(OP_1, OP_PUSHDATA(tweakedKey.value))).byteVector()

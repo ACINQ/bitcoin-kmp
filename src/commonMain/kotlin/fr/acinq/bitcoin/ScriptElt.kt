@@ -20,6 +20,8 @@ import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 public sealed class ScriptElt {
+    public abstract val code: Int
+
     public fun isPush(size: Int): Boolean = isPush(this, size)
 
     public fun isPush(): Boolean = isPush(this)
@@ -44,122 +46,352 @@ public sealed class ScriptElt {
 }
 
 // @formatter:off
-public object OP_0 : ScriptElt()
-public object OP_PUSHDATA1 : ScriptElt()
-public object OP_PUSHDATA2 : ScriptElt()
-public object OP_PUSHDATA4 : ScriptElt()
-public object OP_1NEGATE : ScriptElt()
-public object OP_RESERVED : ScriptElt()
-public object OP_1 : ScriptElt()
-public object OP_2 : ScriptElt()
-public object OP_3 : ScriptElt()
-public object OP_4 : ScriptElt()
-public object OP_5 : ScriptElt()
-public object OP_6 : ScriptElt()
-public object OP_7 : ScriptElt()
-public object OP_8 : ScriptElt()
-public object OP_9 : ScriptElt()
-public object OP_10 : ScriptElt()
-public object OP_11 : ScriptElt()
-public object OP_12 : ScriptElt()
-public object OP_13 : ScriptElt()
-public object OP_14 : ScriptElt()
-public object OP_15 : ScriptElt()
-public object OP_16 : ScriptElt()
-public object OP_NOP : ScriptElt()
-public object OP_VER : ScriptElt()
-public object OP_IF : ScriptElt()
-public object OP_NOTIF : ScriptElt()
-public object OP_VERIF : ScriptElt()
-public object OP_VERNOTIF : ScriptElt()
-public object OP_ELSE : ScriptElt()
-public object OP_ENDIF : ScriptElt()
-public object OP_VERIFY : ScriptElt()
-public object OP_RETURN : ScriptElt()
-public object OP_TOALTSTACK : ScriptElt()
-public object OP_FROMALTSTACK : ScriptElt()
-public object OP_2DROP : ScriptElt()
-public object OP_2DUP : ScriptElt()
-public object OP_3DUP : ScriptElt()
-public object OP_2OVER : ScriptElt()
-public object OP_2ROT : ScriptElt()
-public object OP_2SWAP : ScriptElt()
-public object OP_IFDUP : ScriptElt()
-public object OP_DEPTH : ScriptElt()
-public object OP_DROP : ScriptElt()
-public object OP_DUP : ScriptElt()
-public object OP_NIP : ScriptElt()
-public object OP_OVER : ScriptElt()
-public object OP_PICK : ScriptElt()
-public object OP_ROLL : ScriptElt()
-public object OP_ROT : ScriptElt()
-public object OP_SWAP : ScriptElt()
-public object OP_TUCK : ScriptElt()
-public object OP_CAT : ScriptElt()
-public object OP_SUBSTR : ScriptElt()
-public object OP_LEFT : ScriptElt()
-public object OP_RIGHT : ScriptElt()
-public object OP_SIZE : ScriptElt()
-public object OP_INVERT : ScriptElt()
-public object OP_AND : ScriptElt()
-public object OP_OR : ScriptElt()
-public object OP_XOR : ScriptElt()
-public object OP_EQUAL : ScriptElt()
-public object OP_EQUALVERIFY : ScriptElt()
-public object OP_RESERVED1 : ScriptElt()
-public object OP_RESERVED2 : ScriptElt()
-public object OP_1ADD : ScriptElt()
-public object OP_1SUB : ScriptElt()
-public object OP_2MUL : ScriptElt()
-public object OP_2DIV : ScriptElt()
-public object OP_NEGATE : ScriptElt()
-public object OP_ABS : ScriptElt()
-public object OP_NOT : ScriptElt()
-public object OP_0NOTEQUAL : ScriptElt()
-public object OP_ADD : ScriptElt()
-public object OP_SUB : ScriptElt()
-public object OP_MUL : ScriptElt()
-public object OP_DIV : ScriptElt()
-public object OP_MOD : ScriptElt()
-public object OP_LSHIFT : ScriptElt()
-public object OP_RSHIFT : ScriptElt()
-public object OP_BOOLAND : ScriptElt()
-public object OP_BOOLOR : ScriptElt()
-public object OP_NUMEQUAL : ScriptElt()
-public object OP_NUMEQUALVERIFY : ScriptElt()
-public object OP_NUMNOTEQUAL : ScriptElt()
-public object OP_LESSTHAN : ScriptElt()
-public object OP_GREATERTHAN : ScriptElt()
-public object OP_LESSTHANOREQUAL : ScriptElt()
-public object OP_GREATERTHANOREQUAL : ScriptElt()
-public object OP_MIN : ScriptElt()
-public object OP_MAX : ScriptElt()
-public object OP_WITHIN : ScriptElt()
-public object OP_RIPEMD160 : ScriptElt()
-public object OP_SHA1 : ScriptElt()
-public object OP_SHA256 : ScriptElt()
-public object OP_HASH160 : ScriptElt()
-public object OP_HASH256 : ScriptElt()
-public object OP_CODESEPARATOR : ScriptElt()
-public object OP_CHECKSIG : ScriptElt()
-public object OP_CHECKSIGVERIFY : ScriptElt()
-public object OP_CHECKMULTISIG : ScriptElt()
-public object OP_CHECKMULTISIGVERIFY : ScriptElt()
-public object OP_NOP1 : ScriptElt()
-public object OP_CHECKLOCKTIMEVERIFY : ScriptElt()
-public object OP_CHECKSEQUENCEVERIFY : ScriptElt()
-public object OP_NOP4 : ScriptElt()
-public object OP_NOP5 : ScriptElt()
-public object OP_NOP6 : ScriptElt()
-public object OP_NOP7 : ScriptElt()
-public object OP_NOP8 : ScriptElt()
-public object OP_NOP9 : ScriptElt()
-public object OP_NOP10 : ScriptElt()
-public object OP_SMALLINTEGER : ScriptElt()
-public object OP_INVALIDOPCODE : ScriptElt()
+public object OP_0 : ScriptElt() {
+    override val code: Int get() = 0x00
+}
+public object OP_PUSHDATA1 : ScriptElt() {
+    override val code: Int get() = 0x4c
+}
+public object OP_PUSHDATA2 : ScriptElt() {
+    override val code: Int get() = 0x4d
+}
+public object OP_PUSHDATA4 : ScriptElt() {
+    override val code: Int get() = 0x4e
+}
+public object OP_1NEGATE : ScriptElt() {
+    override val code: Int get() = 0x4f
+}
+public object OP_RESERVED : ScriptElt() {
+    override val code: Int get() = 0x50
+}
+public object OP_1 : ScriptElt() {
+    override val code: Int get() = 0x51
+}
+public object OP_2 : ScriptElt() {
+    override val code: Int get() = 0x52
+}
+public object OP_3 : ScriptElt() {
+    override val code: Int get() = 0x53
+}
+public object OP_4 : ScriptElt() {
+    override val code: Int get() = 0x54
+}
+public object OP_5 : ScriptElt() {
+    override val code: Int get() = 0x55
+}
+public object OP_6 : ScriptElt() {
+    override val code: Int get() = 0x56
+}
+public object OP_7 : ScriptElt() {
+    override val code: Int get() = 0x57
+}
+public object OP_8 : ScriptElt() {
+    override val code: Int get() = 0x58
+}
+public object OP_9 : ScriptElt() {
+    override val code: Int get() = 0x59
+}
+public object OP_10 : ScriptElt() {
+    override val code: Int get() = 0x5a
+}
+public object OP_11 : ScriptElt() {
+    override val code: Int get() = 0x5b
+}
+public object OP_12 : ScriptElt() {
+    override val code: Int get() = 0x5c
+}
+public object OP_13 : ScriptElt() {
+    override val code: Int get() = 0x5d
+}
+public object OP_14 : ScriptElt() {
+    override val code: Int get() = 0x5e
+}
+public object OP_15 : ScriptElt() {
+    override val code: Int get() = 0x5f
+}
+public object OP_16 : ScriptElt() {
+    override val code: Int get() = 0x60
+}
+public object OP_NOP : ScriptElt() {
+    override val code: Int get() = 0x61
+}
+public object OP_VER : ScriptElt() {
+    override val code: Int get() = 0x62
+}
+public object OP_IF : ScriptElt() {
+    override val code: Int get() = 0x63
+}
+public object OP_NOTIF : ScriptElt() {
+    override val code: Int get() = 0x64
+}
+public object OP_VERIF : ScriptElt() {
+    override val code: Int get() = 0x65
+}
+public object OP_VERNOTIF : ScriptElt() {
+    override val code: Int get() = 0x66
+}
+public object OP_ELSE : ScriptElt() {
+    override val code: Int get() = 0x67
+}
+public object OP_ENDIF : ScriptElt() {
+    override val code: Int get() = 0x68
+}
+public object OP_VERIFY : ScriptElt() {
+    override val code: Int get() = 0x69
+}
+public object OP_RETURN : ScriptElt() {
+    override val code: Int get() = 0x6a
+}
+public object OP_TOALTSTACK : ScriptElt() {
+    override val code: Int get() = 0x6b
+}
+public object OP_FROMALTSTACK : ScriptElt() {
+    override val code: Int get() = 0x6c
+}
+public object OP_2DROP : ScriptElt() {
+    override val code: Int get() = 0x6d
+}
+public object OP_2DUP : ScriptElt() {
+    override val code: Int get() = 0x6e
+}
+public object OP_3DUP : ScriptElt() {
+    override val code: Int get() = 0x6f
+}
+public object OP_2OVER : ScriptElt() {
+    override val code: Int get() = 0x70
+}
+public object OP_2ROT : ScriptElt() {
+    override val code: Int get() = 0x71
+}
+public object OP_2SWAP : ScriptElt() {
+    override val code: Int get() = 0x72
+}
+public object OP_IFDUP : ScriptElt() {
+    override val code: Int get() = 0x73
+}
+public object OP_DEPTH : ScriptElt() {
+    override val code: Int get() = 0x74
+}
+public object OP_DROP : ScriptElt() {
+    override val code: Int get() = 0x75
+}
+public object OP_DUP : ScriptElt() {
+    override val code: Int get() = 0x76
+}
+public object OP_NIP : ScriptElt() {
+    override val code: Int get() = 0x77
+}
+public object OP_OVER : ScriptElt() {
+    override val code: Int get() = 0x78
+}
+public object OP_PICK : ScriptElt() {
+    override val code: Int get() = 0x79
+}
+public object OP_ROLL : ScriptElt() {
+    override val code: Int get() = 0x7a
+}
+public object OP_ROT : ScriptElt() {
+    override val code: Int get() = 0x7b
+}
+public object OP_SWAP : ScriptElt() {
+    override val code: Int get() = 0x7c
+}
+public object OP_TUCK : ScriptElt() {
+    override val code: Int get() = 0x7d
+}
+public object OP_CAT : ScriptElt() {
+    override val code: Int get() = 0x7e
+}
+public object OP_SUBSTR : ScriptElt() {
+    override val code: Int get() = 0x7f
+}
+public object OP_LEFT : ScriptElt() {
+    override val code: Int get() = 0x80
+}
+public object OP_RIGHT : ScriptElt() {
+    override val code: Int get() = 0x81
+}
+public object OP_SIZE : ScriptElt() {
+    override val code: Int get() = 0x82
+}
+public object OP_INVERT : ScriptElt() {
+    override val code: Int get() = 0x83
+}
+public object OP_AND : ScriptElt() {
+    override val code: Int get() = 0x84
+}
+public object OP_OR : ScriptElt() {
+    override val code: Int get() = 0x85
+}
+public object OP_XOR : ScriptElt() {
+    override val code: Int get() = 0x86
+}
+public object OP_EQUAL : ScriptElt() {
+    override val code: Int get() = 0x87
+}
+public object OP_EQUALVERIFY : ScriptElt() {
+    override val code: Int get() = 0x88
+}
+public object OP_RESERVED1 : ScriptElt() {
+    override val code: Int get() = 0x89
+}
+public object OP_RESERVED2 : ScriptElt() {
+    override val code: Int get() = 0x8a
+}
+public object OP_1ADD : ScriptElt() {
+    override val code: Int get() = 0x8b
+}
+public object OP_1SUB : ScriptElt() {
+    override val code: Int get() = 0x8c
+}
+public object OP_2MUL : ScriptElt() {
+    override val code: Int get() = 0x8d
+}
+public object OP_2DIV : ScriptElt() {
+    override val code: Int get() = 0x8e
+}
+public object OP_NEGATE : ScriptElt() {
+    override val code: Int get() = 0x8f
+}
+public object OP_ABS : ScriptElt() {
+    override val code: Int get() = 0x90
+}
+public object OP_NOT : ScriptElt() {
+    override val code: Int get() = 0x91
+}
+public object OP_0NOTEQUAL : ScriptElt() {
+    override val code: Int get() = 0x92
+}
+public object OP_ADD : ScriptElt() {
+    override val code: Int get() = 0x93
+}
+public object OP_SUB : ScriptElt() {
+    override val code: Int get() = 0x94
+}
+public object OP_MUL : ScriptElt() {
+    override val code: Int get() = 0x95
+}
+public object OP_DIV : ScriptElt() {
+    override val code: Int get() = 0x96
+}
+public object OP_MOD : ScriptElt() {
+    override val code: Int get() = 0x97
+}
+public object OP_LSHIFT : ScriptElt() {
+    override val code: Int get() = 0x98
+}
+public object OP_RSHIFT : ScriptElt() {
+    override val code: Int get() = 0x99
+}
+public object OP_BOOLAND : ScriptElt() {
+    override val code: Int get() = 0x9a
+}
+public object OP_BOOLOR : ScriptElt() {
+    override val code: Int get() = 0x9b
+}
+public object OP_NUMEQUAL : ScriptElt() {
+    override val code: Int get() = 0x9c
+}
+public object OP_NUMEQUALVERIFY : ScriptElt() {
+    override val code: Int get() = 0x9d
+}
+public object OP_NUMNOTEQUAL : ScriptElt() {
+    override val code: Int get() = 0x9e
+}
+public object OP_LESSTHAN : ScriptElt() {
+    override val code: Int get() = 0x9f
+}
+public object OP_GREATERTHAN : ScriptElt() {
+    override val code: Int get() = 0xa0
+}
+public object OP_LESSTHANOREQUAL : ScriptElt() {
+    override val code: Int get() = 0xa1
+}
+public object OP_GREATERTHANOREQUAL : ScriptElt() {
+    override val code: Int get() = 0xa2
+}
+public object OP_MIN : ScriptElt() {
+    override val code: Int get() = 0xa3
+}
+public object OP_MAX : ScriptElt() {
+    override val code: Int get() = 0xa4
+}
+public object OP_WITHIN : ScriptElt() {
+    override val code: Int get() = 0xa5
+}
+public object OP_RIPEMD160 : ScriptElt() {
+    override val code: Int get() = 0xa6
+}
+public object OP_SHA1 : ScriptElt() {
+    override val code: Int get() = 0xa7
+}
+public object OP_SHA256 : ScriptElt() {
+    override val code: Int get() = 0xa8
+}
+public object OP_HASH160 : ScriptElt() {
+    override val code: Int get() = 0xa9
+}
+public object OP_HASH256 : ScriptElt() {
+    override val code: Int get() = 0xaa
+}
+public object OP_CODESEPARATOR : ScriptElt() {
+    override val code: Int get() = 0xab
+}
+public object OP_CHECKSIG : ScriptElt() {
+    override val code: Int get() = 0xac
+}
+public object OP_CHECKSIGVERIFY : ScriptElt() {
+    override val code: Int get() = 0xad
+}
+public object OP_CHECKMULTISIG : ScriptElt() {
+    override val code: Int get() = 0xae
+}
+public object OP_CHECKMULTISIGVERIFY : ScriptElt() {
+    override val code: Int get() = 0xaf
+}
+public object OP_NOP1 : ScriptElt() {
+    override val code: Int get() = 0xb0
+}
+public object OP_CHECKLOCKTIMEVERIFY : ScriptElt() {
+    override val code: Int get() = 0xb1
+}
+public object OP_CHECKSEQUENCEVERIFY : ScriptElt() {
+    override val code: Int get() = 0xb2
+}
+public object OP_NOP4 : ScriptElt() {
+    override val code: Int get() = 0xb3
+}
+public object OP_NOP5 : ScriptElt() {
+    override val code: Int get() = 0xb4
+}
+public object OP_NOP6 : ScriptElt() {
+    override val code: Int get() = 0xb5
+}
+public object OP_NOP7 : ScriptElt() {
+    override val code: Int get() = 0xb6
+}
+public object OP_NOP8 : ScriptElt() {
+    override val code: Int get() = 0xb7
+}
+public object OP_NOP9 : ScriptElt() {
+    override val code: Int get() = 0xb8
+}
+public object OP_NOP10 : ScriptElt() {
+    override val code: Int get() = 0xb9
+}
+// Opcode added by BIP 342 (Tapscript)
+public object OP_CHECKSIGADD: ScriptElt() {
+    override val code: Int get() = 0xba
+}
+
+public object OP_INVALIDOPCODE : ScriptElt() {
+    override val code: Int get() = 0xff
+}
 // @formatter:on
 
-public data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val code: Int) : ScriptElt() {
+public data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val opCode: Int) : ScriptElt() {
+    override val code: Int get() = opCode
+
     public constructor(data: ByteArray, code: Int) : this(data.byteVector(), code)
 
     public constructor(data: ByteArray) : this(data, codeFromDataLength(data.count()))
@@ -169,6 +401,8 @@ public data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val code
     public constructor(data: ByteVector32) : this(data, codeFromDataLength(data.size()))
 
     public constructor(publicKey: PublicKey) : this(publicKey.value)
+
+    public constructor(publicKey: XonlyPublicKey) : this(publicKey.value)
 
     public companion object {
         @JvmStatic
@@ -188,12 +422,12 @@ public data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val code
         @JvmStatic
         public fun isMinimal(data: ByteArray, code: Int): Boolean {
             return when {
-                data.size == 0 -> code == ScriptEltMapping.elt2code[OP_0]
-                data.size == 1 && data[0] >= 1 && data[0] <= 16 -> code == (ScriptEltMapping.elt2code[OP_1])?.plus(data[0] - 1)
-                data.size == 1 && data[0] == 0x81.toByte() -> code == ScriptEltMapping.elt2code[OP_1NEGATE]
+                data.size == 0 -> code == OP_0.code
+                data.size == 1 && data[0] >= 1 && data[0] <= 16 -> code == (OP_1.code).plus(data[0] - 1)
+                data.size == 1 && data[0] == 0x81.toByte() -> code == OP_1NEGATE.code
                 data.size <= 75 -> code == data.size
-                data.size <= 255 -> code == ScriptEltMapping.elt2code[OP_PUSHDATA1]
-                data.size <= 65535 -> code == ScriptEltMapping.elt2code[OP_PUSHDATA2]
+                data.size <= 255 -> code == OP_PUSHDATA1.code
+                data.size <= 65535 -> code == OP_PUSHDATA2.code
                 else -> {
                     true
                 }
@@ -202,129 +436,127 @@ public data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val code
     }
 }
 
-public data class OP_INVALID(val code: Int) : ScriptElt()
+public data class OP_INVALID(override val code: Int) : ScriptElt()
 
 public object ScriptEltMapping {
+    public val elements: List<ScriptElt> = listOf(
+        OP_0,
+        OP_PUSHDATA1,
+        OP_PUSHDATA2,
+        OP_PUSHDATA4,
+        OP_1NEGATE,
+        OP_RESERVED,
+        OP_1,
+        OP_2,
+        OP_3,
+        OP_4,
+        OP_5,
+        OP_6,
+        OP_7,
+        OP_8,
+        OP_9,
+        OP_10,
+        OP_11,
+        OP_12,
+        OP_13,
+        OP_14,
+        OP_15,
+        OP_16,
+        OP_NOP,
+        OP_VER,
+        OP_IF,
+        OP_NOTIF,
+        OP_VERIF,
+        OP_VERNOTIF,
+        OP_ELSE,
+        OP_ENDIF,
+        OP_VERIFY,
+        OP_RETURN,
+        OP_TOALTSTACK,
+        OP_FROMALTSTACK,
+        OP_2DROP,
+        OP_2DUP,
+        OP_3DUP,
+        OP_2OVER,
+        OP_2ROT,
+        OP_2SWAP,
+        OP_IFDUP,
+        OP_DEPTH,
+        OP_DROP,
+        OP_DUP,
+        OP_NIP,
+        OP_OVER,
+        OP_PICK,
+        OP_ROLL,
+        OP_ROT,
+        OP_SWAP,
+        OP_TUCK,
+        OP_CAT,
+        OP_SUBSTR,
+        OP_LEFT,
+        OP_RIGHT,
+        OP_SIZE,
+        OP_INVERT,
+        OP_AND,
+        OP_OR,
+        OP_XOR,
+        OP_EQUAL,
+        OP_EQUALVERIFY,
+        OP_RESERVED1,
+        OP_RESERVED2,
+        OP_1ADD,
+        OP_1SUB,
+        OP_2MUL,
+        OP_2DIV,
+        OP_NEGATE,
+        OP_ABS,
+        OP_NOT,
+        OP_0NOTEQUAL,
+        OP_ADD,
+        OP_SUB,
+        OP_MUL,
+        OP_DIV,
+        OP_MOD,
+        OP_LSHIFT,
+        OP_RSHIFT,
+        OP_BOOLAND,
+        OP_BOOLOR,
+        OP_NUMEQUAL,
+        OP_NUMEQUALVERIFY,
+        OP_NUMNOTEQUAL,
+        OP_LESSTHAN,
+        OP_GREATERTHAN,
+        OP_LESSTHANOREQUAL,
+        OP_GREATERTHANOREQUAL,
+        OP_MIN,
+        OP_MAX,
+        OP_WITHIN,
+        OP_RIPEMD160,
+        OP_SHA1,
+        OP_SHA256,
+        OP_HASH160,
+        OP_HASH256,
+        OP_CODESEPARATOR,
+        OP_CHECKSIG,
+        OP_CHECKSIGVERIFY,
+        OP_CHECKMULTISIG,
+        OP_CHECKMULTISIGVERIFY,
+        OP_NOP1,
+        OP_CHECKLOCKTIMEVERIFY,
+        OP_CHECKSEQUENCEVERIFY,
+        OP_NOP4,
+        OP_NOP5,
+        OP_NOP6,
+        OP_NOP7,
+        OP_NOP8,
+        OP_NOP9,
+        OP_NOP10,
+        OP_CHECKSIGADD,
+        OP_INVALIDOPCODE
+    )
     // code -> ScriptElt
     @JvmField
-    public val code2elt: HashMap<Int, ScriptElt> = hashMapOf(
-        0x00 to OP_0,
-        0x4c to OP_PUSHDATA1,
-        0x4d to OP_PUSHDATA2,
-        0x4e to OP_PUSHDATA4,
-        0x4f to OP_1NEGATE,
-        0x50 to OP_RESERVED,
-        0x51 to OP_1,
-        0x52 to OP_2,
-        0x53 to OP_3,
-        0x54 to OP_4,
-        0x55 to OP_5,
-        0x56 to OP_6,
-        0x57 to OP_7,
-        0x58 to OP_8,
-        0x59 to OP_9,
-        0x5a to OP_10,
-        0x5b to OP_11,
-        0x5c to OP_12,
-        0x5d to OP_13,
-        0x5e to OP_14,
-        0x5f to OP_15,
-        0x60 to OP_16,
-        0x61 to OP_NOP,
-        0x62 to OP_VER,
-        0x63 to OP_IF,
-        0x64 to OP_NOTIF,
-        0x65 to OP_VERIF,
-        0x66 to OP_VERNOTIF,
-        0x67 to OP_ELSE,
-        0x68 to OP_ENDIF,
-        0x69 to OP_VERIFY,
-        0x6a to OP_RETURN,
-        0x6b to OP_TOALTSTACK,
-        0x6c to OP_FROMALTSTACK,
-        0x6d to OP_2DROP,
-        0x6e to OP_2DUP,
-        0x6f to OP_3DUP,
-        0x70 to OP_2OVER,
-        0x71 to OP_2ROT,
-        0x72 to OP_2SWAP,
-        0x73 to OP_IFDUP,
-        0x74 to OP_DEPTH,
-        0x75 to OP_DROP,
-        0x76 to OP_DUP,
-        0x77 to OP_NIP,
-        0x78 to OP_OVER,
-        0x79 to OP_PICK,
-        0x7a to OP_ROLL,
-        0x7b to OP_ROT,
-        0x7c to OP_SWAP,
-        0x7d to OP_TUCK,
-        0x7e to OP_CAT,
-        0x7f to OP_SUBSTR,
-        0x80 to OP_LEFT,
-        0x81 to OP_RIGHT,
-        0x82 to OP_SIZE,
-        0x83 to OP_INVERT,
-        0x84 to OP_AND,
-        0x85 to OP_OR,
-        0x86 to OP_XOR,
-        0x87 to OP_EQUAL,
-        0x88 to OP_EQUALVERIFY,
-        0x89 to OP_RESERVED1,
-        0x8a to OP_RESERVED2,
-        0x8b to OP_1ADD,
-        0x8c to OP_1SUB,
-        0x8d to OP_2MUL,
-        0x8e to OP_2DIV,
-        0x8f to OP_NEGATE,
-        0x90 to OP_ABS,
-        0x91 to OP_NOT,
-        0x92 to OP_0NOTEQUAL,
-        0x93 to OP_ADD,
-        0x94 to OP_SUB,
-        0x95 to OP_MUL,
-        0x96 to OP_DIV,
-        0x97 to OP_MOD,
-        0x98 to OP_LSHIFT,
-        0x99 to OP_RSHIFT,
-        0x9a to OP_BOOLAND,
-        0x9b to OP_BOOLOR,
-        0x9c to OP_NUMEQUAL,
-        0x9d to OP_NUMEQUALVERIFY,
-        0x9e to OP_NUMNOTEQUAL,
-        0x9f to OP_LESSTHAN,
-        0xa0 to OP_GREATERTHAN,
-        0xa1 to OP_LESSTHANOREQUAL,
-        0xa2 to OP_GREATERTHANOREQUAL,
-        0xa3 to OP_MIN,
-        0xa4 to OP_MAX,
-        0xa5 to OP_WITHIN,
-        0xa6 to OP_RIPEMD160,
-        0xa7 to OP_SHA1,
-        0xa8 to OP_SHA256,
-        0xa9 to OP_HASH160,
-        0xaa to OP_HASH256,
-        0xab to OP_CODESEPARATOR,
-        0xac to OP_CHECKSIG,
-        0xad to OP_CHECKSIGVERIFY,
-        0xae to OP_CHECKMULTISIG,
-        0xaf to OP_CHECKMULTISIGVERIFY,
-        0xb0 to OP_NOP1,
-        0xb1 to OP_CHECKLOCKTIMEVERIFY,
-        0xb2 to OP_CHECKSEQUENCEVERIFY,
-        0xb3 to OP_NOP4,
-        0xb4 to OP_NOP5,
-        0xb5 to OP_NOP6,
-        0xb6 to OP_NOP7,
-        0xb7 to OP_NOP8,
-        0xb8 to OP_NOP9,
-        0xb9 to OP_NOP10,
-        0xfa to OP_SMALLINTEGER,
-        0xff to OP_INVALIDOPCODE
-    )
-
-    @JvmField
-    public val elt2code: Map<ScriptElt, Int> = code2elt.map { it.value to it.key }.toMap()
+    public val code2elt: Map<Int, ScriptElt> = elements.associateBy { it.code }
 
     public fun name(elt: ScriptElt): String {
         val name = elt.toString().removePrefix("fr.acinq.bitcoin.OP_")
@@ -332,5 +564,5 @@ public object ScriptEltMapping {
         return name1
     }
 
-    public val name2code: Map<String, Int> = elt2code.map { name(it.key) to it.value }.toMap() + mapOf<String, Int>("NOP2" to 0xb1, "NOP3" to 0xb2)
+    public val name2code: Map<String, Int> = elements.associate { name(it) to it.code }
 }

@@ -83,7 +83,7 @@ class SegwitTestsCommon {
         val priv = PrivateKey.fromHex("619c335025c7f4012e556c2a58b2506e30b8511b53ade95ea316fd8c3286feb901")
         val pub = priv.publicKey()
         val pubKeyScript = Script.write(Script.pay2wpkh(pub)).byteVector()
-        val runner = Script.Runner(Script.Context(tx, 1, 600000000L.toSatoshi()), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        val runner = Script.Runner(Script.Context(tx, 1, 600000000L.toSatoshi(), listOf()), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         assertTrue(runner.verifyScripts(tx.txIn[1].signatureScript, pubKeyScript, tx.txIn[1].witness))
     }
 

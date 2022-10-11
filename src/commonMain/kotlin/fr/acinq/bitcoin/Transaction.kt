@@ -48,7 +48,6 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
 
     public val isCoinbase: Boolean get() = isCoinbase(this)
 
-    @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     public companion object : BtcSerializer<OutPoint>() {
         @JvmStatic
         override fun read(input: Input, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input).toLong())
@@ -194,7 +193,7 @@ public data class TxIn(
 
         @JvmStatic
         override fun validate(input: TxIn) {
-            require(input.signatureScript.size() <= Script.MaxScriptElementSize) { "signature script is ${input.signatureScript.size()} bytes, limit is $Script.MaxScriptElementSize bytes" }
+            require(input.signatureScript.size() <= Script.MAX_SCRIPT_ELEMENT_SIZE) { "signature script is ${input.signatureScript.size()} bytes, limit is $Script.MaxScriptElementSize bytes" }
         }
 
         @JvmStatic
@@ -248,8 +247,8 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
 
         @JvmStatic
         override fun validate(t: TxOut) {
-            require(t.amount.sat >= 0) { "invalid txout amount: ${t.amount}" }
-            require(t.publicKeyScript.size() < Script.MaxScriptElementSize) { "public key script is ${t.publicKeyScript.size()} bytes, limit is ${Script.MaxScriptElementSize} bytes" }
+            require(t.amount in Satoshi(0L)..Satoshi.MAX_MONEY) { "invalid txout amount: ${t.amount}" }
+            require(t.publicKeyScript.size() < Script.MAX_SCRIPT_ELEMENT_SIZE) { "public key script is ${t.publicKeyScript.size()} bytes, limit is ${Script.MAX_SCRIPT_ELEMENT_SIZE} bytes" }
         }
     }
 
@@ -317,6 +316,24 @@ public data class Transaction(
     public fun addOutput(output: TxOut): Transaction = this.copy(txOut = this.txOut + output)
 
     public fun weight(): Int = weight(this)
+
+    public fun transactionData(inputs: List<TxOut>, sighashType: Int): ByteArray {
+        val out = ByteArrayOutput()
+        BtcSerializer.writeUInt32(version.toUInt(), out)
+        BtcSerializer.writeUInt32(lockTime.toUInt(), out)
+        val inputType = sighashType and SigHash.SIGHASH_INPUT_MASK
+        if (inputType != SigHash.SIGHASH_ANYONECANPAY) {
+            out.write(prevoutsSha256(this))
+            out.write(amountsSha256(inputs))
+            out.write(scriptPubkeysSha256(inputs))
+            out.write(sequencesSha256(this))
+        }
+        val outputType = if (sighashType == SigHash.SIGHASH_DEFAULT) SigHash.SIGHASH_ALL else sighashType and SigHash.SIGHASH_OUTPUT_MASK
+        if (outputType == SigHash.SIGHASH_ALL) {
+            out.write(outputsSha256(this))
+        }
+        return out.toByteArray()
+    }
 
     override fun toString(): String {
         return Hex.encode(write(this))
@@ -429,6 +446,41 @@ public data class Transaction(
 
         @JvmStatic
         public fun isCoinbase(input: Transaction): Boolean = input.txIn.count() == 1 && OutPoint.isCoinbase(input.txIn.first().outPoint)
+
+        @JvmStatic
+        public fun prevoutsSha256(tx: Transaction): ByteArray {
+            val buffer = ByteArrayOutput()
+            tx.txIn.forEach { OutPoint.write(it.outPoint, buffer) }
+            return Crypto.sha256(buffer.toByteArray())
+        }
+
+        @JvmStatic
+        public fun amountsSha256(inputs: List<TxOut>): ByteArray {
+            val buffer = ByteArrayOutput()
+            inputs.forEach { writeUInt64(it.amount.toULong(), buffer) }
+            return Crypto.sha256(buffer.toByteArray())
+        }
+
+        @JvmStatic
+        public fun scriptPubkeysSha256(inputs: List<TxOut>): ByteArray {
+            val buffer = ByteArrayOutput()
+            inputs.forEach { writeScript(it.publicKeyScript, buffer) }
+            return Crypto.sha256(buffer.toByteArray())
+        }
+
+        @JvmStatic
+        public fun sequencesSha256(tx: Transaction): ByteArray {
+            val buffer = ByteArrayOutput()
+            tx.txIn.forEach { writeUInt32(it.sequence.toUInt(), buffer) }
+            return Crypto.sha256(buffer.toByteArray())
+        }
+
+        @JvmStatic
+        public fun outputsSha256(tx: Transaction): ByteArray {
+            val buffer = ByteArrayOutput()
+            tx.txOut.forEach { TxOut.write(it, buffer) }
+            return Crypto.sha256(buffer.toByteArray())
+        }
 
         /**
          * prepare a transaction for signing a specific input
@@ -629,14 +681,73 @@ public data class Transaction(
         public fun signInput(tx: Transaction, inputIndex: Int, previousOutputScript: List<ScriptElt>, sighashType: Int, privateKey: PrivateKey): ByteArray =
             signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, privateKey)
 
+        /**
+         * @param tx transaction to sign
+         * @param inputIndex index of the transaction input being signed
+         * @param inputs UTXOs spent by this transaction
+         * @param sighashType signature hash type
+         * @param sigVersion signature version
+         * @param executionData execution context of a transaction script
+         */
+        @JvmStatic
+        public fun hashForSigningSchnorr(
+            tx: Transaction,
+            inputIndex: Int,
+            inputs: List<TxOut>,
+            sighashType: Int,
+            sigVersion: Int,
+            executionData: Script.ExecutionData = Script.ExecutionData.empty
+        ): ByteVector32 {
+            val out = ByteArrayOutput()
+            out.write(0)
+            require(sighashType <= 0x03 || (sighashType in 0x81..0x83))
+
+            out.write(sighashType)
+            val txData = tx.transactionData(inputs, sighashType)
+            out.write(txData)
+            val (extFlag, keyVersion) = when (sigVersion) {
+                SigVersion.SIGVERSION_TAPSCRIPT -> Pair(1, 0)
+                else -> Pair(0, 0)
+            }
+            val spendType = 2 * extFlag + (if (executionData.annex != null) 1 else 0)
+            out.write(spendType)
+            val inputType = sighashType and SigHash.SIGHASH_INPUT_MASK
+            if (inputType == SigHash.SIGHASH_ANYONECANPAY) {
+                OutPoint.write(tx.txIn[inputIndex].outPoint, out)
+                TxOut.write(inputs[inputIndex], out)
+                writeUInt32(tx.txIn[inputIndex].sequence.toUInt(), out)
+            } else {
+                writeUInt32(inputIndex.toUInt(), out)
+            }
+            if (executionData.annex != null) {
+                val buffer = ByteArrayOutput()
+                writeScript(executionData.annex, buffer)
+                val annexHash = Crypto.sha256(buffer.toByteArray())
+                out.write(annexHash)
+            }
+            val outputType = if (sighashType == SigHash.SIGHASH_DEFAULT) SigHash.SIGHASH_ALL else sighashType and SigHash.SIGHASH_OUTPUT_MASK
+            if (outputType == SigHash.SIGHASH_SINGLE) {
+                out.write(Crypto.sha256(TxOut.write(tx.txOut[inputIndex])))
+            }
+            if (sigVersion == SigVersion.SIGVERSION_TAPSCRIPT) {
+                require(executionData.tapleafHash != null) { "tapleaf hash is missing" }
+                out.write(executionData.tapleafHash.toByteArray())
+                out.write(keyVersion)
+                writeUInt32(executionData.codeSeparatorPos.toUInt(), out)
+            }
+            val preimage = out.toByteArray()
+            return Crypto.taggedHash(preimage, "TapSighash")
+        }
+
         @JvmStatic
         public fun correctlySpends(tx: Transaction, previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int, callback: RunnerCallback? = null) {
+            val prevouts = tx.txIn.map { previousOutputs[it.outPoint]!! }
             for (i in 0 until tx.txIn.count()) {
                 if (OutPoint.isCoinbase(tx.txIn.elementAt(i).outPoint)) continue
                 val prevOutput = previousOutputs.getValue(tx.txIn[i].outPoint)
                 val prevOutputScript = prevOutput.publicKeyScript
                 val amount = prevOutput.amount
-                val ctx = Script.Context(tx, i, amount)
+                val ctx = Script.Context(tx, i, amount, prevouts)
                 val runner = Script.Runner(ctx, scriptFlags, callback)
                 if (!runner.verifyScripts(tx.txIn[i].signatureScript, prevOutputScript, tx.txIn[i].witness)) throw RuntimeException("tx ${tx.txid} does not spend its input #$i")
             }

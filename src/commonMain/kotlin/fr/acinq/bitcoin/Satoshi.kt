@@ -37,6 +37,11 @@ public data class Satoshi(val sat: Long) : Comparable<Satoshi> {
     public fun toULong(): ULong = sat.toULong()
     override fun toString(): String = "$sat sat"
     // @formatter:on
+
+    public companion object {
+        public const val COIN: Long = 100_000_000L
+        public val MAX_MONEY: Satoshi = Satoshi(21_000_000L * COIN)
+    }
 }
 
 public fun Long.sat(): Satoshi = Satoshi(this)

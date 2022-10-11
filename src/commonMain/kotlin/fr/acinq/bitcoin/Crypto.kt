@@ -154,9 +154,50 @@ public object Crypto {
         )
     }
 
+    /**
+     * Specify how private keys are tweaked when creating Schnorr signatures
+     */
+    public sealed class SchnorrTweak {
+        /**
+         * private key is used as-is
+         */
+        public object NoTweak : SchnorrTweak()
+
+        public sealed class TaprootTweak: SchnorrTweak()
+        /**
+         * private key is tweaked with H_TapTweak(public key) (this is used for key path spending when no scripts are present)
+         */
+        public object NoScriptTweak : TaprootTweak()
+
+        /**
+         * private key is tweaked with H_TapTweak(public key || merkle_root) (this is used for key path spending, with specific Merkle root of the script tree).
+         */
+        public data class ScriptTweak(val merkleRoot: ByteVector32) : TaprootTweak()
+    }
+
+    /**
+     * @param data data to sign (32 bytes)
+     * @param privateKey private key
+     * @param schnorrTweak specify how to tweak the private key.
+     * @param auxrand32 optional auxiliary random data
+     * @return the Schnorr signature of data with private key (optionally tweaked with the tapscript merkle root)
+     */
     @JvmStatic
-    public fun verifySignature(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean =
-        verifySignature(data.toByteArray(), signature, publicKey)
+    public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey, schnorrTweak: SchnorrTweak, auxrand32: ByteVector32? = null): ByteVector64 {
+        val priv = when(schnorrTweak)  {
+            SchnorrTweak.NoTweak -> privateKey
+            is SchnorrTweak.NoScriptTweak -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(schnorrTweak))
+            is SchnorrTweak.ScriptTweak -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(schnorrTweak))
+        }
+        val sig = Secp256k1.signSchnorr(data.toByteArray(), priv.value.toByteArray(), auxrand32?.toByteArray()).byteVector64()
+        require(verifySignatureSchnorr(data, sig, priv.xOnlyPublicKey())) { "Cannot create Schnorr signature" }
+        return sig
+    }
+
+    @JvmStatic
+    public fun verifySignatureSchnorr(data: ByteVector32, signature: ByteVector, publicKey: XonlyPublicKey): Boolean {
+        return Secp256k1.verifySchnorr(signature.toByteArray(), data.toByteArray(), publicKey.value.toByteArray())
+    }
 
     private fun padLeft(data: ByteArray, size: Int): ByteArray = when {
         data.size == size -> data
@@ -363,5 +404,16 @@ public object Crypto {
     @JvmStatic
     public fun recoverPublicKey(sig: ByteVector64, message: ByteArray, recid: Int): PublicKey {
         return PublicKey(PublicKey.compress(Secp256k1.ecdsaRecover(sig.toByteArray(), message, recid)))
+    }
+
+    /**
+     * @param input data to be hashed
+     * @param tag tag name
+     * @return the tagged hash of input as defined in BIP340
+     */
+    @JvmStatic
+    public fun taggedHash(input: ByteArray, tag: String): ByteVector32 {
+        val hashedTag = sha256(tag.encodeToByteArray())
+        return sha256(hashedTag + hashedTag + input).byteVector32()
     }
 }

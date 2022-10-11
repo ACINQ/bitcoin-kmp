@@ -83,7 +83,10 @@ public abstract class BtcSerializer<T> {
 
     public companion object {
         @JvmStatic
-        public fun uint8(input: Input): UByte = input.read().toUByte()
+        public fun uint8(input: Input): UByte {
+            require(input.availableBytes >= 1)
+            return input.read().toUByte()
+        }
 
         @JvmStatic
         public fun writeUInt8(input: UByte, out: Output): Unit = out.write(input.toInt() and 0xff)

@@ -39,6 +39,12 @@ public data class PublicKey(@JvmField val value: ByteVector) {
      */
     public fun isValid(): Boolean = Crypto.isPubKeyValid(value.toByteArray())
 
+    public fun isEven(): Boolean = (value[0] == 2.toByte())
+
+    public fun isOdd(): Boolean = !isEven()
+
+    public fun xOnly(): XonlyPublicKey = XonlyPublicKey(this)
+
     public operator fun plus(that: PublicKey): PublicKey {
         val pub = Secp256k1.pubKeyCombine(arrayOf(value.toByteArray(), that.value.toByteArray()))
         return PublicKey(compress(pub))

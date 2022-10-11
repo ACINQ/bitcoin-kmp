@@ -121,6 +121,26 @@ public object Bitcoin {
 
     @JvmStatic
     public fun addressToPublicKeyScript(chainHash: ByteVector32, address: String): List<ScriptElt> {
+        val witnessVersions = mapOf(
+            0.toByte() to OP_0,
+            1.toByte() to OP_1,
+            2.toByte() to OP_2,
+            3.toByte() to OP_3,
+            4.toByte() to OP_4,
+            5.toByte() to OP_5,
+            6.toByte() to OP_6,
+            7.toByte() to OP_7,
+            8.toByte() to OP_8,
+            9.toByte() to OP_9,
+            10.toByte() to OP_10,
+            11.toByte() to OP_11,
+            12.toByte() to OP_12,
+            13.toByte() to OP_13,
+            14.toByte() to OP_14,
+            15.toByte() to OP_15,
+            16.toByte() to OP_16
+        )
+
         return runCatching { Base58Check.decode(address) }.fold(
             onSuccess = {
                 when {
@@ -131,17 +151,17 @@ public object Bitcoin {
                     else -> error("base58 address does not match our blockchain")
                 }
             },
-            onFailure = {
-                val base58error = it
+            onFailure = { base58error ->
                 runCatching { Bech32.decodeWitnessAddress(address) }.fold(
                     onSuccess = {
+                        val witnessVersion = witnessVersions[it.second]
                         when {
-                            it.second < 0.toByte() || it.second > 16.toByte() -> error("invalid version ${it.second} in bech32 address")
+                            witnessVersion == null -> error("invalid version ${it.second} in bech32 address")
                             it.third.size != 20 && it.third.size != 32 -> error("hash length in bech32 address must be either 20 or 32 bytes")
-                            it.first == "bc" && chainHash == Block.LivenetGenesisBlock.hash -> listOf(OP_0, OP_PUSHDATA(it.third))
-                            it.first == "tb" && chainHash == Block.TestnetGenesisBlock.hash -> listOf(OP_0, OP_PUSHDATA(it.third))
-                            it.first == "tb" && chainHash == Block.SignetGenesisBlock.hash -> listOf(OP_0, OP_PUSHDATA(it.third))
-                            it.first == "bcrt" && chainHash == Block.RegtestGenesisBlock.hash -> listOf(OP_0, OP_PUSHDATA(it.third))
+                            it.first == "bc" && chainHash == Block.LivenetGenesisBlock.hash -> listOf(witnessVersion, OP_PUSHDATA(it.third))
+                            it.first == "tb" && chainHash == Block.TestnetGenesisBlock.hash -> listOf(witnessVersion, OP_PUSHDATA(it.third))
+                            it.first == "tb" && chainHash == Block.SignetGenesisBlock.hash -> listOf(witnessVersion, OP_PUSHDATA(it.third))
+                            it.first == "bcrt" && chainHash == Block.RegtestGenesisBlock.hash -> listOf(witnessVersion, OP_PUSHDATA(it.third))
                             else -> error("bech32 address does not match our blockchain")
                         }
                     },

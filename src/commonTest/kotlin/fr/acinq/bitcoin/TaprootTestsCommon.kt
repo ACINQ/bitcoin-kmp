@@ -18,7 +18,10 @@ package fr.acinq.bitcoin
 import fr.acinq.bitcoin.Bech32.hrp
 import fr.acinq.bitcoin.Bitcoin.addressToPublicKeyScript
 import fr.acinq.bitcoin.Transaction.Companion.hashForSigningSchnorr
+import fr.acinq.bitcoin.reference.TransactionTestsCommon.Companion.resourcesDir
 import fr.acinq.secp256k1.Secp256k1
+import org.kodein.memory.file.openReadableFile
+import org.kodein.memory.file.resolve
 import kotlin.test.*
 
 class TaprootTestsCommon {
@@ -347,5 +350,18 @@ class TaprootTestsCommon {
         // see: https://mempool.space/signet/tx/2eb421e044de0535aa3d14a5a4c325ba8b5181440bbd911b5b43718b686b09a8
         assertEquals(tx3.toString(), "020000000001015c55c02d972cbad48a5da8f0c7d06641a3663a1438a7d2559908eec31d6e19970100000000ffffffff018ca5f50500000000160014310b7b9acef217ed007ba904eac9fa45ad5cb0640340c10da2636457db468385345303e984ee949d0815745f5dcba67cde603ef02738b6f26f6c44beef0a93d9fcbb82571d215ca2cf04a1894ce01d2eaf7b6068260a2220a4fbd2c1822592c0ae8afa0e63a0d4c56a571179e93fd61615627f419fd0be9aac41c01b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f35b9c8be6dc0c33d6ce3cc9d3ba04c509b3f5b0139254f67d3184a5a238901f400000000")
         Transaction.correctlySpends(tx3, fundingTx3, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    }
+
+    @Test
+    fun `parse and validate huge transaction`() {
+        // this is the tx that broke btcd/lnd
+        val file = resourcesDir().resolve("7393096d97bfee8660f4100ffd61874d62f9a65de9fb6acf740c4c386990ef73.bin").openReadableFile()
+        val buffer = ByteArray(file.available)
+        file.readBytes(buffer)
+        file.close()
+        val tx = Transaction.read(buffer)
+        assertEquals(1001, tx.txIn[0].witness.stack.size)
+        val parentTx = Transaction.read("020000000001011c0bf7a36ae6f663be6424d8fb84672fec0c2efb9753630675d1fe9836785fff0000000000fdffffff02906500000000000022512056e1005938333d0095cd0b7225e47216417619867bc12ae91c5b61cbc95a315ef5e6010000000000160014dbd208b293eaae96ded0424695f68718b97cd8290247304402206c1d49b0c0afc55e48b3ff56ab09c71be9f52a38ca69e88b89fbee437cdf68df02201984d8e67629b5a8dd477d09fb3abae18e98d33c41f2b57696f98c1d90af807201210331a2f9b23d7dbb4eb51050b1d35a88b608e48cc6e48c23051b362a498887fc8600000000")
+        Transaction.correctlySpends(tx, parentTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
 }

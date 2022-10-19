@@ -803,18 +803,18 @@ public object Script {
                     isUpgradableNop(head) && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) -> throw RuntimeException("use of upgradable NOP is discouraged")
                     isUpgradableNop(head) -> opCount++
 
-                    head == OP_1ADD && stack.isEmpty() -> throw RuntimeException("cannot run OP_1ADD on am empty stack")
+                    head == OP_1ADD && stack.isEmpty() -> throw RuntimeException("cannot run OP_1ADD on an empty stack")
                     head == OP_1ADD -> {
                         stack[0] = encodeNumber(decodeNumber(stack.first()) + 1)
                         opCount++
                     }
-                    head == OP_1SUB && stack.isEmpty() -> throw RuntimeException("cannot run OP_1SUB on am empty stack")
+                    head == OP_1SUB && stack.isEmpty() -> throw RuntimeException("cannot run OP_1SUB on an empty stack")
                     head == OP_1SUB -> {
                         stack[0] = encodeNumber(decodeNumber(stack.first()) - 1)
                         opCount++
                     }
 
-                    head == OP_ABS && stack.isEmpty() -> throw RuntimeException("cannot run OP_ABS on am empty stack")
+                    head == OP_ABS && stack.isEmpty() -> throw RuntimeException("cannot run OP_ABS on an empty stack")
                     head == OP_ABS -> {
                         stack[0] = encodeNumber(kotlin.math.abs(decodeNumber(stack.first())))
                         opCount++
@@ -1409,7 +1409,6 @@ public object Script {
                                 isOpSuccess(it.next().code) -> true
                                 else -> hasOpSuccess(it)
                             }
-
                             if (hasOpSuccess(scriptIterator(script.toByteArray()))) {
                                 require(scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS == 0) { "OP_SUCCESSx reserved for soft-fork upgrades" }
                                 return

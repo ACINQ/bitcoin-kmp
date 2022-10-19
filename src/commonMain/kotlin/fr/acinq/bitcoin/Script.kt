@@ -24,8 +24,6 @@ import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmStatic
 
-public typealias RunnerCallback = (List<ScriptElt>, List<ByteVector>, Script.Runner.Companion.State) -> Boolean
-
 public object Script {
     public const val MAX_SCRIPT_SIZE: Int = 10000
     public const val MAX_SCRIPT_ELEMENT_SIZE: Int = 520
@@ -596,7 +594,6 @@ public object Script {
     public class Runner(
         public val context: Context,
         public val scriptFlag: Int = ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS,
-        public val callback: RunnerCallback? = null
     ) {
         public companion object {
             /**

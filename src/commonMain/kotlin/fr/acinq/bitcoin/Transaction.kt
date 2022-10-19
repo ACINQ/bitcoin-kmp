@@ -740,7 +740,7 @@ public data class Transaction(
         }
 
         @JvmStatic
-        public fun correctlySpends(tx: Transaction, previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int, callback: RunnerCallback? = null) {
+        public fun correctlySpends(tx: Transaction, previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int) {
             val prevouts = tx.txIn.map { previousOutputs[it.outPoint]!! }
             for (i in 0 until tx.txIn.count()) {
                 if (OutPoint.isCoinbase(tx.txIn.elementAt(i).outPoint)) continue
@@ -748,34 +748,24 @@ public data class Transaction(
                 val prevOutputScript = prevOutput.publicKeyScript
                 val amount = prevOutput.amount
                 val ctx = Script.Context(tx, i, amount, prevouts)
-                val runner = Script.Runner(ctx, scriptFlags, callback)
+                val runner = Script.Runner(ctx, scriptFlags)
                 if (!runner.verifyScripts(tx.txIn[i].signatureScript, prevOutputScript, tx.txIn[i].witness)) throw RuntimeException("tx ${tx.txid} does not spend its input #$i")
             }
         }
 
         @JvmStatic
-        public fun correctlySpends(tx: Transaction, previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int): Unit =
-            correctlySpends(tx, previousOutputs, scriptFlags, null)
-
-        @JvmStatic
-        public fun correctlySpends(tx: Transaction, inputs: List<Transaction>, scriptFlags: Int, callback: RunnerCallback?) {
+        public fun correctlySpends(tx: Transaction, inputs: List<Transaction>, scriptFlags: Int) {
             val map = mutableMapOf<OutPoint, TxOut>()
             for (outPoint in tx.txIn.map { it.outPoint }) {
                 val prevTx = inputs.find { it.txid == outPoint.txid }
                 val prevOut = prevTx?.txOut!![outPoint.index.toInt()]
                 map[outPoint] = prevOut
             }
-            correctlySpends(tx, map.toMap(), scriptFlags, callback)
+            correctlySpends(tx, map.toMap(), scriptFlags)
         }
 
         @JvmStatic
-        public fun correctlySpends(tx: Transaction, inputs: List<Transaction>, scriptFlags: Int): Unit = correctlySpends(tx, inputs, scriptFlags, null)
-
-        @JvmStatic
-        public fun correctlySpends(tx: Transaction, parent: Transaction, scriptFlags: Int, callback: RunnerCallback?): Unit = correctlySpends(tx, listOf(parent), scriptFlags, callback)
-
-        @JvmStatic
-        public fun correctlySpends(tx: Transaction, parent: Transaction, scriptFlags: Int): Unit = correctlySpends(tx, listOf(parent), scriptFlags, null)
+        public fun correctlySpends(tx: Transaction, parent: Transaction, scriptFlags: Int): Unit = correctlySpends(tx, listOf(parent), scriptFlags)
     }
 
     override fun serializer(): BtcSerializer<Transaction> = Transaction

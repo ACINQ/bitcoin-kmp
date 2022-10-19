@@ -67,7 +67,7 @@ class TapscriptCoreTestsCommon {
         val amount = prevOutput.amount
         val scriptFlags = ScriptTestsCommon.parseScriptFlags(json["flags"]!!.jsonPrimitive.content)
         val ctx = Script.Context(tx1, i, amount, prevouts)
-        val runner = Script.Runner(ctx, scriptFlags, null)
+        val runner = Script.Runner(ctx, scriptFlags)
         if (shouldSucceed) {
             val result = runner.verifyScripts(tx1.txIn[i].signatureScript, prevOutputScript, tx1.txIn[i].witness)
             assertTrue(result, "success test $name failed")

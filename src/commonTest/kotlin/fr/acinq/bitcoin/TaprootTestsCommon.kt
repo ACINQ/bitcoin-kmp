@@ -363,5 +363,9 @@ class TaprootTestsCommon {
         assertEquals(1001, tx.txIn[0].witness.stack.size)
         val parentTx = Transaction.read("020000000001011c0bf7a36ae6f663be6424d8fb84672fec0c2efb9753630675d1fe9836785fff0000000000fdffffff02906500000000000022512056e1005938333d0095cd0b7225e47216417619867bc12ae91c5b61cbc95a315ef5e6010000000000160014dbd208b293eaae96ded0424695f68718b97cd8290247304402206c1d49b0c0afc55e48b3ff56ab09c71be9f52a38ca69e88b89fbee437cdf68df02201984d8e67629b5a8dd477d09fb3abae18e98d33c41f2b57696f98c1d90af807201210331a2f9b23d7dbb4eb51050b1d35a88b608e48cc6e48c23051b362a498887fc8600000000")
         Transaction.correctlySpends(tx, parentTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+
+        // check that we can also serialize this tx and get the same result
+        val serializedTx = Transaction.write(tx)
+        assertContentEquals(buffer, serializedTx)
     }
 }

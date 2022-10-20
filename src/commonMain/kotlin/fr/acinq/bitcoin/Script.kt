@@ -734,7 +734,7 @@ public object Script {
             inputStack: List<ByteVector>,
             signatureVersion: Int
         ): List<ByteVector> {
-            var stack = inputStack.toMutableList()
+            val stack = inputStack.toMutableList()
             val altstack = mutableListOf<ByteVector>()
             val conditions = mutableListOf<Boolean>()
             var opCount = 0
@@ -941,17 +941,16 @@ public object Script {
                         if (m < 0 || m > 20) throw RuntimeException("OP_CHECKMULTISIG: invalid number of public keys")
                         val nextOpCount = opCount + 1 + m
                         if (nextOpCount > 201) throw RuntimeException("operation count is over the limit")
-                        val pubKeys = stack.take(m)
-                        stack = stack.drop(m).toMutableList()
+                        val pubKeys = (1..m).map { stack.removeFirst() }
 
                         // pop signatures
                         val n = decodeNumber(stack.removeFirst()).toInt()
                         if (n < 0 || n > m) throw RuntimeException("OP_CHECKMULTISIG: invalid number of signatures")
                         // check that we have at least n + 1 items on the stack (+1 because of a bug in the reference client)
                         require(stack.size >= n + 1) { "invalid stack operation" }
-                        val sigs = stack.take(n)
-                        if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_NULLDUMMY) != 0) require(stack[n].size() == 0) { "multisig dummy is not empty" }
-                        stack = stack.drop(n + 1).toMutableList()
+                        val sigs = (1..n).map { stack.removeFirst() }
+                        if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_NULLDUMMY) != 0) require(stack.first().size() == 0) { "multisig dummy is not empty" }
+                        stack.removeFirst()
 
                         // Drop the signature in pre-segwit scripts but not segwit scripts
                         val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {

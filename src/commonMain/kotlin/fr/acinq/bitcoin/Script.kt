@@ -941,8 +941,8 @@ public object Script {
                         // pop public keys
                         val m = decodeNumber(stack.removeFirst()).toInt()
                         if (m < 0 || m > 20) throw RuntimeException("OP_CHECKMULTISIG: invalid number of public keys")
-                        val nextOpCount = opCount  + m
-                        if (nextOpCount > MAX_OPS_PER_SCRIPT) throw RuntimeException("operation count is over the limit")
+                        opCount += m
+                        if (opCount > MAX_OPS_PER_SCRIPT) throw RuntimeException("operation count is over the limit")
                         val pubKeys = (1..m).map { stack.removeFirst() }
 
                         // pop signatures
@@ -968,7 +968,6 @@ public object Script {
                         if (!success && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_NULLFAIL) != 0) {
                             sigs.forEach { require(it.isEmpty()) { "Signature must be zero for failed CHECKMULTISIG operation" } }
                         }
-                        opCount = nextOpCount
                         if (head == OP_CHECKMULTISIGVERIFY) {
                             require(success) { "OP_CHECKMULTISIGVERIFY failed" }
                         } else {

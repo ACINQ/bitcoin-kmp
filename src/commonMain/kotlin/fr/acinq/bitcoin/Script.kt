@@ -28,6 +28,7 @@ public object Script {
     public const val MAX_SCRIPT_SIZE: Int = 10000
     public const val MAX_SCRIPT_ELEMENT_SIZE: Int = 520
     public const val MAX_OPS_PER_SCRIPT: Int = 201
+    public const val MAX_STACK_SIZE: Int = 1000
     public const val LOCKTIME_THRESHOLD: Long = 500000000L
     public const val WITNESS_V0_SCRIPTHASH_SIZE: Int = 32
     public const val WITNESS_V0_KEYHASH_SIZE: Int = 20
@@ -734,7 +735,7 @@ public object Script {
             inputStack: List<ByteVector>,
             signatureVersion: Int
         ): List<ByteVector> {
-            var stack = inputStack.toMutableList()
+            val stack = inputStack.toMutableList()
             val altstack = mutableListOf<ByteVector>()
             val conditions = mutableListOf<Boolean>()
             var opCount = 0
@@ -755,7 +756,7 @@ public object Script {
                         opCount++
                     }
                     head == OP_IF -> {
-                        val stackhead = stack.removeAt(0)
+                        val stackhead = stack.removeFirst()
                         opCount++
                         when {
                             stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditions.add(0, true)
@@ -772,7 +773,7 @@ public object Script {
                         opCount++
                     }
                     head == OP_NOTIF -> {
-                        val stackhead = stack.removeAt(0)
+                        val stackhead = stack.removeFirst()
                         opCount++
                         when {
                             stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditions.add(0, true)
@@ -789,7 +790,7 @@ public object Script {
                         opCount++
                     }
                     head == OP_ENDIF -> {
-                        conditions.removeAt(0)
+                        conditions.removeFirst()
                         opCount++
                     }
                     conditions.any { !it } -> {
@@ -866,7 +867,6 @@ public object Script {
                         val locktime = decodeNumber(stack.first(), maximumSize = 5)
                         if (locktime < 0) throw RuntimeException("CLTV lock time cannot be negative")
                         if (!checkLockTime(locktime, context.tx, context.inputIndex)) throw RuntimeException("unsatisfied CLTV lock time")
-                        // stack is not popped: we use stack here and not stacktail !!
                         opCount++
                     }
                     head == OP_CHECKLOCKTIMEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) -> throw RuntimeException("use of upgradable NOP is discouraged")
@@ -882,7 +882,6 @@ public object Script {
                         // some arithmetic being done first, you can always use
                         // 0 MAX CHECKSEQUENCEVERIFY.
                         if (sequence < 0) throw RuntimeException("CSV lock time cannot be negative")
-
                         // To provide for future soft-fork extensibility, if the
                         // operand has the disabled lock-time flag set,
                         // CHECKSEQUENCEVERIFY behaves as a NOP.
@@ -891,8 +890,6 @@ public object Script {
                             // with the input.
                             if (!checkSequence(sequence, context.tx, context.inputIndex)) throw RuntimeException("unsatisfied CSV lock time")
                         }
-
-                        // stack is not popped: we use stack here and not stacktail !!
                         opCount++
                     }
                     head == OP_CHECKSEQUENCEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) -> throw RuntimeException("use of upgradable NOP is discouraged")
@@ -900,16 +897,18 @@ public object Script {
 
                     head == OP_CHECKSIG && stack.size < 2 -> throw RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
                     head == OP_CHECKSIG || head == OP_CHECKSIGVERIFY -> {
-                        // remove signature from script
                         val pubKey = stack.removeFirst()
                         val sigBytes = stack.removeFirst()
+                        // remove signature from script
                         val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
                             val scriptCode1 = removeSignature(scriptCode, sigBytes)
                             if (scriptCode1.size != scriptCode.size && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0) {
                                 throw RuntimeException("Signature is found in scriptCode")
                             }
                             scriptCode1
-                        } else scriptCode
+                        } else {
+                            scriptCode
+                        }
                         val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), write(scriptCode1), signatureVersion)
                         if (!success && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_NULLFAIL) != 0) {
                             require(sigBytes.isEmpty()) { "Signature must be zero for failed CHECKSIG operation" }
@@ -940,18 +939,17 @@ public object Script {
                         val m = decodeNumber(stack.removeFirst()).toInt()
                         if (m < 0 || m > 20) throw RuntimeException("OP_CHECKMULTISIG: invalid number of public keys")
                         val nextOpCount = opCount + 1 + m
-                        if (nextOpCount > 201) throw RuntimeException("operation count is over the limit")
-                        val pubKeys = stack.take(m)
-                        stack = stack.drop(m).toMutableList()
+                        if (nextOpCount > MAX_OPS_PER_SCRIPT) throw RuntimeException("operation count is over the limit")
+                        val pubKeys = (1..m).map { stack.removeFirst() }
 
                         // pop signatures
                         val n = decodeNumber(stack.removeFirst()).toInt()
                         if (n < 0 || n > m) throw RuntimeException("OP_CHECKMULTISIG: invalid number of signatures")
                         // check that we have at least n + 1 items on the stack (+1 because of a bug in the reference client)
                         require(stack.size >= n + 1) { "invalid stack operation" }
-                        val sigs = stack.take(n)
-                        if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_NULLDUMMY) != 0) require(stack[n].size() == 0) { "multisig dummy is not empty" }
-                        stack = stack.drop(n + 1).toMutableList()
+                        val sigs = (1..n).map { stack.removeFirst() }
+                        if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_NULLDUMMY) != 0) require(stack.first().size() == 0) { "multisig dummy is not empty" }
+                        stack.removeFirst()
 
                         // Drop the signature in pre-segwit scripts but not segwit scripts
                         val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
@@ -1010,40 +1008,34 @@ public object Script {
 
                     head == OP_2DUP && stack.size < 2 -> throw RuntimeException("Cannot perform OP_2DUP on a stack with less than 2 elements")
                     head == OP_2DUP -> {
-                        val x1 = stack.removeFirst()
-                        val x2 = stack.removeFirst()
-                        stack.addAll(0, listOf(x1, x2, x1, x2))
+                        val x1 = stack[0]
+                        val x2 = stack[1]
+                        stack.addAll(0, listOf(x1, x2))
                         opCount++
                     }
 
                     head == OP_3DUP && stack.size < 3 -> throw RuntimeException("Cannot perform OP_3DUP on a stack with less than 2 elements")
                     head == OP_3DUP -> {
-                        val x1 = stack.removeFirst()
-                        val x2 = stack.removeFirst()
-                        val x3 = stack.removeFirst()
-                        stack.addAll(0, listOf(x1, x2, x3, x1, x2, x3))
+                        val x1 = stack[0]
+                        val x2 = stack[1]
+                        val x3 = stack[2]
+                        stack.addAll(0, listOf(x1, x2, x3))
                         opCount++
                     }
 
                     head == OP_EQUAL && stack.size < 2 -> throw RuntimeException("Cannot perform OP_EQUAL on a stack with less than 2 elements")
-                    head == OP_EQUAL && stack[0] != stack[1] -> {
-                        stack.removeFirst()
-                        stack.removeFirst()
-                        stack.add(0, False)
-                        opCount++
-                    }
                     head == OP_EQUAL -> {
-                        stack.removeFirst()
-                        stack.removeFirst()
-                        stack.add(0, True)
+                        val x1 = stack.removeFirst()
+                        val x2 = stack.removeFirst()
+                        stack.add(0, if (x1 != x2) False else True)
                         opCount++
                     }
 
                     head == OP_EQUALVERIFY && stack.size < 2 -> throw RuntimeException("Cannot perform OP_EQUALVERIFY on a stack with less than 2 elements")
-                    head == OP_EQUALVERIFY && stack[0] != stack[1] -> throw RuntimeException("OP_EQUALVERIFY failed: elements are different")
                     head == OP_EQUALVERIFY -> {
-                        stack.removeFirst()
-                        stack.removeFirst()
+                        val x1 = stack.removeFirst()
+                        val x2 = stack.removeFirst()
+                        require(x1 == x2) { "OP_EQUALVERIFY failed: elements are different" }
                         opCount++
                     }
 
@@ -1063,11 +1055,10 @@ public object Script {
                     }
 
                     head == OP_IFDUP && stack.isEmpty() -> throw RuntimeException("Cannot perform OP_IFDUP on an empty stack")
-                    head == OP_IFDUP && castToBoolean(stack.first()) -> {
-                        stack.add(0, stack.first())
+                    head == OP_IFDUP -> {
+                        if (castToBoolean(stack.first())) stack.add(0, stack.first())
                         opCount++
                     }
-                    head == OP_IFDUP -> opCount++
 
                     head == OP_LESSTHAN && stack.size < 2 -> throw RuntimeException("Cannot perform OP_LESSTHAN on a stack with less than 2 elements")
                     head == OP_LESSTHAN -> {
@@ -1160,7 +1151,7 @@ public object Script {
                     head == OP_NUMEQUALVERIFY -> {
                         val x1 = decodeNumber(stack.removeFirst())
                         val x2 = decodeNumber(stack.removeFirst())
-                        if (x1 != x2) throw RuntimeException("OP_NUMEQUALVERIFY failed")
+                        require(x1 == x2) { "OP_NUMEQUALVERIFY failed" }
                         opCount++
                     }
 
@@ -1188,6 +1179,7 @@ public object Script {
                     head == OP_PICK && stack.isEmpty() -> throw RuntimeException("Cannot perform OP_PICK on an empty stack")
                     head == OP_PICK -> {
                         val n = decodeNumber(stack.removeFirst()).toInt()
+                        require(stack.size > n) { "Cannot perform OP_PICK on a stack with less than ${n + 1} elements" }
                         stack.add(0, stack[n])
                         opCount++
                     }
@@ -1196,20 +1188,9 @@ public object Script {
                     head is OP_PUSHDATA -> stack.add(0, head.data)
 
                     head == OP_ROLL && stack.isEmpty() -> throw RuntimeException("Cannot perform OP_ROLL on an empty stack")
-                    /*
-                                    head == OP_ROLL -> {
-                    val n = decodeNumber(stack.first()).toInt()
-                    val stacktail = stack.tail()
-                    runInternal(
-                        tail,
-                        listOf(stacktail[n]) + stacktail.take(n) + stacktail.takeLast(stacktail.size - 1 - n),
-                        state.copy(opCount = state.opCount + 1),
-                        signatureVersion
-                    )
-                }
-                     */
                     head == OP_ROLL -> {
                         val n = decodeNumber(stack.removeFirst()).toInt()
+                        require(stack.size > n) { "Cannot perform OP_ROLL on a stack with less than ${n + 1} elements" }
                         val xn = stack.removeAt(n)
                         stack.add(0, xn)
                         opCount++
@@ -1304,9 +1285,9 @@ public object Script {
                     }
 
                     head == OP_VERIFY && stack.isEmpty() -> throw RuntimeException("Cannot perform OP_VERIFY on an empty stack")
-                    head == OP_VERIFY && !castToBoolean(stack.first()) -> throw RuntimeException("OP_VERIFY failed")
                     head == OP_VERIFY -> {
-                        stack.removeFirst()
+                        val x = stack.removeFirst()
+                        require(castToBoolean(x)) { "OP_VERIFY failed" }
                         opCount++
                     }
 
@@ -1324,8 +1305,8 @@ public object Script {
                         throw RuntimeException("unexpected operator $head")
                     }
                 }
-                if ((stack.size + altstack.size) > 1000) throw RuntimeException("stack is too large: stack size = ${stack.size} alt stack size = ${altstack.size}")
 
+                require(stack.size + altstack.size <= MAX_STACK_SIZE) { "stack is too large: stack size = ${stack.size} alt stack size = ${altstack.size}" }
                 if (signatureVersion == SigVersion.SIGVERSION_BASE || signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) {
                     require(opCount <= MAX_OPS_PER_SCRIPT) { "operation count is over the limit" }
                 }
@@ -1414,7 +1395,7 @@ public object Script {
                                 return
                             }
                             val stack1 = stack.dropLast(2).reversed()
-                            require(stack1.size <= 1000) { "Stack size limit exceeded" }
+                            require(stack1.size <= MAX_STACK_SIZE) { "Stack size limit exceeded" }
                             val finalStack = run(script, stack1, SigVersion.SIGVERSION_TAPSCRIPT)
                             checkFinalStack(finalStack)
                         } else {

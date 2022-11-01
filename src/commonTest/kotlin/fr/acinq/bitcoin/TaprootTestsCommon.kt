@@ -19,6 +19,7 @@ import fr.acinq.bitcoin.Bech32.hrp
 import fr.acinq.bitcoin.Bitcoin.addressToPublicKeyScript
 import fr.acinq.bitcoin.Transaction.Companion.hashForSigningSchnorr
 import fr.acinq.bitcoin.reference.TransactionTestsCommon.Companion.resourcesDir
+import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
 import org.kodein.memory.file.openReadableFile
 import org.kodein.memory.file.resolve
@@ -363,6 +364,26 @@ class TaprootTestsCommon {
         assertEquals(1001, tx.txIn[0].witness.stack.size)
         val parentTx = Transaction.read("020000000001011c0bf7a36ae6f663be6424d8fb84672fec0c2efb9753630675d1fe9836785fff0000000000fdffffff02906500000000000022512056e1005938333d0095cd0b7225e47216417619867bc12ae91c5b61cbc95a315ef5e6010000000000160014dbd208b293eaae96ded0424695f68718b97cd8290247304402206c1d49b0c0afc55e48b3ff56ab09c71be9f52a38ca69e88b89fbee437cdf68df02201984d8e67629b5a8dd477d09fb3abae18e98d33c41f2b57696f98c1d90af807201210331a2f9b23d7dbb4eb51050b1d35a88b608e48cc6e48c23051b362a498887fc8600000000")
         Transaction.correctlySpends(tx, parentTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+
+        // check that we can also serialize this tx and get the same result
+        val serializedTx = Transaction.write(tx)
+        assertContentEquals(buffer, serializedTx)
+    }
+
+    @Test
+    fun `parse and validate huge transaction made of empty pushes`() {
+        // this is the tx that broke btcd/lnd: https://github.com/btcsuite/btcd/issues/1906
+        // construct large taproot tx: 73be398c4bdc43709db7398106609eea2a7841aaf3a4fa2000dc18184faa2a7e
+        val pre = Hex.decode("020000000001015d631bf6a5dbb22cdfad0349e54367393e76bfdec3f187207adcfbbc04d92bfe0000000000ffffffff010000000000000000266a24796f75276c6c2072756e20636c6e2e20616e6420796f75276c6c2062652068617070792efe23a107")
+        val post = Hex.decode("015021c11dae61a4a8f841952be3a511502d4f56e889ffa0685aa0098773ea2d4309f62400000000")
+        val buffer = pre + ByteArray(500002) { 0 } + post
+        val tx = Transaction.read(buffer)
+        assertEquals(500003, tx.txIn[0].witness.stack.size)
+        val parentTx = Transaction.read("0200000000010219d3bdb21c713911fe18cf2dbe8dde9e85c2bdde76139a30c725a7f0115a983b0100000000fdffffffb9da566f902363594ce178f8b32e92a45fec5860e1121aae58b15178fbd3fb670000000000fdffffff019f313800000000002251209bb9efbddf9d70afd3ac2cef011747236bdf90832a78b08f57d1139f07aa9185024730440220146d18445bd3fb00f5140e4ef886cff7b432c55911730483a202abfe8ca43880022074e143eec20286df9ab06194a638dbbdaa7ef3001c252f9b83c8270a608ce04a01210349e84631e7d206600f72fc30d43fa9004171c5d314ea9f88e92687394b2560f3024730440220140c1888004c649a7ca4135bc9e4fe10fd4bf30264126a248ad9c5c762a387e702204de3da8bf5304abe05fba690a91eed2cab59444592be520640280ee7f1b5467401210290d5dab3b51ae9293d07ace66bdfa6bbaa5f398d1a5464b2ede4d41104aae97e00000000")
+        assertFails {
+            Transaction.correctlySpends(tx, parentTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        }
+        Transaction.correctlySpends(tx, parentTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS xor ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS)
 
         // check that we can also serialize this tx and get the same result
         val serializedTx = Transaction.write(tx)

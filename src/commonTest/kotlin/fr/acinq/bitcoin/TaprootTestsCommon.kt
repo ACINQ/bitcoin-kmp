@@ -19,6 +19,7 @@ import fr.acinq.bitcoin.Bech32.hrp
 import fr.acinq.bitcoin.Bitcoin.addressToPublicKeyScript
 import fr.acinq.bitcoin.Transaction.Companion.hashForSigningSchnorr
 import fr.acinq.bitcoin.reference.TransactionTestsCommon.Companion.resourcesDir
+import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
 import org.kodein.memory.file.openReadableFile
 import org.kodein.memory.file.resolve
@@ -367,5 +368,37 @@ class TaprootTestsCommon {
         // check that we can also serialize this tx and get the same result
         val serializedTx = Transaction.write(tx)
         assertContentEquals(buffer, serializedTx)
+    }
+
+    @Test
+    fun `parse and validate huge transaction enabled by OP_SUCCESSx`() {
+        // construct large taproot tx: 73be398c4bdc43709db7398106609eea2a7841aaf3a4fa2000dc18184faa2a7e
+        // this is the tx that broke btcd/lnd: https://github.com/btcsuite/btcd/issues/1906
+        val parentTx = Transaction.read("0200000000010219d3bdb21c713911fe18cf2dbe8dde9e85c2bdde76139a30c725a7f0115a983b0100000000fdffffffb9da566f902363594ce178f8b32e92a45fec5860e1121aae58b15178fbd3fb670000000000fdffffff019f313800000000002251209bb9efbddf9d70afd3ac2cef011747236bdf90832a78b08f57d1139f07aa9185024730440220146d18445bd3fb00f5140e4ef886cff7b432c55911730483a202abfe8ca43880022074e143eec20286df9ab06194a638dbbdaa7ef3001c252f9b83c8270a608ce04a01210349e84631e7d206600f72fc30d43fa9004171c5d314ea9f88e92687394b2560f3024730440220140c1888004c649a7ca4135bc9e4fe10fd4bf30264126a248ad9c5c762a387e702204de3da8bf5304abe05fba690a91eed2cab59444592be520640280ee7f1b5467401210290d5dab3b51ae9293d07ace66bdfa6bbaa5f398d1a5464b2ede4d41104aae97e00000000")
+        val count = 500001
+        val tx = Transaction(
+            version = 2L,
+            txIn = listOf(TxIn(OutPoint(parentTx, 0), sequence = 0xffffffff)),
+            txOut = listOf(TxOut(amount = 0L.toSatoshi(), publicKeyScript = Hex.decode("6a24796f75276c6c2072756e20636c6e2e20616e6420796f75276c6c2062652068617070792e"))),
+            lockTime = 0L
+        )
+        val sig = ByteVector("c11dae61a4a8f841952be3a511502d4f56e889ffa0685aa0098773ea2d4309f624")
+        val opSuccess = ByteVector("0x50") // OP_RESERVED
+        val stack = Array(count) { ByteVector("") }.toList()
+        val witness = ScriptWitness(stack + opSuccess + sig) // must not exceed available Java heap space
+        val tx2 = tx.updateWitness(0, witness) //, op, sig)
+        assertEquals(count+2, tx2.txIn[0].witness.stack.size)
+        assertEquals(ByteVector32("73be398c4bdc43709db7398106609eea2a7841aaf3a4fa2000dc18184faa2a7e"), tx.txid)
+
+        assertFails {
+            // invalid and not relayed by nodes with default policy settings because of OP_SUCCESSx in the script
+            Transaction.correctlySpends(tx2, parentTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        }
+        // block validation deactivates the policy which rejects this transactions
+        Transaction.correctlySpends(tx2, parentTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS xor ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS)
+
+        // check that we can also deserialize this tx and get the same result
+        val tx3 = Transaction.read(Transaction.write(tx2))
+        assertContentEquals(Transaction.write(tx2), Transaction.write(tx3))
     }
 }

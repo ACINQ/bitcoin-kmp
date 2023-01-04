@@ -1341,7 +1341,7 @@ public object Script {
                             Crypto.taggedHash(if (LexicographicalOrdering.isLessThan(a, b)) a.toByteArray() + b.toByteArray() else b.toByteArray() + a.toByteArray(), "TapBranch")
                         }
                         val parity = (control[0].toInt() and 0x01) == 0x01
-                        require(Pair(outputKey, parity) == internalKey.outputKey(Crypto.SchnorrTweak.ScriptTweak(merkleRoot)))
+                        require(Pair(outputKey, parity) == internalKey.outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot)))
 
                         if (leafVersion == TAPROOT_LEAF_TAPSCRIPT) {
                             this.context.executionData = this.context.executionData.copy(validationWeightLeft = ScriptWitness.write(witness).size + VALIDATION_WEIGHT_OFFSET)

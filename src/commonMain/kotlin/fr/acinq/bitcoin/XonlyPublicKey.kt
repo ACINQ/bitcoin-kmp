@@ -26,10 +26,10 @@ public data class XonlyPublicKey(@JvmField val value: ByteVector32) {
 
     val publicKey: PublicKey = PublicKey(byteArrayOf(2) + value.toByteArray())
 
-    public fun tweak(tapTweak: Crypto.SchnorrTweak.TaprootTweak):  ByteVector32 {
-        return when(tapTweak) {
-            Crypto.SchnorrTweak.NoScriptTweak -> Crypto.taggedHash(value.toByteArray(), "TapTweak")
-            is Crypto.SchnorrTweak.ScriptTweak -> Crypto.taggedHash(value.toByteArray() + tapTweak.merkleRoot.toByteArray(), "TapTweak")
+    public fun tweak(tapTweak: Crypto.TaprootTweak): ByteVector32 {
+        return when (tapTweak) {
+            Crypto.TaprootTweak.NoScriptTweak -> Crypto.taggedHash(value.toByteArray(), "TapTweak")
+            is Crypto.TaprootTweak.ScriptTweak -> Crypto.taggedHash(value.toByteArray() + tapTweak.merkleRoot.toByteArray(), "TapTweak")
         }
     }
 
@@ -38,7 +38,7 @@ public data class XonlyPublicKey(@JvmField val value: ByteVector32) {
      * @param tapTweak taproot tweak
      * @return an (x-only pubkey, parity) pair
      */
-    public fun outputKey(tapTweak: Crypto.SchnorrTweak.TaprootTweak): Pair<XonlyPublicKey, Boolean> = this + PrivateKey(tweak(tapTweak)).publicKey()
+    public fun outputKey(tapTweak: Crypto.TaprootTweak): Pair<XonlyPublicKey, Boolean> = this + PrivateKey(tweak(tapTweak)).publicKey()
 
     /**
      * add a public key to this x-only key

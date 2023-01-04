@@ -162,8 +162,9 @@ public object Crypto {
          * private key is used as-is
          */
         public object NoTweak : SchnorrTweak()
+    }
 
-        public sealed class TaprootTweak: SchnorrTweak()
+    public sealed class TaprootTweak: SchnorrTweak() {
         /**
          * private key is tweaked with H_TapTweak(public key) (this is used for key path spending when no scripts are present)
          */
@@ -174,7 +175,6 @@ public object Crypto {
          */
         public data class ScriptTweak(val merkleRoot: ByteVector32) : TaprootTweak()
     }
-
     /**
      * @param data data to sign (32 bytes)
      * @param privateKey private key
@@ -186,8 +186,8 @@ public object Crypto {
     public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey, schnorrTweak: SchnorrTweak, auxrand32: ByteVector32? = null): ByteVector64 {
         val priv = when(schnorrTweak)  {
             SchnorrTweak.NoTweak -> privateKey
-            is SchnorrTweak.NoScriptTweak -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(schnorrTweak))
-            is SchnorrTweak.ScriptTweak -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(schnorrTweak))
+            is TaprootTweak.NoScriptTweak -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(schnorrTweak))
+            is TaprootTweak.ScriptTweak -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(schnorrTweak))
         }
         val sig = Secp256k1.signSchnorr(data.toByteArray(), priv.value.toByteArray(), auxrand32?.toByteArray()).byteVector64()
         require(verifySignatureSchnorr(data, sig, priv.xOnlyPublicKey())) { "Cannot create Schnorr signature" }

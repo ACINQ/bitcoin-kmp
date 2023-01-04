@@ -16,6 +16,7 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.io.ByteArrayOutput
+import kotlin.jvm.JvmStatic
 
 /**
  * leaf of a script tree used to create and spend tapscript transactions
@@ -46,6 +47,7 @@ public sealed class ScriptTree<T> {
         /**
          * @return the hash of the input merkle tree
          */
+        @JvmStatic
         public fun hash(tree: ScriptTree<ScriptLeaf>): ByteVector32 = when (tree) {
             is Leaf -> tree.value.hash
             is Branch -> {

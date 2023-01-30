@@ -18,7 +18,9 @@ package fr.acinq.bitcoin.psbt
 
 import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.crypto.Pack
-import fr.acinq.bitcoin.io.*
+import fr.acinq.bitcoin.io.ByteArrayInput
+import fr.acinq.bitcoin.io.ByteArrayOutput
+import fr.acinq.bitcoin.io.readNBytes
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.getOrElse
 import kotlin.jvm.JvmStatic
@@ -48,6 +50,10 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
         tx.txIn.map { Input.PartiallySignedInputWithoutUtxo(null, mapOf(), setOf(), setOf(), setOf(), setOf(), listOf()) },
         tx.txOut.map { Output.UnspecifiedOutput(mapOf(), listOf()) }
     )
+
+    public fun updateGlobalUnknownField(unknown: List<DataEntry>): Either<UpdateFailure, Psbt> {
+        return Either.Right(this.copy(global = this.global.copy(unknown = unknown)))
+    }
 
     /**
      * Implements the PSBT updater role; adds information about a given segwit utxo.
@@ -225,6 +231,19 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
         return Either.Right(this.copy(inputs = inputs.updated(inputIndex, updatedInput)))
     }
 
+    public fun updateInputUnknownField(inputIndex: Int, unknown: List<DataEntry>): Either<UpdateFailure, Psbt> {
+        if (inputIndex >= inputs.size) return Either.Left(UpdateFailure.InvalidInput("input index must exist in the input tx"))
+        val updatedInput = when (val input = inputs[inputIndex]) {
+            is Input.PartiallySignedInputWithoutUtxo -> input.copy(unknown = unknown)
+            is Input.WitnessInput.PartiallySignedWitnessInput -> input.copy(unknown = unknown)
+            is Input.NonWitnessInput.PartiallySignedNonWitnessInput -> input.copy(unknown = unknown)
+            is Input.WitnessInput.FinalizedWitnessInput -> input.copy(unknown = unknown)
+            is Input.NonWitnessInput.FinalizedNonWitnessInput -> input.copy(unknown = unknown)
+            is Input.FinalizedInputWithoutUtxo -> input.copy(unknown = unknown)
+        }
+        return Either.Right(this.copy(inputs = inputs.updated(inputIndex, updatedInput)))
+    }
+
     /**
      * Add details for a segwit output.
      *
@@ -272,8 +291,19 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
                 redeemScript = redeemScript ?: output.redeemScript,
                 derivationPaths = derivationPaths + output.derivationPaths
             )
+
             is Output.WitnessOutput -> return Either.Left(UpdateFailure.CannotUpdateOutput(outputIndex, "cannot update non-segwit output: it has already been updated with segwit data"))
             is Output.UnspecifiedOutput -> Output.NonWitnessOutput(redeemScript, derivationPaths + output.derivationPaths, output.unknown)
+        }
+        return Either.Right(this.copy(outputs = outputs.updated(outputIndex, updatedOutput)))
+    }
+
+    public fun updateOutputUnknownField(outputIndex: Int, unknown: List<DataEntry>): Either<UpdateFailure, Psbt> {
+        if (outputIndex >= global.tx.txOut.size) return Either.Left(UpdateFailure.InvalidInput("output index must exist in the global tx"))
+        val updatedOutput = when (val output = outputs[outputIndex]) {
+            is Output.NonWitnessOutput -> output.copy(unknown = unknown)
+            is Output.WitnessOutput -> output.copy(unknown = unknown)
+            is Output.UnspecifiedOutput -> output.copy(unknown = unknown)
         }
         return Either.Right(this.copy(outputs = outputs.updated(outputIndex, updatedOutput)))
     }
@@ -527,6 +557,10 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
         return if (0 <= inputIndex && inputIndex < inputs.size) inputs[inputIndex] else null
     }
 
+    public fun getOutput(outputIndex: Int): Output? {
+        return if (0 <= outputIndex && outputIndex < outputs.size) outputs[outputIndex] else null
+    }
+    
     public companion object {
 
         /** Only version 0 is supported for now. */

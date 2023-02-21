@@ -150,12 +150,12 @@ public abstract class BtcSerializer<T> {
         @JvmStatic
         public fun writeVarint(input: ULong, out: Output) {
             when {
-                input < 0xFDuL -> writeUInt8(input.toUByte(), out)
-                input < 65535uL -> {
+                input < 253uL -> writeUInt8(input.toUByte(), out)
+                input <= 65535uL -> {
                     writeUInt8(0xFDu, out)
                     writeUInt16(input.toUShort(), out)
                 }
-                input < 1048576uL -> {
+                input <= 4294967295uL -> {
                     writeUInt8(0xFEu, out)
                     writeUInt32(input.toUInt(), out)
                 }

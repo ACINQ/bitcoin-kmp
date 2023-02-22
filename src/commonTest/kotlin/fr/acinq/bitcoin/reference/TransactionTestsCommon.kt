@@ -94,8 +94,8 @@ class TransactionTestsCommon {
                     val tx = Transaction.read(serializedTransaction, Protocol.PROTOCOL_VERSION)
                     val result = try {
                         val isTxValid = kotlin.runCatching { Transaction.validate(tx) }.isSuccess
-                        if(testCase[2].jsonPrimitive.content == "BADTX") require(!isTxValid){ "$tx should be invalid"}
-                        if(testCase[2].jsonPrimitive.content != "BADTX") require(isTxValid){ "$tx should be valid"}
+                        if (testCase[2].jsonPrimitive.content == "BADTX") require(!isTxValid) { "$tx should be invalid" }
+                        if (testCase[2].jsonPrimitive.content != "BADTX") require(isTxValid) { "$tx should be valid" }
                         val verifyFlags = ScriptTestsCommon.parseScriptFlags(testCase[2].jsonPrimitive.content)
 
                         for (i in 0..tx.txIn.lastIndex) {
@@ -147,6 +147,10 @@ class TransactionTestsCommon {
         // See https://bitcoin.stackexchange.com/questions/100159/what-is-the-size-and-weight-of-a-p2wpkh-input
         assertEquals(p2wpkhInputNoWitness.weight(), 164)
         assertEquals(p2wpkhInputWithWitness.weight(), 273)
+
+        // This is similar to a lightning channel funding input.
+        val p2wshInputWithWitness = TxIn(OutPoint(txId, 3), ByteVector.empty, 0, Script.witnessMultiSigMofN(listOf(publicKey1, publicKey2), listOf(sig, sig)))
+        assertEquals(p2wshInputWithWitness.weight(), 386)
 
         val p2wpkhOutput = TxOut(Satoshi(150_000), Script.pay2wpkh(publicKey1))
         val p2wshOutput = TxOut(Satoshi(150_000), Script.pay2wsh(Script.createMultiSigMofN(1, listOf(publicKey1, publicKey2))))

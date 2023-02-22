@@ -24,22 +24,17 @@ class BtcSerializerTestsCommon {
         assertEquals("ff0000000001000000", varintToHex(0x100000000uL))
         assertEquals("ffffffffffffffffff", varintToHex(0xffffffffffffffffuL))
 
-        // test that we can read back what we wrote using values that are trickier to encode (2^n  and 2^n - 1)
-        var i = 1uL
-        val output = ByteArrayOutput()
-        while (i <= 33554432UL) {
-            BtcSerializer.writeVarint(i - 1uL, output)
-            BtcSerializer.writeVarint(i, output)
-            i *= 2uL
-        }
-        i = 1uL
-        val input = ByteArrayInput(output.toByteArray())
-        while (i <= 33554432UL) {
-            var j = BtcSerializer.varint(input)
-            assertEquals(i - 1uL, j)
-            j = BtcSerializer.varint(input)
-            assertEquals(i, j)
-            i *= 2uL
+        // test that we can read back what we wrote using values that are trickier to encode (2^n - 1, 2^n, 2^n + 1)
+        for (i in 0..31) {
+            val output = ByteArrayOutput()
+            val v = (1 shl i).toULong()
+            BtcSerializer.writeVarint(v - 1UL, output)
+            BtcSerializer.writeVarint(v, output)
+            BtcSerializer.writeVarint(v + 1UL, output)
+            val input = ByteArrayInput(output.toByteArray())
+            assertEquals(BtcSerializer.varint(input), v - 1UL)
+            assertEquals(BtcSerializer.varint(input), v)
+            assertEquals(BtcSerializer.varint(input), v + 1UL)
         }
     }
 }

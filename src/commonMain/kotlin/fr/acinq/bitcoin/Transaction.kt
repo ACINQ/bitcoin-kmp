@@ -150,6 +150,8 @@ public data class TxIn(
 
     public fun updateWitness(witness: ScriptWitness): TxIn = this.copy(witness = witness)
 
+    public fun weight(): Int = weight(this)
+
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     public companion object : BtcSerializer<TxIn>() {
         /* Setting nSequence to this value for every input in a transaction disables nLockTime. */
@@ -204,6 +206,13 @@ public data class TxIn(
 
         @JvmStatic
         public fun coinbase(script: List<ScriptElt>): TxIn = coinbase(Script.write(script))
+
+        @JvmStatic
+        public fun weight(txIn: TxIn, protocolVersion: Long = PROTOCOL_VERSION): Int {
+            // Note that the write function doesn't serialize witness data, so we count it separately.
+            val witnessWeight = if (txIn.hasWitness) ScriptWitness.write(txIn.witness, protocolVersion).size else 0
+            return 4 * write(txIn).size + witnessWeight
+        }
     }
 
     override fun serializer(): BtcSerializer<TxIn> = TxIn
@@ -222,6 +231,8 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
     public fun updatePublicKeyScript(input: ByteArray): TxOut = updatePublicKeyScript(input.byteVector())
 
     public fun updatePublicKeyScript(input: List<ScriptElt>): TxOut = updatePublicKeyScript(Script.write(input))
+
+    public fun weight(): Int = weight(this)
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     public companion object : BtcSerializer<TxOut>() {
@@ -250,6 +261,12 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
             require(t.amount in Satoshi(0L)..Satoshi.MAX_MONEY) { "invalid txout amount: ${t.amount}" }
             require(t.publicKeyScript.size() < Script.MAX_SCRIPT_ELEMENT_SIZE) { "public key script is ${t.publicKeyScript.size()} bytes, limit is ${Script.MAX_SCRIPT_ELEMENT_SIZE} bytes" }
         }
+
+        @JvmStatic
+        public fun totalSize(txOut: TxOut, protocolVersion: Long = PROTOCOL_VERSION): Int = write(txOut, protocolVersion).size
+
+        @JvmStatic
+        public fun weight(txOut: TxOut, protocolVersion: Long = PROTOCOL_VERSION): Int = 4 * totalSize(txOut, protocolVersion)
     }
 
     override fun serializer(): BtcSerializer<TxOut> = TxOut
@@ -430,16 +447,21 @@ public data class Transaction(
             }
         }
 
+        /** Total size of the transaction without witness data. */
         @JvmStatic
         public fun baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int =
             write(tx, protocolVersion or SERIALIZE_TRANSACTION_NO_WITNESS).size
 
+        /** Total size of the transaction with witness data, if any. */
         @JvmStatic
         public fun totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion).size
 
         @JvmStatic
-        public fun weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int =
-            totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
+        public fun weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int {
+            // Witness data uses 1 weight unit, while non-witness data uses 4 weight units.
+            // We thus serialize once with witness data and 3 times without witness data.
+            return totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
+        }
 
         @JvmStatic
         public fun weight(tx: Transaction): Int = weight(tx, PROTOCOL_VERSION)

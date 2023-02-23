@@ -459,7 +459,7 @@ public data class Transaction(
         @JvmStatic
         public fun weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int {
             // Witness data uses 1 weight unit, while non-witness data uses 4 weight units.
-            // We thus serialize ones with witness data and 3 times without witness data.
+            // We thus serialize once with witness data and 3 times without witness data.
             return totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
         }
 

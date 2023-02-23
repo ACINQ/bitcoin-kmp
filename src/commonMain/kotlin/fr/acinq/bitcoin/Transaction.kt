@@ -209,6 +209,7 @@ public data class TxIn(
 
         @JvmStatic
         public fun weight(txIn: TxIn, protocolVersion: Long = PROTOCOL_VERSION): Int {
+            // Note that the write function doesn't serialize witness data, so we count it separately.
             val witnessWeight = if (txIn.hasWitness) ScriptWitness.write(txIn.witness, protocolVersion).size else 0
             return 4 * write(txIn).size + witnessWeight
         }
@@ -446,16 +447,21 @@ public data class Transaction(
             }
         }
 
+        /** Total size of the transaction without witness data. */
         @JvmStatic
         public fun baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int =
             write(tx, protocolVersion or SERIALIZE_TRANSACTION_NO_WITNESS).size
 
+        /** Total size of the transaction with witness data, if any. */
         @JvmStatic
         public fun totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion).size
 
         @JvmStatic
-        public fun weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int =
-            totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
+        public fun weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int {
+            // Witness data uses 1 weight unit, while non-witness data uses 4 weight units.
+            // We thus serialize ones with witness data and 3 times without witness data.
+            return totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
+        }
 
         @JvmStatic
         public fun weight(tx: Transaction): Int = weight(tx, PROTOCOL_VERSION)

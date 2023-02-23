@@ -25,9 +25,9 @@ class BtcSerializerTestsCommon {
         assertEquals("ffffffffffffffffff", varintToHex(0xffffffffffffffffuL))
 
         // test that we can read back what we wrote using values that are trickier to encode (2^n - 1, 2^n, 2^n + 1)
-        for (i in 0..31) {
+        for (i in 0..63) {
             val output = ByteArrayOutput()
-            val v = (1 shl i).toULong()
+            val v = (1uL shl i)
             BtcSerializer.writeVarint(v - 1UL, output)
             BtcSerializer.writeVarint(v, output)
             BtcSerializer.writeVarint(v + 1UL, output)

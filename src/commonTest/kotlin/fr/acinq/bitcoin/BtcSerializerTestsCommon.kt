@@ -28,13 +28,13 @@ class BtcSerializerTestsCommon {
         for (i in 0..63) {
             val output = ByteArrayOutput()
             val v = (1uL shl i)
-            BtcSerializer.writeVarint(v - 1UL, output)
+            BtcSerializer.writeVarint(v - 1uL, output)
             BtcSerializer.writeVarint(v, output)
-            BtcSerializer.writeVarint(v + 1UL, output)
+            BtcSerializer.writeVarint(v + 1uL, output)
             val input = ByteArrayInput(output.toByteArray())
-            assertEquals(BtcSerializer.varint(input), v - 1UL)
+            assertEquals(BtcSerializer.varint(input), v - 1uL)
             assertEquals(BtcSerializer.varint(input), v)
-            assertEquals(BtcSerializer.varint(input), v + 1UL)
+            assertEquals(BtcSerializer.varint(input), v + 1uL)
         }
     }
 }

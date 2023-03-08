@@ -198,7 +198,12 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
                 sighashType = sighashType ?: input.sighashType,
                 derivationPaths = input.derivationPaths + derivationPaths
             )
-            is Input.WitnessInput.PartiallySignedWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update non-segwit input: it has already been updated with segwit data"))
+            is Input.WitnessInput.PartiallySignedWitnessInput -> input.copy(
+                nonWitnessUtxo = inputTx,
+                redeemScript = redeemScript ?: input.redeemScript,
+                sighashType = sighashType ?: input.sighashType,
+                derivationPaths = input.derivationPaths + derivationPaths
+            )
             is Input.FinalizedInputWithoutUtxo -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update non-segwit input: it has already been finalized"))
             is Input.WitnessInput.FinalizedWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update non-segwit input: it has already been finalized"))
             is Input.NonWitnessInput.FinalizedNonWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update non-segwit input: it has already been finalized"))

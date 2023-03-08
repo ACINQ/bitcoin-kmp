@@ -77,7 +77,7 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
                 null,
                 sighashType ?: input.sighashType,
                 mapOf(),
-                derivationPaths + input.derivationPaths,
+                input.derivationPaths + derivationPaths,
                 redeemScript,
                 witnessScript,
                 input.ripemd160,
@@ -131,7 +131,7 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
                 inputTx,
                 sighashType ?: input.sighashType,
                 mapOf(),
-                derivationPaths + input.derivationPaths,
+                input.derivationPaths + derivationPaths,
                 redeemScript,
                 witnessScript,
                 input.ripemd160,
@@ -183,7 +183,7 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
                 outputIndex,
                 sighashType ?: input.sighashType,
                 mapOf(),
-                derivationPaths + input.derivationPaths,
+                input.derivationPaths + derivationPaths,
                 redeemScript,
                 input.ripemd160,
                 input.sha256,
@@ -251,9 +251,9 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
             is Output.WitnessOutput -> output.copy(
                 witnessScript = witnessScript ?: output.witnessScript,
                 redeemScript = redeemScript ?: output.redeemScript,
-                derivationPaths = derivationPaths + output.derivationPaths
+                derivationPaths = output.derivationPaths + derivationPaths
             )
-            is Output.UnspecifiedOutput -> Output.WitnessOutput(witnessScript, redeemScript, derivationPaths + output.derivationPaths, output.unknown)
+            is Output.UnspecifiedOutput -> Output.WitnessOutput(witnessScript, redeemScript, output.derivationPaths + derivationPaths, output.unknown)
         }
         return Either.Right(this.copy(outputs = outputs.updated(outputIndex, updatedOutput)))
     }
@@ -275,10 +275,10 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
         val updatedOutput = when (val output = outputs[outputIndex]) {
             is Output.NonWitnessOutput -> output.copy(
                 redeemScript = redeemScript ?: output.redeemScript,
-                derivationPaths = derivationPaths + output.derivationPaths
+                derivationPaths = output.derivationPaths + derivationPaths
             )
             is Output.WitnessOutput -> return Either.Left(UpdateFailure.CannotUpdateOutput(outputIndex, "cannot update non-segwit output: it has already been updated with segwit data"))
-            is Output.UnspecifiedOutput -> Output.NonWitnessOutput(redeemScript, derivationPaths + output.derivationPaths, output.unknown)
+            is Output.UnspecifiedOutput -> Output.NonWitnessOutput(redeemScript, output.derivationPaths + derivationPaths, output.unknown)
         }
         return Either.Right(this.copy(outputs = outputs.updated(outputIndex, updatedOutput)))
     }

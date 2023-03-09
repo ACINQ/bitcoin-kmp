@@ -824,11 +824,13 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
                     when {
                         it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("witness utxo key must contain exactly 1 byte"))
                         else -> {
-                            try {
+                            val txOut = try {
                                 TxOut.read(it.value.bytes)
                             } catch (e: Exception) {
                                 return Either.Left(ParseFailure.InvalidTxInput(e.message ?: "failed to parse transaction output"))
                             }
+                            nonWitnessUtxo?.let { tx -> if (tx.txOut[txIn.outPoint.index.toInt()] != txOut) return Either.Left(ParseFailure.InvalidTxInput("witness utxo does not match non-witness utxo output")) }
+                            txOut
                         }
                     }
                 }

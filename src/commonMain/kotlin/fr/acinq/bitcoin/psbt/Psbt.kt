@@ -74,10 +74,10 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
         val updatedInput = when (val input = inputs[inputIndex]) {
             is Input.PartiallySignedInputWithoutUtxo -> Input.WitnessInput.PartiallySignedWitnessInput(
                 txOut,
-                null,
+                input.nonWitnessUtxo,
                 sighashType ?: input.sighashType,
-                mapOf(),
-                derivationPaths + input.derivationPaths,
+                input.partialSigs,
+                input.derivationPaths + derivationPaths,
                 redeemScript,
                 witnessScript,
                 input.ripemd160,
@@ -130,8 +130,8 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
                 inputTx.txOut[outputIndex],
                 inputTx,
                 sighashType ?: input.sighashType,
-                mapOf(),
-                derivationPaths + input.derivationPaths,
+                input.partialSigs,
+                input.derivationPaths + derivationPaths,
                 redeemScript,
                 witnessScript,
                 input.ripemd160,
@@ -182,8 +182,8 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
                 inputTx,
                 outputIndex,
                 sighashType ?: input.sighashType,
-                mapOf(),
-                derivationPaths + input.derivationPaths,
+                input.partialSigs,
+                input.derivationPaths + derivationPaths,
                 redeemScript,
                 input.ripemd160,
                 input.sha256,
@@ -198,7 +198,12 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
                 sighashType = sighashType ?: input.sighashType,
                 derivationPaths = input.derivationPaths + derivationPaths
             )
-            is Input.WitnessInput.PartiallySignedWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update non-segwit input: it has already been updated with segwit data"))
+            is Input.WitnessInput.PartiallySignedWitnessInput -> input.copy(
+                nonWitnessUtxo = inputTx,
+                redeemScript = redeemScript ?: input.redeemScript,
+                sighashType = sighashType ?: input.sighashType,
+                derivationPaths = input.derivationPaths + derivationPaths
+            )
             is Input.FinalizedInputWithoutUtxo -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update non-segwit input: it has already been finalized"))
             is Input.WitnessInput.FinalizedWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update non-segwit input: it has already been finalized"))
             is Input.NonWitnessInput.FinalizedNonWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update non-segwit input: it has already been finalized"))
@@ -246,9 +251,9 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
             is Output.WitnessOutput -> output.copy(
                 witnessScript = witnessScript ?: output.witnessScript,
                 redeemScript = redeemScript ?: output.redeemScript,
-                derivationPaths = derivationPaths + output.derivationPaths
+                derivationPaths = output.derivationPaths + derivationPaths
             )
-            is Output.UnspecifiedOutput -> Output.WitnessOutput(witnessScript, redeemScript, derivationPaths + output.derivationPaths, output.unknown)
+            is Output.UnspecifiedOutput -> Output.WitnessOutput(witnessScript, redeemScript, output.derivationPaths + derivationPaths, output.unknown)
         }
         return Either.Right(this.copy(outputs = outputs.updated(outputIndex, updatedOutput)))
     }
@@ -270,10 +275,10 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
         val updatedOutput = when (val output = outputs[outputIndex]) {
             is Output.NonWitnessOutput -> output.copy(
                 redeemScript = redeemScript ?: output.redeemScript,
-                derivationPaths = derivationPaths + output.derivationPaths
+                derivationPaths = output.derivationPaths + derivationPaths
             )
             is Output.WitnessOutput -> return Either.Left(UpdateFailure.CannotUpdateOutput(outputIndex, "cannot update non-segwit output: it has already been updated with segwit data"))
-            is Output.UnspecifiedOutput -> Output.NonWitnessOutput(redeemScript, derivationPaths + output.derivationPaths, output.unknown)
+            is Output.UnspecifiedOutput -> Output.NonWitnessOutput(redeemScript, output.derivationPaths + derivationPaths, output.unknown)
         }
         return Either.Right(this.copy(outputs = outputs.updated(outputIndex, updatedOutput)))
     }
@@ -819,11 +824,13 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
                     when {
                         it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("witness utxo key must contain exactly 1 byte"))
                         else -> {
-                            try {
+                            val txOut = try {
                                 TxOut.read(it.value.bytes)
                             } catch (e: Exception) {
                                 return Either.Left(ParseFailure.InvalidTxInput(e.message ?: "failed to parse transaction output"))
                             }
+                            nonWitnessUtxo?.let { tx -> if (tx.txOut[txIn.outPoint.index.toInt()] != txOut) return Either.Left(ParseFailure.InvalidTxInput("witness utxo does not match non-witness utxo output")) }
+                            txOut
                         }
                     }
                 }

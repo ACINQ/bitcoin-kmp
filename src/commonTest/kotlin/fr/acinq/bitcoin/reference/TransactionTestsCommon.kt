@@ -57,7 +57,7 @@ class TransactionTestsCommon {
             return count
         }
 
-        fun processSingle(testCase: JsonArray, valid: Boolean, comment: String? = null) {
+        private fun processSingle(testCase: JsonArray, valid: Boolean, comment: String? = null) {
             val prevoutMap = mutableMapOf<OutPoint, ByteVector>()
             val prevamountMap = mutableMapOf<OutPoint, Satoshi>()
 
@@ -68,23 +68,23 @@ class TransactionTestsCommon {
                     array.map {
                         when (it.jsonArray.size) {
                             3 -> {
-                                val hash = it.jsonArray[0].jsonPrimitive.content
+                                val txid = it.jsonArray[0].jsonPrimitive.content
                                 val index = it.jsonArray[1].jsonPrimitive.int
                                 val scriptPubKey = it.jsonArray[2].jsonPrimitive.content
                                 val prevoutScript = ScriptTestsCommon.parseFromText(scriptPubKey)
                                 prevoutMap.put(
-                                    OutPoint(ByteVector32(hash).reversed(), index.toLong()),
+                                    OutPoint(TxId(txid), index.toLong()),
                                     prevoutScript.byteVector()
                                 )
                             }
                             4 -> {
-                                val hash = it.jsonArray[0].jsonPrimitive.content
+                                val txid = it.jsonArray[0].jsonPrimitive.content
                                 val index = it.jsonArray[1].jsonPrimitive.long
                                 val scriptPubKey = it.jsonArray[2].jsonPrimitive.content
                                 val prevoutScript = ScriptTestsCommon.parseFromText(scriptPubKey)
-                                prevoutMap[OutPoint(ByteVector32(hash).reversed(), index)] = prevoutScript.byteVector()
+                                prevoutMap[OutPoint(TxId(txid), index)] = prevoutScript.byteVector()
                                 val amount = it.jsonArray[3].jsonPrimitive.long.toSatoshi()
-                                prevamountMap.put(OutPoint(ByteVector32(hash).reversed(), index), amount)
+                                prevamountMap.put(OutPoint(TxId(txid), index), amount)
                             }
                             else -> {
                                 fail("unexpected test data $testCase $comment")
@@ -140,7 +140,7 @@ class TransactionTestsCommon {
         val publicKey1 = PublicKey.fromHex("03949633a194a43a310c5a593aada2f2d4a4e3c181880e2b396facfb2130a7f0b5")
         val publicKey2 = PublicKey.fromHex("02cf5642ac302c004f429b1d9334ac3f93f65ae4df2fb6bf23af3a848166afc662")
         val sig = ByteVector("f55bcf4c0650024f421bef9f47f9967fe3015b8ceeda8328185d0f2e73e8c30980e95282b1a73c8d30ceae3c40a9d6df952fd93ea027f6d2a41f6b21dcb1afbef37e81988e8f770cca")
-        val txId = ByteVector32("2f8dbf25b36aef3ab1c14c302e3d07fddd8a9d860126bc6a03e8533bb6a31cbe")
+        val txId = TxId("2f8dbf25b36aef3ab1c14c302e3d07fddd8a9d860126bc6a03e8533bb6a31cbe")
 
         val p2wpkhInputNoWitness = TxIn(OutPoint(txId, 3), ByteVector.empty, 0)
         val p2wpkhInputWithWitness = TxIn(OutPoint(txId, 3), ByteVector.empty, 0, Script.witnessPay2wpkh(publicKey1, sig))

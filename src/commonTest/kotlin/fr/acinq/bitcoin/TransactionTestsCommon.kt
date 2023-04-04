@@ -46,7 +46,7 @@ class TransactionTestsCommon {
         val tx = Transaction.read(hex, Protocol.PROTOCOL_VERSION or Transaction.SERIALIZE_TRANSACTION_NO_WITNESS)
         assertEquals(tx.version, 2)
         assertTrue(tx.txIn.isEmpty())
-        assertEquals(tx.txid, ByteVector32("062d74b3c6183147c30a02addf3c8cd0df10a049ced5677247edd8f114ddb6fb"))
+        assertEquals(tx.txid, TxId("062d74b3c6183147c30a02addf3c8cd0df10a049ced5677247edd8f114ddb6fb"))
         assertEquals(tx.txOut.size, 2)
         assertEquals(tx.txOut[0].publicKeyScript, ByteVector(Script.write(listOf(OP_DUP, OP_HASH160, OP_PUSHDATA(ByteVector("d0c59903c5bac2868760e90fd521a4665aa76520")), OP_EQUALVERIFY, OP_CHECKSIG))))
         assertEquals(tx.txOut[1].publicKeyScript, ByteVector(Script.write(listOf(OP_HASH160, OP_PUSHDATA(ByteVector("3545e6e33b832c47050f24d3eeb93c9c03948bc7")), OP_EQUAL))))
@@ -98,7 +98,7 @@ class TransactionTestsCommon {
         )
 
         // step #2: sign the tx
-        val sig = Transaction.signInput(tx1, 0, previousTx.txOut[0].publicKeyScript, SigHash.SIGHASH_ALL, privateKey)
+        val sig = Transaction.signInput(tx1, 0, previousTx.txOut[0].publicKeyScript, SIGHASH_ALL, privateKey)
         val tx2 = tx1.updateSigScript(0, listOf(OP_PUSHDATA(sig), OP_PUSHDATA(publicKey)))
 
         // redeem the tx
@@ -147,7 +147,7 @@ class TransactionTestsCommon {
         )
 
         // and sign it
-        val sig = Transaction.signInput(tx, 0, previousTx.txOut[0].publicKeyScript, SigHash.SIGHASH_ALL, privateKey)
+        val sig = Transaction.signInput(tx, 0, previousTx.txOut[0].publicKeyScript, SIGHASH_ALL, privateKey)
         val signedTx = tx.updateSigScript(0, listOf(OP_PUSHDATA(sig), OP_PUSHDATA(privateKey.publicKey().toUncompressedBin())))
         Transaction.correctlySpends(signedTx, listOf(previousTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
@@ -167,8 +167,8 @@ class TransactionTestsCommon {
         )
 
         // we need at least 2 signatures
-        val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SigHash.SIGHASH_ALL, key1)
-        val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SigHash.SIGHASH_ALL, key2)
+        val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, key1)
+        val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, key2)
 
         // update our tx with the correct sig script
         val sigScript = listOf(OP_0, OP_PUSHDATA(sig1), OP_PUSHDATA(sig2), OP_PUSHDATA(redeemScript))
@@ -215,7 +215,7 @@ class TransactionTestsCommon {
             .updateSigScript(0, listOf(OP_PUSHDATA(sig1), OP_PUSHDATA(keys[0].publicKey().value)))
             .updateSigScript(1, listOf(OP_PUSHDATA(sig2), OP_PUSHDATA(keys[1].publicKey().toUncompressedBin())))
 
-        assertEquals(ByteVector32("882e971dbdb7b762cd07e5db016d3c81267ec5233186a31e6f40457a0a56a311"), tx1.txid)
+        assertEquals(TxId("882e971dbdb7b762cd07e5db016d3c81267ec5233186a31e6f40457a0a56a311"), tx1.txid)
         assertEquals(
             "01000000026c8a0bb4fef409509800066578a718e9a771082d94e96e0885a4b6a15b720c02000000006b483045022100e5510a2f15f03788ee2aeb2115edc96089596e3a0f0c1b1abfbbf069f4beedb802203faf6ec92a5a4ed2ce5fd42621be99746b57eca0eb46d322dc076080338b6c5a0121030533e1d2e9b7576fef26de1f34d67887158b7af1b040850aab6024b07925d70affffffffaf01f14881716b8acb062c33e7a66fc71e77bb2e4359b1f91b959aeb4f8837f1000000008b483045022100d3e5756f36e39a801c71c406124b3e0a66f0893a7fea46c69939b84715137c40022070a0e96e37c0a8e8c920e84fc63ed1914b4cef114a027f2d027d0a4a04b0b52d0141040081a4cce4c497d51d2f9be2d2109c00cbdef252185ca23074889604ace3504d73fd5f5aaac6423b04e776e467a948e1e79cb8793ded5f4b59c730c4460a0f86ffffffff02c0c62d00000000001976a914558c6b340f5abd22bf97b15cbc1483f8f1b54f5f88aca0f01900000000001976a914a1f93b5b00f9f5e8ade5549b58ed06cdc5c8203e88ac00000000",
             tx1.toString(),
@@ -274,7 +274,7 @@ class TransactionTestsCommon {
             .updateSigScript(1, listOf(OP_PUSHDATA(sig2), OP_PUSHDATA(keys[1].publicKey().toUncompressedBin())))
             .updateSigScript(2, listOf(OP_PUSHDATA(sig3), OP_PUSHDATA(keys[2].publicKey().toUncompressedBin())))
 
-        assertEquals(signedTx.txid, ByteVector32("e8570dd062de8e354b18f6308ff739a51f25db75563c4ee2bc5849281263528f"))
+        assertEquals(signedTx.txid, TxId("e8570dd062de8e354b18f6308ff739a51f25db75563c4ee2bc5849281263528f"))
         assertEquals(
             "0100000003864d5e5ec82c9e6f4ac52b8fa47b77f8616bbc26fcf668432c097c5add169584010000006a47304402203be0cff1faacadce3b02d615a8ac15532f9a90bd30e109eaa3e01bfa3a97d90b0220355f3bc382e35b9cae24e5d674f200b289bb948675ce1b5c931029ccb23ae836012102fd18c2a069488288ae93c2157dff3fd657a39426e8753512a5547f046b4a2cbbffffffffd587b10688e6d56225dd4dc488b74229a353e4613cbe1deadaef52b56616baa9000000008b483045022100ab98145e8526b32e821beeaed41a98da68c3c75ee13c477ee0e3d66a626217e902204d015af2e7dba834bbe421dd0b1353a1060dafee58c284dd763e07639858f9340141043ca81d9fe7996372eb21b2588af07c7fbdb6d4fc1da13aaf953c520ba1da4f87d53dfcba3525369fdb248e60233fdf6df0a8183a6dd5699c9a6f5c537367c627ffffffff94a162b4aab080a09fa982a5d7f586045ba2a4c653c98ff47b952d43c25b45fd000000008a47304402200e0c0223d169282a48731b58ff0673c00205deb3f3f4f28d99b50730ada1571402202fa9f051762d8e0199791ea135df1f393578c1eea530bec00fa16f6bba7e3aa3014104626f9b06c44bcfd5d2f6bdeab456591287e2d2b2e299815edf0c9fd0f23c21364ed5dbe97c9c6e2be40fff40c31f8561a9dee015146fe59ecf68b8a377292c72ffffffff02c0c62d00000000001976a914e410e8bc694e8a39c32a273eb1d71930f63648fe88acc0cf6a00000000001976a914324505870d6f21dca7d2f90642cd9603553f6fa688ac00000000",
             signedTx.toString()

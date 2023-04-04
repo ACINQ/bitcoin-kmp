@@ -222,7 +222,7 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
         @JvmStatic
         override fun validate(message: Block) {
             BlockHeader.validate(message.header)
-            require(message.header.hashMerkleRoot == MerkleTree.computeRoot(message.tx.map { it.hash })) { "invalid block:  merkle root mismatch" }
+            require(message.header.hashMerkleRoot == MerkleTree.computeRoot(message.tx.map { it.hash.value })) { "invalid block:  merkle root mismatch" }
             require(message.tx.map { it.hash }.toSet().size == message.tx.size) { "invalid block: duplicate transactions" }
             message.tx.map { Transaction.validate(it) }
         }

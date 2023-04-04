@@ -40,7 +40,7 @@ class BlockTestsCommon {
         val block = Block.read(blockData)
         assertTrue(Block.checkProofOfWork(block))
 
-        assertEquals(MerkleTree.computeRoot(block.tx.map { it.hash }), block.header.hashMerkleRoot)
+        assertEquals(MerkleTree.computeRoot(block.tx.map { it.hash.value }), block.header.hashMerkleRoot)
 
         // check that we can deserialize and re-serialize scripts
         for (tx in block.tx) {

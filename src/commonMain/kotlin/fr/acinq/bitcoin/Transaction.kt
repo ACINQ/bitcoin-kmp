@@ -25,32 +25,54 @@ import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 /**
- * an out point is a reference to a specific output in a specific transaction that we want to claim
- *
- * @param hash  reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
- * @param index index of the output in tx that we want to refer to
+ * This is the double hash of a transaction serialized without witness data.
+ * Note that this is confusingly called `txid` in some context (e.g. in lightning messages).
  */
-public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index: Long) : BtcSerializable<OutPoint> {
-    public constructor(hash: ByteArray, index: Long) : this(hash.byteVector32(), index)
+public data class TxHash(@JvmField val value: ByteVector32) {
+    public constructor(hash: ByteArray) : this(hash.byteVector32())
+    public constructor(hash: String) : this(ByteVector32(hash))
+    public constructor(txid: TxId) : this(txid.value.reversed())
 
+    override fun toString(): String = value.toString()
+}
+
+/**
+ * This contains the same data as [TxHash], but encoded with the opposite endianness.
+ * Some explorers and bitcoin RPCs use this encoding for their inputs.
+ */
+public data class TxId(@JvmField val value: ByteVector32) {
+    public constructor(txid: ByteArray) : this(txid.byteVector32())
+    public constructor(txid: String) : this(ByteVector32(txid))
+    public constructor(hash: TxHash) : this(hash.value.reversed())
+
+    override fun toString(): String = value.toString()
+}
+
+/**
+ * An OutPoint is a reference to a specific output in a specific transaction.
+ *
+ * @param hash  sha256(sha256(tx)) where tx is the transaction we want to refer to.
+ * @param index index of the output in tx that we want to refer to.
+ */
+public data class OutPoint(@JvmField val hash: TxHash, @JvmField val index: Long) : BtcSerializable<OutPoint> {
     public constructor(tx: Transaction, index: Long) : this(tx.hash, index)
+    public constructor(txid: TxId, index: Long) : this(TxHash(txid), index)
 
     init {
         // The genesis block contains inputs with index = -1, so we cannot require it to be >= 0
         require(index >= -1)
     }
 
-    /**
-     * @return the id of the transaction this output belongs to
-     */
     @JvmField
-    public val txid: ByteVector32 = hash.reversed()
+    public val txid: TxId = TxId(hash)
 
     public val isCoinbase: Boolean get() = isCoinbase(this)
 
+    override fun toString(): String = "$txid:$index"
+
     public companion object : BtcSerializer<OutPoint>() {
         @JvmStatic
-        override fun read(input: Input, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input).toLong())
+        override fun read(input: Input, protocolVersion: Long): OutPoint = OutPoint(TxHash(hash(input)), uint32(input).toLong())
 
         @JvmStatic
         override fun read(input: ByteArray): OutPoint {
@@ -59,7 +81,7 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
 
         @JvmStatic
         override fun write(message: OutPoint, out: Output, protocolVersion: Long) {
-            out.write(message.hash.toByteArray())
+            out.write(message.hash.value.toByteArray())
             writeUInt32(message.index.toUInt(), out)
         }
 
@@ -69,7 +91,7 @@ public data class OutPoint(@JvmField val hash: ByteVector32, @JvmField val index
         }
 
         @JvmStatic
-        public fun isCoinbase(input: OutPoint): Boolean = input.index == 0xffffffffL && input.hash == ByteVector32.Zeroes
+        public fun isCoinbase(input: OutPoint): Boolean = input.index == 0xffffffffL && input.hash.value == ByteVector32.Zeroes
 
         @JvmStatic
         public fun isNull(input: OutPoint): Boolean = isCoinbase(input)
@@ -201,7 +223,7 @@ public data class TxIn(
         @JvmStatic
         public fun coinbase(script: ByteArray): TxIn {
             require(script.size in 2..100) { "coinbase script length must be between 2 and 100" }
-            return TxIn(OutPoint(ByteArray(32), 0xffffffffL), script, sequence = 0xffffffffL)
+            return TxIn(OutPoint(TxHash(ByteArray(32)), 0xffffffffL), script, sequence = 0xffffffffL)
         }
 
         @JvmStatic
@@ -282,10 +304,10 @@ public data class Transaction(
     public val hasWitness: Boolean get() = txIn.any { it.hasWitness }
 
     @JvmField
-    public val hash: ByteVector32 = Crypto.hash256(Transaction.write(this, SERIALIZE_TRANSACTION_NO_WITNESS)).byteVector32()
+    public val hash: TxHash = TxHash(Crypto.hash256(Transaction.write(this, SERIALIZE_TRANSACTION_NO_WITNESS)))
 
     @JvmField
-    public val txid: ByteVector32 = hash.reversed()
+    public val txid: TxId = TxId(hash)
 
     /**
      * @param i         index of the tx input to update

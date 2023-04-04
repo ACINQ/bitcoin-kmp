@@ -44,7 +44,7 @@ public object LexicographicalOrdering {
 
     @JvmStatic
     public fun isLessThan(a: OutPoint, b: OutPoint): Boolean {
-        return if (a.txid == b.txid) a.index < b.index else isLessThan(a.txid, b.txid)
+        return if (a.txid == b.txid) a.index < b.index else isLessThan(a.txid.value, b.txid.value)
     }
 
     @JvmStatic

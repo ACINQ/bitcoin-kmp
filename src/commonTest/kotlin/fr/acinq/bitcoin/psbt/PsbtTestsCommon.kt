@@ -179,7 +179,7 @@ class PsbtTestsCommon {
     fun `invalids psbts -- non-witness input utxos don't match tx`() {
         val inputTx1 = Transaction(
             version = 2,
-            txIn = listOf(TxIn(OutPoint(ByteVector32("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858"), 1), ByteVector("00208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903"), 0)),
+            txIn = listOf(TxIn(OutPoint(TxHash("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858"), 1), ByteVector("00208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903"), 0)),
             txOut = listOf(
                 TxOut(500.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d")),
                 TxOut(750.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d"))
@@ -188,7 +188,7 @@ class PsbtTestsCommon {
         )
         val inputTx2 = Transaction(
             version = 2,
-            txIn = listOf(TxIn(OutPoint(ByteVector32("1dea7cd05979072a3578cab271c02244ea8a090bbb46aa680a65ecd027048d83"), 0), ByteVector("00208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903"), 0)),
+            txIn = listOf(TxIn(OutPoint(TxHash("1dea7cd05979072a3578cab271c02244ea8a090bbb46aa680a65ecd027048d83"), 0), ByteVector("00208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903"), 0)),
             txOut = listOf(
                 TxOut(800.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d")),
                 TxOut(600.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d"))
@@ -469,8 +469,8 @@ class PsbtTestsCommon {
         val unsignedTx = Transaction(
             version = 2,
             txIn = listOf(
-                TxIn(OutPoint(ByteVector32("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858").reversed(), 0), listOf(), TxIn.SEQUENCE_FINAL),
-                TxIn(OutPoint(ByteVector32("1dea7cd05979072a3578cab271c02244ea8a090bbb46aa680a65ecd027048d83").reversed(), 1), listOf(), TxIn.SEQUENCE_FINAL)
+                TxIn(OutPoint(TxId("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858"), 0), listOf(), TxIn.SEQUENCE_FINAL),
+                TxIn(OutPoint(TxId("1dea7cd05979072a3578cab271c02244ea8a090bbb46aa680a65ecd027048d83"), 1), listOf(), TxIn.SEQUENCE_FINAL)
             ),
             txOut = listOf(
                 TxOut(149_990_000.toSatoshi(), ByteVector("0014d85c2b71d0060b09c9886aeb815e50991dda124d")),
@@ -785,11 +785,11 @@ class PsbtTestsCommon {
 
     @Test
     fun `join PSBTs`() {
-        val input1 = TxIn(OutPoint(ByteVector32("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 0), ByteVector("2a"), 42)
+        val input1 = TxIn(OutPoint(TxHash("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 0), ByteVector("2a"), 42)
         val output1 = TxOut(500.toSatoshi(), ByteVector("2a2a"))
         val psbt1 = Psbt(Transaction(2, listOf(input1), listOf(output1), 0))
 
-        val input2 = TxIn(OutPoint(ByteVector32("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 3), ByteVector("2a2a2a"), 0)
+        val input2 = TxIn(OutPoint(TxHash("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 3), ByteVector("2a2a2a"), 0)
         val psbt2 = Psbt(Transaction(2, listOf(input2), listOf(), 0))
 
         val output2 = TxOut(1200.toSatoshi(), ByteVector("2a2a2a2a2a"))
@@ -803,8 +803,8 @@ class PsbtTestsCommon {
             joined.right!!.global.tx, Transaction(
                 version = 2,
                 txIn = listOf(
-                    TxIn(OutPoint(ByteVector32("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 0), listOf(), 42),
-                    TxIn(OutPoint(ByteVector32("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 3), listOf(), 0)
+                    TxIn(OutPoint(TxHash("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 0), listOf(), 42),
+                    TxIn(OutPoint(TxHash("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"), 3), listOf(), 0)
                 ),
                 txOut = listOf(output1, output2),
                 lockTime = 0
@@ -889,7 +889,7 @@ class PsbtTestsCommon {
         assertEquals(psbt.getInput(2), Input.PartiallySignedInputWithoutUtxo(null, mapOf(), setOf(), setOf(), setOf(), setOf(), listOf()))
         assertNull(psbt.getInput(6))
         assertEquals(psbt.getInput(OutPoint(inputTx, 1)), Input.PartiallySignedInputWithoutUtxo(null, mapOf(), setOf(), setOf(), setOf(), setOf(), listOf()))
-        assertNull(psbt.getInput(OutPoint(ByteVector32.Zeroes, 0)))
+        assertNull(psbt.getInput(OutPoint(TxHash(ByteVector32.Zeroes), 0)))
 
         // We can't sign the psbt before adding the utxo details (updater role).
         assertTrue(psbt.sign(priv1, 0).isLeft)
@@ -1124,8 +1124,8 @@ class PsbtTestsCommon {
         // see https://blog.trezor.io/details-of-firmware-updates-for-trezor-one-version-1-9-1-and-trezor-model-t-version-2-3-1-1eba8f60f2dd for more details
         val priv1 = PrivateKey.fromHex("0101010101010101010101010101010101010101010101010101010101010101")
         val priv2 = PrivateKey.fromHex("0202020202020202020202020202020202020202020202020202020202020202")
-        val utxo1 = Transaction(2, listOf(TxIn(OutPoint(Hex.decode("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"), 0), TxIn.SEQUENCE_FINAL)), listOf(TxOut(Satoshi(15_000_000L), Script.pay2wpkh(priv1.publicKey()))), 0)
-        val utxo2 = Transaction(2, listOf(TxIn(OutPoint(Hex.decode("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"), 0), TxIn.SEQUENCE_FINAL)), listOf(TxOut(Satoshi(20_000_000L), Script.pay2wpkh(priv2.publicKey()))), 0)
+        val utxo1 = Transaction(2, listOf(TxIn(OutPoint(TxHash("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"), 0), TxIn.SEQUENCE_FINAL)), listOf(TxOut(Satoshi(15_000_000L), Script.pay2wpkh(priv1.publicKey()))), 0)
+        val utxo2 = Transaction(2, listOf(TxIn(OutPoint(TxHash("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"), 0), TxIn.SEQUENCE_FINAL)), listOf(TxOut(Satoshi(20_000_000L), Script.pay2wpkh(priv2.publicKey()))), 0)
 
         // create a tx that spends our utxo, with an output of 20_000_000 sats: it pays a huge fee of 15_000_000 sats
         val tx = Transaction(

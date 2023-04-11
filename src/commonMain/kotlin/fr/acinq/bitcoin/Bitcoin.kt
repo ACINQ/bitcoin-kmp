@@ -87,10 +87,10 @@ public sealed class AddressFromPublicKeyScriptResult {
 
 public object Bitcoin {
     @JvmStatic
-    public fun computeP2PkhAddress(pub: PublicKey, chainHash: ByteVector32): String = pub.p2pkhAddress(chainHash)
+    public fun computeP2PkhAddress(pub: PublicKey, chainHash: BlockHash): String = pub.p2pkhAddress(chainHash)
 
     @JvmStatic
-    public fun computeBIP44Address(pub: PublicKey, chainHash: ByteVector32): String = computeP2PkhAddress(pub, chainHash)
+    public fun computeBIP44Address(pub: PublicKey, chainHash: BlockHash): String = computeP2PkhAddress(pub, chainHash)
 
     /**
      * @param pub public key
@@ -98,10 +98,10 @@ public object Bitcoin {
      * @return the p2swh-of-p2pkh address for this key. It is a Base58 address that is compatible with most bitcoin wallets
      */
     @JvmStatic
-    public fun computeP2ShOfP2WpkhAddress(pub: PublicKey, chainHash: ByteVector32): String = pub.p2shOfP2wpkhAddress(chainHash)
+    public fun computeP2ShOfP2WpkhAddress(pub: PublicKey, chainHash: BlockHash): String = pub.p2shOfP2wpkhAddress(chainHash)
 
     @JvmStatic
-    public fun computeBIP49Address(pub: PublicKey, chainHash: ByteVector32): String = computeP2ShOfP2WpkhAddress(pub, chainHash)
+    public fun computeBIP49Address(pub: PublicKey, chainHash: BlockHash): String = computeP2ShOfP2WpkhAddress(pub, chainHash)
 
     /**
      * @param pub public key
@@ -110,10 +110,10 @@ public object Bitcoin {
      *         understood only by native segwit wallets
      */
     @JvmStatic
-    public fun computeP2WpkhAddress(pub: PublicKey, chainHash: ByteVector32): String = pub.p2wpkhAddress(chainHash)
+    public fun computeP2WpkhAddress(pub: PublicKey, chainHash: BlockHash): String = pub.p2wpkhAddress(chainHash)
 
     @JvmStatic
-    public fun computeBIP84Address(pub: PublicKey, chainHash: ByteVector32): String = computeP2WpkhAddress(pub, chainHash)
+    public fun computeBIP84Address(pub: PublicKey, chainHash: BlockHash): String = computeP2WpkhAddress(pub, chainHash)
 
     /**
      * Compute an address from a public key script
@@ -121,7 +121,7 @@ public object Bitcoin {
      * @param pubkeyScript public key script
      */
     @JvmStatic
-    public fun addressFromPublicKeyScript(chainHash: ByteVector32, pubkeyScript: List<ScriptElt>): AddressFromPublicKeyScriptResult {
+    public fun addressFromPublicKeyScript(chainHash: BlockHash, pubkeyScript: List<ScriptElt>): AddressFromPublicKeyScriptResult {
         try {
             return when {
                 Script.isPay2pkh(pubkeyScript) -> {
@@ -179,7 +179,7 @@ public object Bitcoin {
     }
 
     @JvmStatic
-    public fun addressFromPublicKeyScript(chainHash: ByteVector32, pubkeyScript: ByteArray): AddressFromPublicKeyScriptResult {
+    public fun addressFromPublicKeyScript(chainHash: BlockHash, pubkeyScript: ByteArray): AddressFromPublicKeyScriptResult {
         return runCatching { Script.parse(pubkeyScript) }.fold(
             onSuccess = {
                 addressFromPublicKeyScript(chainHash, it)
@@ -191,7 +191,7 @@ public object Bitcoin {
     }
 
     @JvmStatic
-    public fun addressToPublicKeyScript(chainHash: ByteVector32, address: String): AddressToPublicKeyScriptResult {
+    public fun addressToPublicKeyScript(chainHash: BlockHash, address: String): AddressToPublicKeyScriptResult {
         val witnessVersions = mapOf(
             0.toByte() to OP_0,
             1.toByte() to OP_1,

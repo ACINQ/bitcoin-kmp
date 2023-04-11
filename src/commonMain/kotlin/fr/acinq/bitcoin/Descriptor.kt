@@ -66,14 +66,14 @@ public object Descriptor {
         return ret.toString()
     }
 
-    private fun getBIP84KeyPath(chainHash: ByteVector32): Pair<String, Int> = when (chainHash) {
+    private fun getBIP84KeyPath(chainHash: BlockHash): Pair<String, Int> = when (chainHash) {
         Block.RegtestGenesisBlock.hash, Block.TestnetGenesisBlock.hash -> "84'/1'/0'/0" to DeterministicWallet.tpub
         Block.LivenetGenesisBlock.hash -> "84'/0'/0'/0" to DeterministicWallet.xpub
         else -> error("invalid chain hash $chainHash")
     }
 
     @JvmStatic
-    public fun BIP84Descriptors(chainHash: ByteVector32, master: DeterministicWallet.ExtendedPrivateKey): Pair<String, String> {
+    public fun BIP84Descriptors(chainHash: BlockHash, master: DeterministicWallet.ExtendedPrivateKey): Pair<String, String> {
         val (keyPath, _) = getBIP84KeyPath(chainHash)
         val accountPub = publicKey(derivePrivateKey(master, KeyPath(keyPath)))
         val fingerprint = DeterministicWallet.fingerprint(master) and 0xFFFFFFFFL
@@ -81,7 +81,7 @@ public object Descriptor {
     }
 
     @JvmStatic
-    public fun BIP84Descriptors(chainHash: ByteVector32, fingerprint: Long, accountPub: DeterministicWallet.ExtendedPublicKey): Pair<String, String> {
+    public fun BIP84Descriptors(chainHash: BlockHash, fingerprint: Long, accountPub: DeterministicWallet.ExtendedPublicKey): Pair<String, String> {
         val (keyPath, prefix) = getBIP84KeyPath(chainHash)
         val accountDesc = "wpkh([${fingerprint.toString(16)}/$keyPath]${DeterministicWallet.encode(accountPub, prefix)}/0/*)"
         val changeDesc = "wpkh([${fingerprint.toString(16)}/$keyPath]${DeterministicWallet.encode(accountPub, prefix)}/1/*)"

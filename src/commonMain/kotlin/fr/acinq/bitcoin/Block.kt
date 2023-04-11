@@ -24,11 +24,27 @@ import kotlin.experimental.and
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
+/** This is the double hash of a serialized block header. */
+public data class BlockHash(@JvmField val value: ByteVector32) {
+    public constructor(hash: ByteArray) : this(hash.byteVector32())
+    public constructor(hash: String) : this(ByteVector32(hash))
+    public constructor(blockId: BlockId) : this(blockId.value.reversed())
+
+    override fun toString(): String = value.toString()
+}
+
+/** This contains the same data as [BlockHash], but encoded with the opposite endianness. */
+public data class BlockId(@JvmField val value: ByteVector32) {
+    public constructor(blockId: ByteArray) : this(blockId.byteVector32())
+    public constructor(blockId: String) : this(ByteVector32(blockId))
+    public constructor(hash: BlockHash) : this(hash.value.reversed())
+
+    override fun toString(): String = value.toString()
+}
+
 /**
- *
  * @param version           Block version information, based upon the software version creating this block
- * @param hashPreviousBlock The hash value of the previous block this particular block references. Please note that
- *                          this hash is not reversed (as opposed to Block.hash)
+ * @param hashPreviousBlock The hash value of the previous block this particular block references.
  * @param hashMerkleRoot    The reference to a Merkle tree collection which is a hash of all transactions related to this block
  * @param time              A timestamp recording when this block was created (Will overflow in 2106[2])
  * @param bits              The calculated difficulty target being used for this block
@@ -36,21 +52,21 @@ import kotlin.jvm.JvmStatic
  */
 public data class BlockHeader(
     @JvmField val version: Long,
-    @JvmField val hashPreviousBlock: ByteVector32,
+    @JvmField val hashPreviousBlock: BlockHash,
     @JvmField val hashMerkleRoot: ByteVector32,
     @JvmField val time: Long,
     @JvmField val bits: Long,
     @JvmField val nonce: Long
 ) : BtcSerializable<BlockHeader> {
     @JvmField
-    public val hash: ByteVector32 = ByteVector32(Crypto.hash256(write(this)))
+    public val hash: BlockHash = BlockHash(Crypto.hash256(write(this)))
 
     @JvmField
-    public val blockId: ByteVector32 = hash.reversed()
+    public val blockId: BlockId = BlockId(hash)
 
     public fun setVersion(input: Long): BlockHeader = this.copy(version = input)
 
-    public fun setHashPreviousBlock(input: ByteVector32): BlockHeader = this.copy(hashPreviousBlock = input)
+    public fun setHashPreviousBlock(input: BlockHash): BlockHeader = this.copy(hashPreviousBlock = input)
 
     public fun setHashMerkleRoot(input: ByteVector32): BlockHeader = this.copy(hashMerkleRoot = input)
 
@@ -64,14 +80,14 @@ public data class BlockHeader(
     public companion object : BtcSerializer<BlockHeader>() {
         override fun read(input: Input, protocolVersion: Long): BlockHeader {
             val version = uint32(input)
-            val hashPreviousBlock = hash(input)
+            val hashPreviousBlock = BlockHash(hash(input))
             val hashMerkleRoot = hash(input)
             val time = uint32(input)
             val bits = uint32(input)
             val nonce = uint32(input)
             return BlockHeader(
                 version.toLong(),
-                hashPreviousBlock.byteVector32(),
+                hashPreviousBlock,
                 hashMerkleRoot.byteVector32(),
                 time.toLong(),
                 bits.toLong(),
@@ -91,7 +107,7 @@ public data class BlockHeader(
 
         override fun write(message: BlockHeader, output: Output, protocolVersion: Long) {
             writeUInt32(message.version.toUInt(), output)
-            writeBytes(message.hashPreviousBlock, output)
+            writeBytes(message.hashPreviousBlock.value, output)
             writeBytes(message.hashMerkleRoot, output)
             writeUInt32(message.time.toUInt(), output)
             writeUInt32(message.bits.toUInt(), output)
@@ -138,7 +154,7 @@ public data class BlockHeader(
         @JvmStatic
         public fun checkProofOfWork(header: BlockHeader): Boolean {
             val (target, _, _) = UInt256.decodeCompact(header.bits)
-            val hash = UInt256(header.blockId.toByteArray())
+            val hash = UInt256(header.blockId.value.toByteArray())
             return hash <= target
         }
 
@@ -187,10 +203,10 @@ public object MerkleTree {
 
 public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: List<Transaction>) {
     @JvmField
-    val hash: ByteVector32 = header.hash
+    val hash: BlockHash = header.hash
 
     @JvmField
-    val blockId: ByteVector32 = hash.reversed()
+    val blockId: BlockId = header.blockId
 
     public companion object : BtcSerializer<Block>() {
         override fun write(message: Block, out: Output, protocolVersion: Long) {
@@ -333,7 +349,7 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
             Block(
                 BlockHeader(
                     version = 1,
-                    hashPreviousBlock = ByteVector32.Zeroes,
+                    hashPreviousBlock = BlockHash(ByteVector32.Zeroes),
                     hashMerkleRoot = ByteVector32("3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"),
                     time = 1231006505,
                     bits = 0x1d00ffff,

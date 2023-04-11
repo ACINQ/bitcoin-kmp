@@ -65,6 +65,18 @@ class BlockTestsCommon {
     }
 
     @Test
+    fun `serialize and deserialize block headers`() {
+        // The following are mainnet block headers for blocks 784900 and 784901.
+        val serialized784900 = ByteVector("0020a1309ea246510ac18e4bf1e40d7534e0e34ccc9af28c24a402000000000000000000bb5c749cd2700dbfb944acaefdc5af88e85b12b2300a80edf0d8d51cf00149c709333564b2e0051776140ae0")
+        val header784900 = BlockHeader.read(serialized784900.bytes)
+        val serialized784901 = ByteVector("00602f2ae7c9e1422e2782ea47a06a1e646a7ed61abefd11fe1102000000000000000000b6695a665e4f1b444770bb8e6224cce3ee4c74e031cbaf432981718b7a0c53e42e343564b2e00517275e5cf9")
+        val header784901 = BlockHeader.read(serialized784901.bytes)
+        assertEquals(header784901.hashPreviousBlock, header784900.hash)
+        assertEquals(serialized784900, BlockHeader.write(header784900).byteVector())
+        assertEquals(serialized784901, BlockHeader.write(header784901).byteVector())
+    }
+
+    @Test
     fun `compute proof of work`() {
         assertEquals(
             UInt256(Hex.decode("0000000000000000000000000000000000000000000000000000000400040004")),

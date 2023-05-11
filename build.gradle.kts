@@ -4,8 +4,8 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "1.6.21"
-    id("org.jetbrains.dokka") version "1.6.21"
+    kotlin("multiplatform") version "1.8.21"
+    id("org.jetbrains.dokka") version "1.8.10"
     `maven-publish`
 }
 
@@ -37,7 +37,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.9.0"
+        val secp256k1KmpVersion = "0.10.0"
 
         val commonMain by getting {
             dependencies {
@@ -49,7 +49,7 @@ kotlin {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
                 implementation("org.kodein.memory:kodein-memory-files:0.7.0")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.3")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.0")
             }
         }
 
@@ -125,6 +125,7 @@ tasks.dokkaHtml {
                 Platform.js -> "js"
                 Platform.native -> "native"
                 Platform.common -> "common"
+                Platform.wasm -> "wasm"
             }
             displayName.set(platformName)
 

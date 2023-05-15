@@ -1,4 +1,4 @@
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.6.21-blue.svg?style=flat&logo=kotlin)](http://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.8.21-blue.svg?style=flat&logo=kotlin)](http://kotlinlang.org)
 [![Maven Central](https://img.shields.io/maven-central/v/fr.acinq.bitcoin/bitcoin-kmp)](https://search.maven.org/search?q=g:fr.acinq.bitcoin%20a:bitcoin-kmp*)
 ![Github Actions](https://github.com/ACINQ/bitcoin-kmp/actions/workflows/test.yml/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/ACINQ/bitcoin-kmp/blob/master/LICENSE)

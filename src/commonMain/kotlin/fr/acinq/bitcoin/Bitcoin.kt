@@ -26,72 +26,61 @@ public fun <T> List<T>.updated(i: Int, t: T): List<T> = when (i) {
     else -> this.take(i) + t + this.drop(i + 1)
 }
 
-public sealed interface AddressToPublicKeyScriptResult {
-    public val result: List<ScriptElt>?
-    public val isSuccess: Boolean
-        get() = result != null
-    public val isFailure: Boolean
-        get() = !isSuccess
+public sealed class AddressToPublicKeyScriptResult {
 
-    public data class Success(val script: List<ScriptElt>) : AddressToPublicKeyScriptResult {
-        override val result: List<ScriptElt>?
-            get() = script
+    public abstract val result: List<ScriptElt>?
+
+    public val isSuccess: Boolean = result != null
+
+    public val isFailure: Boolean = !isSuccess
+
+    public data class Success(val script: List<ScriptElt>) : AddressToPublicKeyScriptResult() {
+        override val result: List<ScriptElt>? = script
     }
 
-    public sealed class Failure : AddressToPublicKeyScriptResult, Throwable() {
-        override val result: List<ScriptElt>?
-            get() = null
+    public sealed class Failure : AddressToPublicKeyScriptResult() {
+        override val result: List<ScriptElt>? = null
 
         public object ChainHashMismatch : Failure() {
-            override val message: String? get() = "chain hash mismatch"
+            override fun toString(): String = "chain hash mismatch"
+        }
+
+        public object InvalidAddress : Failure() {
+            override fun toString(): String = "invalid base58 or bech32 address "
         }
 
         public object InvalidBech32Address : Failure() {
-            override val message: String?
-                get() = "invalid bech32 address"
+            override fun toString(): String = "invalid bech32 address"
         }
 
         public data class InvalidWitnessVersion(val version: Int) : Failure() {
-            override val message: String?
-                get() = "invalid witness version $version"
-        }
-
-        public data class GenericFailure(val t: Throwable) : Failure() {
-            override val cause: Throwable?
-                get() = t
+            override fun toString(): String = "invalid witness version $version"
         }
     }
 }
 
-public sealed interface AddressFromPublicKeyScriptResult {
-    public val result: String?
-    public val isSuccess: Boolean
-        get() = result != null
-    public val isFailure: Boolean
-        get() = !isSuccess
+public sealed class AddressFromPublicKeyScriptResult {
+    public abstract val result: String?
+    public val isSuccess: Boolean = result != null
+    public val isFailure: Boolean = !isSuccess
 
-    public data class Success(val address: String) : AddressFromPublicKeyScriptResult {
-        override val result: String?
-            get() = address
+    public data class Success(val address: String) : AddressFromPublicKeyScriptResult() {
+        override val result: String? = address
     }
 
-    public sealed class Failure : AddressFromPublicKeyScriptResult, Throwable() {
-        override val result: String?
-            get() = null
+    public sealed class Failure : AddressFromPublicKeyScriptResult() {
+        override val result: String? = null
 
         public object InvalidChainHash : Failure() {
-            override val message: String?
-                get() = "invalid chain hash"
+            override fun toString(): String = "invalid chain hash"
         }
 
         public object InvalidScript : Failure() {
-            override val message: String?
-                get() = "invalid script"
+            override fun toString(): String = "invalid script"
         }
 
         public data class GenericError(val t: Throwable) : Failure() {
-            override val cause: Throwable?
-                get() = t
+            override fun toString(): String = "generic failure: ${t.message}"
         }
     }
 }
@@ -127,7 +116,7 @@ public object Bitcoin {
     public fun computeBIP84Address(pub: PublicKey, chainHash: ByteVector32): String = computeP2WpkhAddress(pub, chainHash)
 
     /**
-     * Compute an address form a public key script
+     * Compute an address from a public key script
      * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
      * @param pubkeyScript public key script
      */
@@ -191,11 +180,14 @@ public object Bitcoin {
 
     @JvmStatic
     public fun addressFromPublicKeyScript(chainHash: ByteVector32, pubkeyScript: ByteArray): AddressFromPublicKeyScriptResult {
-        return try {
-            addressFromPublicKeyScript(chainHash, Script.parse(pubkeyScript))
-        } catch (t: Throwable) {
-            AddressFromPublicKeyScriptResult.Failure.GenericError(t)
-        }
+        return runCatching { Script.parse(pubkeyScript) }.fold(
+            onSuccess = {
+                addressFromPublicKeyScript(chainHash, it)
+            },
+            onFailure = {
+                AddressFromPublicKeyScriptResult.Failure.InvalidScript
+            }
+        )
     }
 
     @JvmStatic
@@ -253,7 +245,7 @@ public object Bitcoin {
                         }
                     },
                     onFailure = {
-                        AddressToPublicKeyScriptResult.Failure.GenericFailure(it)
+                        AddressToPublicKeyScriptResult.Failure.InvalidAddress
                     }
                 )
             }

@@ -30,7 +30,7 @@ class ScriptTestsCommon {
         assertTrue(Script.isPay2pkh(script))
         assertNull(Script.getWitnessVersion(script))
         assertFalse(Script.isPay2sh(script) || Script.isPay2wpkh(script) || Script.isPay2wsh(script))
-        assertEquals("1C6Rc3w25VHud3dLDamutaqfKWqhrLRTaD", Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).right)
+        assertEquals("1C6Rc3w25VHud3dLDamutaqfKWqhrLRTaD", Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).result)
     }
 
     @Test
@@ -40,7 +40,7 @@ class ScriptTestsCommon {
         assertTrue(Script.isPay2sh(script))
         assertNull(Script.getWitnessVersion(script))
         assertFalse(Script.isPay2pkh(script) || Script.isPay2wpkh(script) || Script.isPay2wsh(script))
-        assertEquals("3DedZ8SErqfunkjqnv8Pta1MKgEuHi22W5", Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).right)
+        assertEquals("3DedZ8SErqfunkjqnv8Pta1MKgEuHi22W5", Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).result)
     }
 
     @Test
@@ -50,7 +50,7 @@ class ScriptTestsCommon {
         assertTrue(Script.isPay2wpkh(script))
         assertEquals(0, Script.getWitnessVersion(script))
         assertFalse(Script.isPay2sh(script) || Script.isPay2pkh(script) || Script.isPay2wsh(script))
-        assertEquals("bc1q0xcqpzrky6eff2g52qdye53xkk9jxkvrh6yhyw", Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).right)
+        assertEquals("bc1q0xcqpzrky6eff2g52qdye53xkk9jxkvrh6yhyw", Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).result)
     }
 
     @Test
@@ -60,7 +60,7 @@ class ScriptTestsCommon {
         assertTrue(Script.isPay2wsh(script))
         assertEquals(0, Script.getWitnessVersion(script))
         assertFalse(Script.isPay2sh(script) || Script.isPay2wpkh(script) || Script.isPay2pkh(script))
-        assertEquals("bc1qdudnf8tla4fyptt3n9y9985tq64lqwzr37d4ywpqfzfhtt638glsqaednx", Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).right)
+        assertEquals("bc1qdudnf8tla4fyptt3n9y9985tq64lqwzr37d4ywpqfzfhtt638glsqaednx", Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).result)
     }
 
     @Test
@@ -70,7 +70,7 @@ class ScriptTestsCommon {
         assertTrue(Script.isNativeWitnessScript(script))
         assertFalse(Script.isPay2sh(script) || Script.isPay2wsh(script) || Script.isPay2wpkh(script) || Script.isPay2pkh(script))
         assertEquals(1, Script.getWitnessVersion(script))
-        assertEquals("bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).right)
+        assertEquals("bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).result)
     }
 
     @Test

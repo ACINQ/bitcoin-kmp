@@ -84,7 +84,7 @@ class TaprootTestsCommon {
         assertEquals(Script.pay2tr(outputKey), Script.parse(tx.txOut[1].publicKeyScript))
 
         // we want to spend
-        val outputScript = addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, "tb1pn3g330w4n5eut7d4vxq0pp303267qc6vg8d2e0ctjuqre06gs3yqnc5yx0")
+        val outputScript = addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, "tb1pn3g330w4n5eut7d4vxq0pp303267qc6vg8d2e0ctjuqre06gs3yqnc5yx0").result!!
         val tx1 = Transaction(
             2,
             listOf(TxIn(OutPoint(tx, 1), TxIn.SEQUENCE_FINAL)),
@@ -188,7 +188,7 @@ class TaprootTestsCommon {
         val tmp = Transaction(
             version = 2,
             txIn = listOf(TxIn(OutPoint(fundingTx, 0), TxIn.SEQUENCE_FINAL)),
-            txOut = listOf(TxOut(fundingTx.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, "bcrt1qdtu5cwyngza8hw8s5uk2erlrkh8ceh3msp768v"))),
+            txOut = listOf(TxOut(fundingTx.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, "bcrt1qdtu5cwyngza8hw8s5uk2erlrkh8ceh3msp768v").result!!)),
             lockTime = 0
         )
         val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(annex = null, tapleafHash = merkleRoot))
@@ -247,14 +247,14 @@ class TaprootTestsCommon {
         val script = Script.write(listOf(OP_1, OP_PUSHDATA(tweakedKey.value))).byteVector()
         val bip350Address = Bech32.encodeWitnessAddress(hrp(blockchain), 1.toByte(), tweakedKey.value.toByteArray())
         assertEquals(bip350Address, "tb1p78gx95syx0qz8w5nftk8t7nce78zlpqpsxugcvq5xpfy4tvn6rasd7wk0y")
-        val sweepPublicKeyScript = addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7")
+        val sweepPublicKeyScript = addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7").result!!
 
         // see https://mempool.space/signet/tx/c284010f06b5182e9f4722ce3474980339b1fc76e5ff29ece812f5d2162595c1
         val fundingTx = Transaction.read("020000000001017034061243a7770f791aa2afdb118be900f4f8fc755a36d8632213acc139bab20100000000feffffff0200e1f50500000000225120f1d062d20433c023ba934aec75fa78cf8e2f840181b88c301430524aad93d0fbc192ac1700000000160014b66f2e807b9f4adecb99ad811dde501ca3f0fd5f02473044022046a2fd077e12b1d7ba74f6e7ac469deb3e3755c100216abad667980fc39463dc022018b63cfaf72fde0b5ca10c617aeaa0015013bd06ef08f82eea500c6467d963cc0121030b50ec81d958ae79d34d3579faf72456213d7d581a908e2b64d21b96777882043ab10100")
 
         // output #1 is the one we want to spend
         assertEquals(fundingTx.txOut[0].publicKeyScript, script)
-        assertEquals(addressToPublicKeyScript(blockchain, bip350Address), listOf(OP_1, OP_PUSHDATA(tweakedKey.value)))
+        assertEquals(addressToPublicKeyScript(blockchain, bip350Address).result, listOf(OP_1, OP_PUSHDATA(tweakedKey.value)))
 
         // spending with the key path: no need to provide any script
         val tx = run {
@@ -336,7 +336,7 @@ class TaprootTestsCommon {
             val tmp = Transaction(
                 version = 2,
                 txIn = listOf(TxIn(OutPoint(fundingTx3, 1), TxIn.SEQUENCE_FINAL)),
-                txOut = listOf(TxOut(fundingTx3.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7"))),
+                txOut = listOf(TxOut(fundingTx3.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7").result!!)),
                 lockTime = 0
             )
             // to re-compute the merkle root we need to provide branch(#1, #2)

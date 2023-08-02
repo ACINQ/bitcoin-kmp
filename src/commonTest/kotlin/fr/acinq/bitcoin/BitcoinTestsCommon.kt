@@ -40,9 +40,9 @@ class BitcoinTestsCommon {
             assertEquals(address(Script.pay2wpkh(pub), it).result, computeP2WpkhAddress(pub, it))
             assertEquals(address(Script.pay2sh(Script.pay2wpkh(pub)), it).result, computeP2ShOfP2WpkhAddress(pub, it))
             // all these chain hashes are invalid
-            assertTrue(address(Script.pay2pkh(pub), it.reversed()).isFailure)
-            assertTrue(address(Script.pay2wpkh(pub), it.reversed()).isFailure)
-            assertTrue(address(Script.pay2sh(Script.pay2wpkh(pub)), it.reversed()).isFailure)
+            assertTrue(address(Script.pay2pkh(pub), it.reversed()).isFailure())
+            assertTrue(address(Script.pay2wpkh(pub), it.reversed()).isFailure())
+            assertTrue(address(Script.pay2sh(Script.pay2wpkh(pub)), it.reversed()).isFailure())
         }
 
         listOf(

@@ -12,7 +12,7 @@ plugins {
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.13.0"
+version = "0.14.0-SNASPHOT"
 
 repositories {
     google()

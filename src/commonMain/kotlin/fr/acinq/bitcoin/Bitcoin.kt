@@ -30,12 +30,12 @@ public sealed class AddressToPublicKeyScriptResult {
 
     public abstract val result: List<ScriptElt>?
 
-    public val isSuccess: Boolean = result != null
+    public fun isSuccess(): Boolean = result != null
 
-    public val isFailure: Boolean = !isSuccess
+    public fun isFailure(): Boolean = !isSuccess()
 
     public data class Success(val script: List<ScriptElt>) : AddressToPublicKeyScriptResult() {
-        override val result: List<ScriptElt>? = script
+        override val result: List<ScriptElt> = script
     }
 
     public sealed class Failure : AddressToPublicKeyScriptResult() {
@@ -61,11 +61,11 @@ public sealed class AddressToPublicKeyScriptResult {
 
 public sealed class AddressFromPublicKeyScriptResult {
     public abstract val result: String?
-    public val isSuccess: Boolean = result != null
-    public val isFailure: Boolean = !isSuccess
+    public fun isSuccess(): Boolean = result != null
+    public fun isFailure(): Boolean = !isSuccess()
 
     public data class Success(val address: String) : AddressFromPublicKeyScriptResult() {
-        override val result: String? = address
+        override val result: String = address
     }
 
     public sealed class Failure : AddressFromPublicKeyScriptResult() {
@@ -95,7 +95,7 @@ public object Bitcoin {
     /**
      * @param pub public key
      * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
-     * @return the p2swh-of-p2pkh address for this key). It is a Base58 address that is compatible with most bitcoin wallets
+     * @return the p2swh-of-p2pkh address for this key. It is a Base58 address that is compatible with most bitcoin wallets
      */
     @JvmStatic
     public fun computeP2ShOfP2WpkhAddress(pub: PublicKey, chainHash: ByteVector32): String = pub.p2shOfP2wpkhAddress(chainHash)
@@ -105,9 +105,9 @@ public object Bitcoin {
 
     /**
      * @param pub public key
-     * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
+     * @param chainHash chain hash (i.e. hash of the genesis block of the chain we're on)
      * @return the BIP84 address for this key (i.e. the p2wpkh address for this key). It is a Bech32 address that will be
-     *         understood only by native sewgit wallets
+     *         understood only by native segwit wallets
      */
     @JvmStatic
     public fun computeP2WpkhAddress(pub: PublicKey, chainHash: ByteVector32): String = pub.p2wpkhAddress(chainHash)
@@ -117,7 +117,7 @@ public object Bitcoin {
 
     /**
      * Compute an address from a public key script
-     * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
+     * @param chainHash chain hash (i.e. hash of the genesis block of the chain we're on)
      * @param pubkeyScript public key script
      */
     @JvmStatic

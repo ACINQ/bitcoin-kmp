@@ -422,7 +422,7 @@ public data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val opCo
         @JvmStatic
         public fun isMinimal(data: ByteArray, code: Int): Boolean {
             return when {
-                data.size == 0 -> code == OP_0.code
+                data.isEmpty() -> code == OP_0.code
                 data.size == 1 && data[0] >= 1 && data[0] <= 16 -> code == (OP_1.code).plus(data[0] - 1)
                 data.size == 1 && data[0] == 0x81.toByte() -> code == OP_1NEGATE.code
                 data.size <= 75 -> code == data.size

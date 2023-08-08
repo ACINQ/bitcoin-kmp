@@ -18,9 +18,12 @@ package fr.acinq.bitcoin.psbt
 
 import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.crypto.Pack
-import fr.acinq.bitcoin.io.*
+import fr.acinq.bitcoin.io.ByteArrayInput
+import fr.acinq.bitcoin.io.ByteArrayOutput
+import fr.acinq.bitcoin.io.readNBytes
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.getOrElse
+import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 /**
@@ -30,7 +33,7 @@ import kotlin.jvm.JvmStatic
  * @param inputs signing data for each input of the transaction to be signed (order matches the unsigned tx).
  * @param outputs signing data for each output of the transaction to be signed (order matches the unsigned tx).
  */
-public data class Psbt(val global: Global, val inputs: List<Input>, val outputs: List<Output>) {
+public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<Input>, @JvmField val outputs: List<Output>) {
 
     init {
         require(global.tx.txIn.size == inputs.size) { "there must be one partially signed input per input of the unsigned tx" }
@@ -537,7 +540,6 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
         /** Only version 0 is supported for now. */
         public const val Version: Long = 0
 
-
         /**
          * Implements the PSBT combiner role: combines multiple psbts for the same unsigned transaction.
          *
@@ -588,8 +590,8 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
         )
 
         private fun combineOutput(outputs: List<Output>): Output = createOutput(
-            outputs.mapNotNull { it.redeemScript }.firstOrNull(),
-            outputs.mapNotNull { it.witnessScript }.firstOrNull(),
+            outputs.firstNotNullOfOrNull { it.redeemScript },
+            outputs.firstNotNullOfOrNull { it.witnessScript },
             outputs.flatMap { it.derivationPaths.toList() }.toMap(),
             combineUnknown(outputs.map { it.unknown })
         )
@@ -1066,15 +1068,15 @@ public data class Psbt(val global: Global, val inputs: List<Input>, val outputs:
  * @param masterKeyFingerprint fingerprint of the master key.
  * @param extendedPublicKey BIP32 extended public key.
  */
-public data class ExtendedPublicKeyWithMaster(val prefix: Long, val masterKeyFingerprint: Long, val extendedPublicKey: DeterministicWallet.ExtendedPublicKey)
+public data class ExtendedPublicKeyWithMaster(@JvmField val prefix: Long, @JvmField val masterKeyFingerprint: Long, @JvmField val extendedPublicKey: DeterministicWallet.ExtendedPublicKey)
 
 /**
  * @param masterKeyFingerprint fingerprint of the master key.
  * @param keyPath bip 32 derivation path.
  */
-public data class KeyPathWithMaster(val masterKeyFingerprint: Long, val keyPath: KeyPath)
+public data class KeyPathWithMaster(@JvmField val masterKeyFingerprint: Long, @JvmField val keyPath: KeyPath)
 
-public data class DataEntry(val key: ByteVector, val value: ByteVector)
+public data class DataEntry(@JvmField val key: ByteVector, @JvmField val value: ByteVector)
 
 /**
  * Global data for the PSBT.
@@ -1084,7 +1086,12 @@ public data class DataEntry(val key: ByteVector, val value: ByteVector)
  * @param extendedPublicKeys (optional) extended public keys used when signing inputs and producing outputs.
  * @param unknown (optional) unknown global entries.
  */
-public data class Global(val version: Long, val tx: Transaction, val extendedPublicKeys: List<ExtendedPublicKeyWithMaster>, val unknown: List<DataEntry>)
+public data class Global(
+    @JvmField val version: Long,
+    @JvmField val tx: Transaction,
+    @JvmField val extendedPublicKeys: List<ExtendedPublicKeyWithMaster>,
+    @JvmField val unknown: List<DataEntry>
+)
 
 /** A PSBT input. A valid PSBT must contain one such input per input of the [[Global.tx]]. */
 public sealed class Input {

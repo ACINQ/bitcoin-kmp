@@ -19,16 +19,14 @@ class DescriptorTestsCommon {
         data.forEach { dnc ->
             val (desc, checksum) = dnc.split('#').toTypedArray()
             assertEquals(checksum, Descriptor.checksum(desc))
-       }
+        }
     }
 
     @Test
     fun `compute BIP84 descriptors`() {
         val seed = ByteVector.fromHex("817a9c8e6ba36f083d7e68b5ee89ce74fde9ef294a724a5efc5cef2b88db057f")
         val master = DeterministicWallet.generate(seed)
-        val (accountDesc, changeDesc) = Descriptor.BIP84Descriptors(Block.RegtestGenesisBlock.hash, master)
-        assertEquals("wpkh([189ef5fe/84'/1'/0'/0]tpubDFTu6FhLqfTBLMd7BvGkyH1h4XBw7XoKWfnNNWw5Sp8V6aC55EhgPTVNAYvBwBXQ8EGnMqaZi3dpdSzhMbD4Z7ivZiaVKNMUkXVjDU1CDuE/0/*)#uysr3s9y", accountDesc)
-        assertEquals("wpkh([189ef5fe/84'/1'/0'/0]tpubDFTu6FhLqfTBLMd7BvGkyH1h4XBw7XoKWfnNNWw5Sp8V6aC55EhgPTVNAYvBwBXQ8EGnMqaZi3dpdSzhMbD4Z7ivZiaVKNMUkXVjDU1CDuE/1/*)#ds4zv94u", changeDesc)
+        val descriptor = Descriptor.BIP84Descriptor(Block.RegtestGenesisBlock.hash, master)
+        assertEquals("wpkh([189ef5fe/84'/1'/0'/0]tpubDFTu6FhLqfTBLMd7BvGkyH1h4XBw7XoKWfnNNWw5Sp8V6aC55EhgPTVNAYvBwBXQ8EGnMqaZi3dpdSzhMbD4Z7ivZiaVKNMUkXVjDU1CDuE/<0;1>/*)#rw8h72wu", descriptor)
     }
-
 }

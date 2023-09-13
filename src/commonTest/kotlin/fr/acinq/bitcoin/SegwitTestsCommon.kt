@@ -152,7 +152,7 @@ class SegwitTestsCommon {
         }
 
         Transaction.correctlySpends(tx2, listOf(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-        assertEquals(tx2.txid, ByteVector32("f25b3fecc9652466926237d96e4bc7ee2c984051fe48e61417aba218af5570c3"))
+        assertEquals(tx2.txid, TxId("f25b3fecc9652466926237d96e4bc7ee2c984051fe48e61417aba218af5570c3"))
         // this tx was published on testnet as f25b3fecc9652466926237d96e4bc7ee2c984051fe48e61417aba218af5570c3
 
         // and now we create a testnet tx that spends the P2WPK output
@@ -185,7 +185,7 @@ class SegwitTestsCommon {
         }
 
         Transaction.correctlySpends(tx3, listOf(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-        assertEquals(tx3.txid, ByteVector32("739e7cba97af259d2c089690adea00aa78b1c8d7995aa9377be58fe5332378aa"))
+        assertEquals(tx3.txid, TxId("739e7cba97af259d2c089690adea00aa78b1c8d7995aa9377be58fe5332378aa"))
         // this tx was published on testnet as 739e7cba97af259d2c089690adea00aa78b1c8d7995aa9377be58fe5332378aa
     }
 
@@ -240,7 +240,7 @@ class SegwitTestsCommon {
             tmp.updateSigScript(0, listOf(OP_PUSHDATA(sig), OP_PUSHDATA(pub1)))
         }
         Transaction.correctlySpends(tx2, listOf(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-        assertEquals(tx2.txid, ByteVector32("2f8360a06a31ca642d717b1857aa86b3306fc554fa9c437d88b4bc61b7f2b3e9"))
+        assertEquals(tx2.txid, TxId("2f8360a06a31ca642d717b1857aa86b3306fc554fa9c437d88b4bc61b7f2b3e9"))
         // this tx was published on testnet as 2f8360a06a31ca642d717b1857aa86b3306fc554fa9c437d88b4bc61b7f2b3e9
 
         // and now we create a segwit tx that spends the P2WSH output
@@ -275,7 +275,7 @@ class SegwitTestsCommon {
         }
 
         Transaction.correctlySpends(tx3, listOf(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-        assertEquals(tx3.txid, ByteVector32("4817f79def9d9f559ddaa636f0c196e79f31bc959feead77b4151733114c652a"))
+        assertEquals(tx3.txid, TxId("4817f79def9d9f559ddaa636f0c196e79f31bc959feead77b4151733114c652a"))
         // this tx was published on testnet as 4817f79def9d9f559ddaa636f0c196e79f31bc959feead77b4151733114c652a
     }
 
@@ -323,7 +323,7 @@ class SegwitTestsCommon {
         }
 
         Transaction.correctlySpends(tx1, listOf(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-        assertEquals(tx1.txid, ByteVector32("4807cb10f50df84acd7766245133f902d22d91b7e8bfe77c4bbcb0cf9b017a86"))
+        assertEquals(tx1.txid, TxId("4807cb10f50df84acd7766245133f902d22d91b7e8bfe77c4bbcb0cf9b017a86"))
         // this tx was published on testnet as 4807cb10f50df84acd7766245133f902d22d91b7e8bfe77c4bbcb0cf9b017a86
     }
 }

@@ -33,16 +33,16 @@ class BitcoinTestsCommon {
     fun `compute address from pubkey script`() {
         val pub = PrivateKey.fromHex("0101010101010101010101010101010101010101010101010101010101010101").publicKey()
 
-        fun address(script: List<ScriptElt>, chainHash: ByteVector32) = addressFromPublicKeyScript(chainHash, script)
+        fun address(script: List<ScriptElt>, chainHash: BlockHash) = addressFromPublicKeyScript(chainHash, script)
 
         listOf(Block.LivenetGenesisBlock.hash, Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash).forEach {
             assertEquals(address(Script.pay2pkh(pub), it).result, computeP2PkhAddress(pub, it))
             assertEquals(address(Script.pay2wpkh(pub), it).result, computeP2WpkhAddress(pub, it))
             assertEquals(address(Script.pay2sh(Script.pay2wpkh(pub)), it).result, computeP2ShOfP2WpkhAddress(pub, it))
             // all these chain hashes are invalid
-            assertTrue(address(Script.pay2pkh(pub), it.reversed()).isFailure())
-            assertTrue(address(Script.pay2wpkh(pub), it.reversed()).isFailure())
-            assertTrue(address(Script.pay2sh(Script.pay2wpkh(pub)), it.reversed()).isFailure())
+            assertTrue(address(Script.pay2pkh(pub), BlockHash(it.value.reversed())).isFailure())
+            assertTrue(address(Script.pay2wpkh(pub), BlockHash(it.value.reversed())).isFailure())
+            assertTrue(address(Script.pay2sh(Script.pay2wpkh(pub)), BlockHash(it.value.reversed())).isFailure())
         }
 
         listOf(
@@ -117,9 +117,9 @@ class BitcoinTestsCommon {
 
     @Test
     fun `check genesis block hashes`() {
-        assertEquals(Block.RegtestGenesisBlock.blockId, ByteVector32.fromValidHex("0x0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"))
-        assertEquals(Block.SignetGenesisBlock.blockId, ByteVector32.fromValidHex("0x00000008819873e925422c1ff0f99f7cc9bbb232af63a077a480a3633bee1ef6"))
-        assertEquals(Block.TestnetGenesisBlock.blockId, ByteVector32.fromValidHex("0x000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"))
-        assertEquals(Block.LivenetGenesisBlock.blockId, ByteVector32.fromValidHex("0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"))
+        assertEquals(Block.RegtestGenesisBlock.blockId, BlockId("0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"))
+        assertEquals(Block.SignetGenesisBlock.blockId, BlockId("00000008819873e925422c1ff0f99f7cc9bbb232af63a077a480a3633bee1ef6"))
+        assertEquals(Block.TestnetGenesisBlock.blockId, BlockId("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"))
+        assertEquals(Block.LivenetGenesisBlock.blockId, BlockId("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"))
     }
 }

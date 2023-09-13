@@ -22,7 +22,7 @@ import kotlin.test.assertEquals
 class PowTestsCommon {
     @Test
     fun `calculate next work required`() {
-        val header = BlockHeader(version = 2, hashPreviousBlock = ByteVector32.Zeroes, hashMerkleRoot = ByteVector32.Zeroes, time = 0L, bits = 0L, nonce = 0L)
+        val header = BlockHeader(version = 2, hashPreviousBlock = BlockHash(ByteVector32.Zeroes), hashMerkleRoot = ByteVector32.Zeroes, time = 0L, bits = 0L, nonce = 0L)
         assertEquals(0x1d00d86aL, BlockHeader.calculateNextWorkRequired(header.copy(time = 1262152739, bits = 0x1d00ffff), 1261130161))
         assertEquals(0x1d00ffffL, BlockHeader.calculateNextWorkRequired(header.copy(time = 1233061996, bits = 0x1d00ffff), 1231006505))
         assertEquals(0x1c0168fdL, BlockHeader.calculateNextWorkRequired(header.copy(time = 1279297671, bits = 0x1c05a3f4), 1279008237))

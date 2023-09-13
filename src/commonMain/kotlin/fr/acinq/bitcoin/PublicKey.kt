@@ -76,7 +76,7 @@ public data class PublicKey(@JvmField val value: ByteVector) {
      * @param chainHash chain hash (i.e. hash of the genesis block of the chain we're on)
      * @return the "legacy" p2pkh address for this key
      */
-    public fun p2pkhAddress(chainHash: ByteVector32): String = when (chainHash) {
+    public fun p2pkhAddress(chainHash: BlockHash): String = when (chainHash) {
         Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, hash160())
         Block.LivenetGenesisBlock.hash -> Base58Check.encode(Base58.Prefix.PubkeyAddress, hash160())
         else -> error("invalid chain hash $chainHash")
@@ -87,7 +87,7 @@ public data class PublicKey(@JvmField val value: ByteVector) {
      * @return the p2swh-of-p2pkh address for this key.
      * It is a Base58 address that is compatible with most bitcoin wallets.
      */
-    public fun p2shOfP2wpkhAddress(chainHash: ByteVector32): String {
+    public fun p2shOfP2wpkhAddress(chainHash: BlockHash): String {
         val script = Script.pay2wpkh(this)
         val hash = Crypto.hash160(Script.write(script))
         return when (chainHash) {
@@ -102,7 +102,7 @@ public data class PublicKey(@JvmField val value: ByteVector) {
      * @return the BIP84 address for this key (i.e. the p2wpkh address for this key).
      * It is a Bech32 address that will be understood only by native segwit wallets.
      */
-    public fun p2wpkhAddress(chainHash: ByteVector32): String {
+    public fun p2wpkhAddress(chainHash: BlockHash): String {
         return Bech32.encodeWitnessAddress(Bech32.hrp(chainHash), 0, hash160())
     }
 

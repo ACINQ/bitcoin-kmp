@@ -47,7 +47,7 @@ public object Bech32 {
     }
 
     @JvmStatic
-    public fun hrp(chainHash: ByteVector32): String = when (chainHash) {
+    public fun hrp(chainHash: BlockHash): String = when (chainHash) {
         Block.TestnetGenesisBlock.hash -> "tb"
         Block.SignetGenesisBlock.hash -> "tb"
         Block.RegtestGenesisBlock.hash -> "bcrt"

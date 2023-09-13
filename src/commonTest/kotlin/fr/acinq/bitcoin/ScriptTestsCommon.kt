@@ -77,7 +77,7 @@ class ScriptTestsCommon {
     fun `parse if - else - endif`() {
         val tx = Transaction(
             version = 1,
-            txIn = listOf(TxIn(OutPoint(ByteVector32.Zeroes, 0xffffffff), Script.write(listOf(OP_NOP)), 0xffffffff)),
+            txIn = listOf(TxIn(OutPoint(TxHash(ByteVector32.Zeroes), 0xffffffff), Script.write(listOf(OP_NOP)), 0xffffffff)),
             txOut = listOf(TxOut(0x12a05f200L.sat(), ByteVector.empty)),
             lockTime = 0
         )

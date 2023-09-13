@@ -78,7 +78,7 @@ class ScriptTestsCommon {
     }
 
     companion object {
-        val mapFlagNames = mapOf(
+        private val mapFlagNames = mapOf(
             "NONE" to SCRIPT_VERIFY_NONE,
             "P2SH" to SCRIPT_VERIFY_P2SH,
             "STRICTENC" to SCRIPT_VERIFY_STRICTENC,
@@ -136,30 +136,29 @@ class ScriptTestsCommon {
 
             try {
                 val tokens = input.split(' ').filterNot { it.isEmpty() }.map { it.removePrefix("OP_") }.toList()
-                val bytes = parseInternal(tokens)
-                return bytes
+                return parseInternal(tokens)
 
             } catch (t: Throwable) {
                 throw RuntimeException("cannot parse $input", t)
             }
         }
 
-        fun creditTx(scriptPubKey: ByteArray, amount: Satoshi) = Transaction(
+        private fun creditTx(scriptPubKey: ByteArray, amount: Satoshi) = Transaction(
             version = 1,
-            txIn = listOf(TxIn(OutPoint(ByteArray(32), -1), listOf(OP_0, OP_0), 0xffffffff)),
+            txIn = listOf(TxIn(OutPoint(TxHash(ByteArray(32)), -1), listOf(OP_0, OP_0), 0xffffffff)),
             txOut = listOf(TxOut(amount, scriptPubKey)),
             lockTime = 0
         )
 
-        fun spendingTx(scriptSig: ByteArray, tx: Transaction) = Transaction(
+        private fun spendingTx(scriptSig: ByteArray, tx: Transaction) = Transaction(
             version = 1,
-            txIn = listOf(TxIn(OutPoint(Crypto.hash256(Transaction.write(tx)), 0), scriptSig, 0xffffffff)),
+            txIn = listOf(TxIn(OutPoint(TxHash(Crypto.hash256(Transaction.write(tx))), 0), scriptSig, 0xffffffff)),
             txOut = listOf(TxOut(tx.txOut[0].amount, ByteArray(0))),
             lockTime = 0
         )
 
         // use 0 btc if no amount is specified
-        fun runTest(
+        private fun runTest(
             witnessText: List<String>,
             scriptSigText: String,
             scriptPubKeyText: String,
@@ -168,7 +167,7 @@ class ScriptTestsCommon {
             expectedText: String
         ) = runTest(witnessText, 0L.toSatoshi(), scriptSigText, scriptPubKeyText, flags, comments, expectedText)
 
-        fun runTest(
+        private fun runTest(
             witnessText: List<String>,
             amount: Satoshi,
             scriptSigText: String,

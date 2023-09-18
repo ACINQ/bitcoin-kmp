@@ -314,14 +314,16 @@ public data class KeyPath(@JvmField val path: List<Long>) {
         return KeyPath(path + that.path)
     }
 
-    override fun toString(): String = path.map { childNumberToString(it) }.fold("m") { a, b -> "$a/$b" }
+    override fun toString(): String = asString('\'')
+
+    public fun asString(hardenedSuffix: Char): String = path.map { childNumberToString(it, hardenedSuffix) }.fold("m") { a, b -> "$a/$b" }
 
     public companion object {
         public val empty: KeyPath = KeyPath(listOf())
 
         @JvmStatic
         public fun computePath(path: String): List<Long> {
-            fun toNumber(value: String): Long = if (value.last() == '\'') hardened(value.dropLast(1).toLong()) else value.toLong()
+            fun toNumber(value: String): Long = if (value.last() == '\'' || value.last() == 'h') hardened(value.dropLast(1).toLong()) else value.toLong()
 
             val path1 = path.removePrefix("m").removePrefix("/")
             return if (path1.isEmpty()) {
@@ -334,8 +336,8 @@ public data class KeyPath(@JvmField val path: List<Long>) {
         @JvmStatic
         public fun fromPath(path: String): KeyPath = KeyPath(path)
 
-        public fun childNumberToString(childNumber: Long): String = if (DeterministicWallet.isHardened(childNumber)) {
-            ((childNumber - DeterministicWallet.hardenedKeyIndex).toString() + "'")
+        public fun childNumberToString(childNumber: Long, hardenedSuffix: Char = '\''): String = if (DeterministicWallet.isHardened(childNumber)) {
+            ((childNumber - DeterministicWallet.hardenedKeyIndex).toString() + hardenedSuffix)
         } else {
             childNumber.toString()
         }

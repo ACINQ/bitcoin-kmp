@@ -25,6 +25,7 @@ import kotlin.jvm.JvmStatic
  * @param leafVersion tapscript version
  */
 public data class ScriptLeaf(val id: Int, val script: ByteVector, val leafVersion: Int) {
+    public constructor(id: Int, script: List<ScriptElt>, leafVersion: Int) : this(id, Script.write(script).byteVector(), leafVersion)
     /**
      * tapleaf hash of this leaf
      */

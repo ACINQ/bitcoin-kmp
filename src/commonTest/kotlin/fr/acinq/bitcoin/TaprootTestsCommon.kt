@@ -179,7 +179,7 @@ class TaprootTestsCommon {
         val merkleRoot = ScriptTree.hash(scriptTree)
         // we choose a pubkey that does not have a corresponding private key: our funding tx can only be spent through the script path, not the key path
         val internalPubkey = XonlyPublicKey(PublicKey.fromHex("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"))
-        val (tweakedKey, parity) = internalPubkey.outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot))
+        val (tweakedKey, _) = internalPubkey.outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot))
 
         // funding tx sends to our tapscript
         val fundingTx = Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(Satoshi(1000000), listOf(OP_1, OP_PUSHDATA(tweakedKey)))), lockTime = 0)
@@ -197,7 +197,7 @@ class TaprootTestsCommon {
         val sigs = privs.map { Crypto.signSchnorr(hash, it, Crypto.SchnorrTweak.NoTweak) }
 
         // control is the same for everyone since there are no specific merkle hashes to provide
-        val controlBlock = byteArrayOf((Script.TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte()) + internalPubkey.value.toByteArray()
+        val controlBlock = Script.ControlBlock.build(internalPubkey, merkleRoot)
 
         // one signature is not enough
         val tx = tmp.updateWitness(0, ScriptWitness(listOf(sigs[0], sigs[0], sigs[0], Script.write(script).byteVector(), controlBlock.byteVector())))
@@ -241,7 +241,7 @@ class TaprootTestsCommon {
 
         // we use key #1 as our internal key
         val internalPubkey = XonlyPublicKey(privs[0].publicKey())
-        val (tweakedKey, parity) = internalPubkey.outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot))
+        val (tweakedKey, _) = internalPubkey.outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot))
 
         // this is the tapscript we send funds to
         val script = Script.write(listOf(OP_1, OP_PUSHDATA(tweakedKey.value))).byteVector()
@@ -287,10 +287,7 @@ class TaprootTestsCommon {
                 lockTime = 0
             )
             // to re-compute the merkle root we need to provide leaves #2 and #3
-            val controlBlock = byteArrayOf((Script.TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte()) +
-                    internalPubkey.value.toByteArray() +
-                    ScriptTree.hash(leaves[1]).toByteArray() +
-                    ScriptTree.hash(leaves[2]).toByteArray()
+            val controlBlock = Script.ControlBlock.build(internalPubkey, merkleRoot, listOf(leaves[1], leaves[2]))
             val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[0])))
             val sig = Crypto.signSchnorr(hash, privs[0], Crypto.SchnorrTweak.NoTweak)
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[0]).byteVector(), controlBlock.byteVector())))
@@ -314,10 +311,7 @@ class TaprootTestsCommon {
                 lockTime = 0
             )
             // to re-compute the merkle root we need to provide leaves #1 and #3
-            val controlBlock = byteArrayOf((Script.TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte()) +
-                    internalPubkey.value.toByteArray() +
-                    ScriptTree.hash(leaves[0]).toByteArray() +
-                    ScriptTree.hash(leaves[2]).toByteArray()
+            val controlBlock = Script.ControlBlock.build(internalPubkey, merkleRoot, listOf(leaves[0], leaves[2]))
             val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx2.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[1])))
             val sig = Crypto.signSchnorr(hash, privs[1], Crypto.SchnorrTweak.NoTweak) // signature for script spend of leaf #2
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[1]).byteVector(), controlBlock.byteVector())))
@@ -340,9 +334,7 @@ class TaprootTestsCommon {
                 lockTime = 0
             )
             // to re-compute the merkle root we need to provide branch(#1, #2)
-            val controlBlock = byteArrayOf((Script.TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte()) +
-                    internalPubkey.value.toByteArray() +
-                    ScriptTree.hash(ScriptTree.Branch(leaves[0], leaves[1])).toByteArray()
+            val controlBlock = Script.ControlBlock.build(internalPubkey, merkleRoot, listOf(ScriptTree.Branch(leaves[0], leaves[1])))
             val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx3.txOut[1]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[2])))
             val sig = Crypto.signSchnorr(hash, privs[2], Crypto.SchnorrTweak.NoTweak) // signature for script spend of leaf #3
             tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[2]).byteVector(), controlBlock.byteVector())))

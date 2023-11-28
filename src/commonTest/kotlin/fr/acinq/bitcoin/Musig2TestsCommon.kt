@@ -7,6 +7,7 @@ import fr.acinq.bitcoin.musig2.SessionCtx
 import fr.acinq.bitcoin.reference.TransactionTestsCommon
 import fr.acinq.secp256k1.Hex
 import kotlinx.serialization.json.*
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -322,5 +323,82 @@ class Musig2TestsCommon {
         // this tx looks like any other tx that spends a p2tr output, with a single signature
         val signedSpendingTx = spendingTx.updateWitness(0, ScriptWitness(listOf(commonSig)))
         Transaction.correctlySpends(signedSpendingTx, tx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    }
+
+    @Test
+    fun `swap-in-potentiam example with musig2 and taproot`() {
+        val userPrivateKey = PrivateKey(ByteArray(32) { 1 })
+        val serverPrivateKey = PrivateKey(ByteArray(32) { 2 })
+        val userRefundPrivateKey = PrivateKey(ByteArray(32) { 3 })
+        val refundDelay = 25920
+
+        val random = Random
+
+        // the redeem script is just the refund script. it is generated from this policy: and_v(v:pk(user),older(refundDelay))
+        // it does not depend upon the user's or server's key, just the user's refund key and the refund delay
+        val redeemScript = listOf(OP_PUSHDATA(userRefundPrivateKey.publicKey().xOnly()), OP_CHECKSIGVERIFY, OP_PUSHDATA(Script.encodeNumber(refundDelay)), OP_CHECKSEQUENCEVERIFY)
+        val scriptTree = ScriptTree.Leaf(ScriptLeaf(0, redeemScript, Script.TAPROOT_LEAF_TAPSCRIPT))
+        val merkleRoot = ScriptTree.hash(scriptTree)
+
+        // the internal pubkey is the musig2 aggregation of the user's and server's public keys: it does not depend upon the user's refund's key
+        val internalPubKey = Musig2.keyAgg(listOf(userPrivateKey.publicKey(), serverPrivateKey.publicKey())).Q.xOnly()
+
+        // it is tweaked with the script's merkle root to get the pubkey that will be exposed
+        val (commonPubKey, _) = internalPubKey.outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot))
+        val pubkeyScript: List<ScriptElt> = Script.pay2tr(commonPubKey)
+
+        val swapInTx = Transaction(
+            version = 2,
+            txIn = listOf(),
+            txOut = listOf(TxOut(Satoshi(10000), pubkeyScript)),
+            lockTime = 0
+        )
+
+        // The transaction can be spent if the user and the server produce a signature.
+        run {
+            val tx = Transaction(
+                version = 2,
+                txIn = listOf(TxIn(OutPoint(swapInTx, 0), sequence = TxIn.SEQUENCE_FINAL)),
+                txOut = listOf(TxOut(Satoshi(10000), Script.pay2wpkh(userPrivateKey.publicKey()))),
+                lockTime = 0
+            )
+            // this is the beginning of an interactive musig2 signing session. if user and server are disconnected before they have exchanged partial
+            // signatures they will have to start again with fresh nonces
+            val userNonce = SecretNonce.generate(userPrivateKey, userPrivateKey.publicKey(), internalPubKey, null, null, random.nextBytes(32).byteVector32())
+            val serverNonce = SecretNonce.generate(serverPrivateKey, serverPrivateKey.publicKey(), internalPubKey, null, null, random.nextBytes(32).byteVector32())
+
+            val txHash = Transaction.hashForSigningSchnorr(tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPROOT)
+            val commonNonce = PublicNonce.aggregate(listOf(userNonce.publicNonce(), serverNonce.publicNonce()))
+            val ctx = SessionCtx(
+                commonNonce,
+                listOf(userPrivateKey.publicKey(), serverPrivateKey.publicKey()),
+                listOf(Pair(internalPubKey.tweak(Crypto.TaprootTweak.ScriptTweak(merkleRoot)), true)),
+                txHash
+            )
+
+            val userSig = ctx.sign(userNonce, userPrivateKey)
+            val serverSig = ctx.sign(serverNonce, serverPrivateKey)
+            val commonSig = ctx.partialSigAgg(listOf(userSig, serverSig))
+            val signedTx = tx.updateWitness(0, ScriptWitness(listOf(commonSig)))
+            Transaction.correctlySpends(signedTx, swapInTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        }
+
+        // Or it can be spent with only the user's signature, after a delay.
+        run {
+            val executionData = Script.ExecutionData(annex = null, tapleafHash = merkleRoot)
+            val controlBlock = Script.ControlBlock.build(internalPubKey, merkleRoot)
+
+            val tx = Transaction(
+                version = 2,
+                txIn = listOf(TxIn(OutPoint(swapInTx, 0), sequence = refundDelay.toLong())),
+                txOut = listOf(TxOut(Satoshi(10000), Script.pay2wpkh(userPrivateKey.publicKey()))),
+                lockTime = 0
+            )
+            val txHash = Transaction.hashForSigningSchnorr(tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, executionData)
+
+            val sig = Crypto.signSchnorr(txHash, userRefundPrivateKey, Crypto.SchnorrTweak.NoTweak)
+            val signedTx = tx.updateWitness(0,  ScriptWitness.empty.push(sig).push(redeemScript).push(controlBlock))
+            Transaction.correctlySpends(signedTx, swapInTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        }
     }
 }

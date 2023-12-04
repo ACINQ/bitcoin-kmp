@@ -44,7 +44,7 @@ public object Musig2 {
  * Musig2 secret nonce. Not meant to be reused !!
  */
 public data class SecretNonce(val p1: PrivateKey, val p2: PrivateKey, val pk: PublicKey) {
-    public fun publicNonce(): PublicNonce = PublicNonce(p1.publicKey(), p2.publicKey())
+    public fun publicNonce(): IndividualNonce = IndividualNonce(p1.publicKey(), p2.publicKey())
 
     public companion object {
         @JvmStatic
@@ -110,34 +110,57 @@ public data class SecretNonce(val p1: PrivateKey, val p2: PrivateKey, val pk: Pu
 
 /**
  * Musig2 public nonce
+ * We use nullable public keys here because we don't have a Point type...
+ * Here null means 0, which is a valid point but not a valid public key
  */
-public data class PublicNonce(val P1: PublicKey?, val P2: PublicKey?) {
+public data class IndividualNonce(val P1: PublicKey?, val P2: PublicKey?) {
     public fun isValid(): Boolean = (P1?.isValid() ?: true) && (P2?.isValid() ?: true)
 
     public fun toByteArray(): ByteArray = (P1?.value?.toByteArray() ?: ByteArray(33)) + (P2?.value?.toByteArray() ?: ByteArray(33))
 
     public companion object {
         @JvmStatic
-        public fun fromValidHex(hex: String): PublicNonce {
+        public fun fromValidHex(hex: String): IndividualNonce {
             return fromBin(Hex.decode(hex))
         }
 
         @JvmStatic
-        public fun fromBin(bin: ByteArray): PublicNonce {
+        public fun fromBin(bin: ByteArray): IndividualNonce {
             require(bin.size == 33 + 33)
             val P1 = bin.copyOfRange(0, 33)
             val P2 = bin.copyOfRange(33, 66)
-            return PublicNonce(if (P1.contentEquals(ByteArray(33))) null else PublicKey(P1), if (P2.contentEquals(ByteArray(33))) null else PublicKey(P2))
+            return IndividualNonce(if (P1.contentEquals(ByteArray(33))) null else PublicKey(P1), if (P2.contentEquals(ByteArray(33))) null else PublicKey(P2))
         }
 
         @JvmStatic
-        public fun aggregate(nonces: List<PublicNonce>): PublicNonce {
+        public fun aggregate(nonces: List<IndividualNonce>): AggregatedNonce {
             for (i in nonces.indices) {
                 require(nonces[i].isValid()) { "invalid nonce at index $i" }
             }
             val R1 = nonces.map { it.P1 }.reduce { a, b -> add(a, b) }
             val R2 = nonces.map { it.P2 }.reduce { a, b -> add(a, b) }
-            return PublicNonce(R1, R2)
+            return AggregatedNonce(R1, R2)
+        }
+    }
+}
+
+public data class AggregatedNonce(val P1: PublicKey?, val P2: PublicKey?) {
+    public fun isValid(): Boolean = (P1?.isValid() ?: true) && (P2?.isValid() ?: true)
+
+    public fun toByteArray(): ByteArray = (P1?.value?.toByteArray() ?: ByteArray(33)) + (P2?.value?.toByteArray() ?: ByteArray(33))
+
+    public companion object {
+        @JvmStatic
+        public fun fromValidHex(hex: String): AggregatedNonce {
+            return fromBin(Hex.decode(hex))
+        }
+
+        @JvmStatic
+        public fun fromBin(bin: ByteArray): AggregatedNonce {
+            require(bin.size == 33 + 33)
+            val P1 = bin.copyOfRange(0, 33)
+            val P2 = bin.copyOfRange(33, 66)
+            return AggregatedNonce(if (P1.contentEquals(ByteArray(33))) null else PublicKey(P1), if (P2.contentEquals(ByteArray(33))) null else PublicKey(P2))
         }
     }
 }
@@ -174,9 +197,9 @@ internal fun mul(a: PublicKey?, b: PrivateKey): PublicKey? = a?.times(b)
  * @param aggnonce aggregated public nonce
  * @param pubkeys signer public keys
  * @param tweaks optional tweaks to apply to the aggregated public key
- * @param msg message to sign
+ * @param message message to sign
  */
-public data class SessionCtx(val aggnonce: PublicNonce, val pubkeys: List<PublicKey>, val tweaks: List<Pair<ByteVector32, Boolean>>, val message: ByteVector) {
+public data class SessionCtx(val aggnonce: AggregatedNonce, val pubkeys: List<PublicKey>, val tweaks: List<Pair<ByteVector32, Boolean>>, val message: ByteVector) {
     private fun build(): SessionValues {
         val keyAggCtx0 = Musig2.keyAgg(pubkeys)
         val keyAggCtx = tweaks.fold(keyAggCtx0) { ctx, tweak -> ctx.tweak(tweak.first, tweak.second) }
@@ -215,7 +238,7 @@ public data class SessionCtx(val aggnonce: PublicNonce, val pubkeys: List<Public
      * @param pk public key
      * @return true if the partial signature has been verified (in the context of a specific signing session)
      */
-    public fun partialSigVerify(psig: ByteVector32, pubnonce: PublicNonce, pk: PublicKey): Boolean {
+    public fun partialSigVerify(psig: ByteVector32, pubnonce: IndividualNonce, pk: PublicKey): Boolean {
         val (Q, gacc, _, b, R, e) = build()
         val Rstar = add(pubnonce.P1, mul(pubnonce.P2, b)) ?: PublicKey.Generator
         val Re = if (R.isEven()) Rstar else -Rstar

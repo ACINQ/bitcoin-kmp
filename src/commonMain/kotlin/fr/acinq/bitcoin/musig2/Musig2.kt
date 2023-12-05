@@ -40,28 +40,25 @@ public object Musig2 {
     @JvmStatic
     public fun keySort(pubkeys: List<PublicKey>): List<PublicKey> = pubkeys.sortedWith { a, b -> LexicographicalOrdering.compare(a, b) }
 }
+
 /**
  * Musig2 secret nonce. Not meant to be reused !!
  */
-public data class SecretNonce(val p1: PrivateKey, val p2: PrivateKey, val pk: PublicKey) {
-    public fun publicNonce(): IndividualNonce = IndividualNonce(p1.publicKey(), p2.publicKey())
+public data class SecretNonce(val data: ByteVector) {
+    public constructor(bin: ByteArray) : this(bin.byteVector())
+
+    public constructor(hex: String) : this(Hex.decode(hex))
+
+    init {
+        require(data.size() == 32 + 32 + 33) { "musig2 secret nonce must be 97 bytes" }
+    }
+
+    internal val p1: PrivateKey = PrivateKey(data.take(32))
+    internal val p2: PrivateKey = PrivateKey(data.drop(32).take(32))
+    internal val pk: PublicKey = PublicKey(data.takeRight(33))
+    public fun publicNonce(): IndividualNonce = IndividualNonce(p1.publicKey().value + p2.publicKey().value)
 
     public companion object {
-        @JvmStatic
-        public fun fromValidHex(hex: String): SecretNonce {
-            return fromBin(Hex.decode(hex))
-        }
-
-        @JvmStatic
-        public fun fromBin(bin: ByteArray): SecretNonce {
-            require(bin.size == 32 + 32 + 33)
-            return SecretNonce(
-                PrivateKey(bin.copyOfRange(0, 32)),
-                PrivateKey(bin.copyOfRange(32, 64)),
-                PublicKey(bin.copyOfRange(64, 97))
-            )
-        }
-
         /**
          * @param sk optional private key
          * @param pk public key
@@ -102,7 +99,7 @@ public data class SecretNonce(val p1: PrivateKey, val p2: PrivateKey, val pk: Pu
             require(k1 != ByteVector32.Zeroes)
             val k2 = Crypto.taggedHash(tmp + ByteArray(1) { 1 }, "MuSig/nonce")
             require(k2 != ByteVector32.Zeroes)
-            val secnonce = SecretNonce(PrivateKey(k1), PrivateKey(k2), pk)
+            val secnonce = SecretNonce(PrivateKey(k1).value + PrivateKey(k2).value + pk.value)
             return secnonce
         }
     }
@@ -111,25 +108,23 @@ public data class SecretNonce(val p1: PrivateKey, val p2: PrivateKey, val pk: Pu
 /**
  * Musig2 public nonce
  */
-public data class IndividualNonce(val P1: PublicKey, val P2: PublicKey) {
+public data class IndividualNonce(val data: ByteVector) {
+    public constructor(bin: ByteArray) : this(bin.byteVector())
+
+    public constructor(hex: String) : this(Hex.decode(hex))
+
+    init {
+        require(data.size() == 66) { "individual musig2 public nonce must be 66 bytes" }
+    }
+
+    internal val P1: PublicKey = PublicKey(data.take(33))
+
+    internal val P2: PublicKey = PublicKey(data.drop(33))
     public fun isValid(): Boolean = P1.isValid() && P2.isValid()
 
-    public fun toByteArray(): ByteArray = P1.value.toByteArray() + P2.value.toByteArray()
+    public fun toByteArray(): ByteArray = data.toByteArray()
 
     public companion object {
-        @JvmStatic
-        public fun fromValidHex(hex: String): IndividualNonce {
-            return fromBin(Hex.decode(hex))
-        }
-
-        @JvmStatic
-        public fun fromBin(bin: ByteArray): IndividualNonce {
-            require(bin.size == 33 + 33)
-            val P1 = bin.copyOfRange(0, 33)
-            val P2 = bin.copyOfRange(33, 66)
-            return IndividualNonce(PublicKey(P1), PublicKey(P2))
-        }
-
         @JvmStatic
         public fun aggregate(nonces: List<IndividualNonce>): AggregatedNonce {
             for (i in nonces.indices) {
@@ -147,25 +142,30 @@ public data class IndividualNonce(val P1: PublicKey, val P2: PublicKey) {
  * Aggregated nonce.
  * The sum of 2 public keys could be 0 (P + (-P)) which we represent with null (0 is a valid point but not a valid public key)
  */
-public data class AggregatedNonce(val P1: PublicKey?, val P2: PublicKey?) {
+public data class AggregatedNonce(val data: ByteVector) {
+    public constructor(bin: ByteArray) : this(bin.byteVector())
+
+    public constructor(hex: String) : this(Hex.decode(hex))
+
+    internal constructor(p1: PublicKey?, p2: PublicKey?) : this((p1?.value?.toByteArray() ?: ByteArray(33)) + (p2?.value?.toByteArray() ?: ByteArray(33)))
+
+    init {
+        require(data.size() == 66) { "aggregated musig2 public nonce must be 66 bytes" }
+    }
+
+    internal val P1: PublicKey? = run {
+        val bin = data.take(33)
+        if (bin.contentEquals(ByteArray(33))) null else PublicKey(bin)
+    }
+
+    internal val P2: PublicKey? = run {
+        val bin = data.drop(33)
+        if (bin.contentEquals(ByteArray(33))) null else PublicKey(bin)
+    }
+
     public fun isValid(): Boolean = (P1?.isValid() ?: true) && (P2?.isValid() ?: true)
 
-    public fun toByteArray(): ByteArray = (P1?.value?.toByteArray() ?: ByteArray(33)) + (P2?.value?.toByteArray() ?: ByteArray(33))
-
-    public companion object {
-        @JvmStatic
-        public fun fromValidHex(hex: String): AggregatedNonce {
-            return fromBin(Hex.decode(hex))
-        }
-
-        @JvmStatic
-        public fun fromBin(bin: ByteArray): AggregatedNonce {
-            require(bin.size == 33 + 33)
-            val P1 = bin.copyOfRange(0, 33)
-            val P2 = bin.copyOfRange(33, 66)
-            return AggregatedNonce(if (P1.contentEquals(ByteArray(33))) null else PublicKey(P1), if (P2.contentEquals(ByteArray(33))) null else PublicKey(P2))
-        }
-    }
+    public fun toByteArray(): ByteArray = data.toByteArray()
 }
 
 internal fun add(a: ByteVector32, b: ByteVector32): ByteVector32 = when {

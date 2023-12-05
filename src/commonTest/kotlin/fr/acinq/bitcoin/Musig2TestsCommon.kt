@@ -52,8 +52,8 @@ class Musig2TestsCommon {
             val aggpk = it.jsonObject["aggpk"]?.jsonPrimitive?.contentOrNull?.let { XonlyPublicKey(ByteVector32.fromValidHex(it)) }
             val msg = it.jsonObject["msg"]?.jsonPrimitive?.contentOrNull?.let { Hex.decode(it) }
             val extraInput = it.jsonObject["extra_in"]?.jsonPrimitive?.contentOrNull?.let { Hex.decode(it) }
-            val expectedSecnonce = SecretNonce.fromValidHex(it.jsonObject["expected_secnonce"]!!.jsonPrimitive.content)
-            val expectedPubnonce = IndividualNonce.fromValidHex(it.jsonObject["expected_pubnonce"]!!.jsonPrimitive.content)
+            val expectedSecnonce = SecretNonce(it.jsonObject["expected_secnonce"]!!.jsonPrimitive.content)
+            val expectedPubnonce = IndividualNonce(it.jsonObject["expected_pubnonce"]!!.jsonPrimitive.content)
             val secnonce = SecretNonce.generate(sk, pk, aggpk, msg, extraInput, randprime)
             assertEquals(expectedSecnonce, secnonce)
             assertEquals(expectedPubnonce, secnonce.publicNonce())
@@ -63,10 +63,10 @@ class Musig2TestsCommon {
     @Test
     fun `aggregate nonces`() {
         val tests = TransactionTestsCommon.readData("musig2/nonce_agg_vectors.json")
-        val nonces = tests.jsonObject["pnonces"]!!.jsonArray.map { IndividualNonce.fromValidHex(it.jsonPrimitive.content) }
+        val nonces = tests.jsonObject["pnonces"]!!.jsonArray.map { IndividualNonce(it.jsonPrimitive.content) }
         tests.jsonObject["valid_test_cases"]!!.jsonArray.forEach {
             val nonceIndices = it.jsonObject["pnonce_indices"]!!.jsonArray.map { it.jsonPrimitive.int }
-            val expected = AggregatedNonce.fromValidHex(it.jsonObject["expected"]!!.jsonPrimitive.content)
+            val expected = AggregatedNonce(it.jsonObject["expected"]!!.jsonPrimitive.content)
             val agg = IndividualNonce.aggregate(nonceIndices.map { nonces[it] })
             assertEquals(expected, agg)
         }
@@ -83,9 +83,9 @@ class Musig2TestsCommon {
         val tests = TransactionTestsCommon.readData("musig2/sign_verify_vectors.json")
         val sk = PrivateKey.fromHex(tests.jsonObject["sk"]!!.jsonPrimitive.content)
         val pubkeys = tests.jsonObject["pubkeys"]!!.jsonArray.map { PublicKey(ByteVector(it.jsonPrimitive.content)) }
-        val secnonces = tests.jsonObject["secnonces"]!!.jsonArray.map { SecretNonce.fromValidHex(it.jsonPrimitive.content) }
-        val pnonces = tests.jsonObject["pnonces"]!!.jsonArray.map { IndividualNonce.fromValidHex(it.jsonPrimitive.content) }
-        val aggnonces = tests.jsonObject["aggnonces"]!!.jsonArray.map { AggregatedNonce.fromValidHex(it.jsonPrimitive.content) }
+        val secnonces = tests.jsonObject["secnonces"]!!.jsonArray.map { SecretNonce(it.jsonPrimitive.content) }
+        val pnonces = tests.jsonObject["pnonces"]!!.jsonArray.map { IndividualNonce(it.jsonPrimitive.content) }
+        val aggnonces = tests.jsonObject["aggnonces"]!!.jsonArray.map { AggregatedNonce(it.jsonPrimitive.content) }
         val msgs = tests.jsonObject["msgs"]!!.jsonArray.map { ByteVector(it.jsonPrimitive.content) }
 
         tests.jsonObject["valid_test_cases"]!!.jsonArray.forEach {
@@ -126,7 +126,7 @@ class Musig2TestsCommon {
     fun `aggregate signatures`() {
         val tests = TransactionTestsCommon.readData("musig2/sig_agg_vectors.json")
         val pubkeys = tests.jsonObject["pubkeys"]!!.jsonArray.map { PublicKey(ByteVector(it.jsonPrimitive.content)) }
-        val pnonces = tests.jsonObject["pnonces"]!!.jsonArray.map { IndividualNonce.fromValidHex(it.jsonPrimitive.content) }
+        val pnonces = tests.jsonObject["pnonces"]!!.jsonArray.map { IndividualNonce(it.jsonPrimitive.content) }
         val tweaks = tests.jsonObject["tweaks"]!!.jsonArray.map { ByteVector32.fromValidHex(it.jsonPrimitive.content) }
         val psigs = tests.jsonObject["psigs"]!!.jsonArray.map { ByteVector32.fromValidHex(it.jsonPrimitive.content) }
         val msg = ByteVector.fromHex(tests.jsonObject["msg"]!!.jsonPrimitive.content)
@@ -139,7 +139,7 @@ class Musig2TestsCommon {
             val aggnonce = IndividualNonce.aggregate(nonceIndices.map { pnonces[it] })
             val tweakIndices = it.jsonObject["tweak_indices"]!!.jsonArray.map { it.jsonPrimitive.int }
             val isXonly = it.jsonObject["is_xonly"]!!.jsonArray.map { it.jsonPrimitive.boolean }
-            assertEquals(AggregatedNonce.fromValidHex(it.jsonObject["aggnonce"]!!.jsonPrimitive.content), aggnonce)
+            assertEquals(AggregatedNonce(it.jsonObject["aggnonce"]!!.jsonPrimitive.content), aggnonce)
             val ctx = SessionCtx(
                 aggnonce,
                 keyIndices.map { pubkeys[it] },
@@ -156,7 +156,7 @@ class Musig2TestsCommon {
             val aggnonce = IndividualNonce.aggregate(nonceIndices.map { pnonces[it] })
             val tweakIndices = it.jsonObject["tweak_indices"]!!.jsonArray.map { it.jsonPrimitive.int }
             val isXonly = it.jsonObject["is_xonly"]!!.jsonArray.map { it.jsonPrimitive.boolean }
-            assertEquals(AggregatedNonce.fromValidHex(it.jsonObject["aggnonce"]!!.jsonPrimitive.content), aggnonce)
+            assertEquals(AggregatedNonce(it.jsonObject["aggnonce"]!!.jsonPrimitive.content), aggnonce)
             assertFails {
                 val ctx = SessionCtx(
                     aggnonce,
@@ -174,12 +174,12 @@ class Musig2TestsCommon {
         val tests = TransactionTestsCommon.readData("musig2/tweak_vectors.json")
         val sk = PrivateKey.fromHex(tests.jsonObject["sk"]!!.jsonPrimitive.content)
         val pubkeys = tests.jsonObject["pubkeys"]!!.jsonArray.map { PublicKey(ByteVector(it.jsonPrimitive.content)) }
-        val pnonces = tests.jsonObject["pnonces"]!!.jsonArray.map { IndividualNonce.fromValidHex(it.jsonPrimitive.content) }
+        val pnonces = tests.jsonObject["pnonces"]!!.jsonArray.map { IndividualNonce(it.jsonPrimitive.content) }
         val tweaks = tests.jsonObject["tweaks"]!!.jsonArray.map { ByteVector32.fromValidHex(it.jsonPrimitive.content) }
         val msg = ByteVector.fromHex(tests.jsonObject["msg"]!!.jsonPrimitive.content)
 
-        val secnonce = SecretNonce.fromValidHex(tests.jsonObject["secnonce"]!!.jsonPrimitive.content)
-        val aggnonce = AggregatedNonce.fromValidHex(tests.jsonObject["aggnonce"]!!.jsonPrimitive.content)
+        val secnonce = SecretNonce(tests.jsonObject["secnonce"]!!.jsonPrimitive.content)
+        val aggnonce = AggregatedNonce(tests.jsonObject["aggnonce"]!!.jsonPrimitive.content)
 
         assertEquals(pubkeys[0], sk.publicKey())
         assertEquals(pnonces[0], secnonce.publicNonce())

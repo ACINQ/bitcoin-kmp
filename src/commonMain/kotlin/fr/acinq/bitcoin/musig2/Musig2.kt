@@ -110,13 +110,11 @@ public data class SecretNonce(val p1: PrivateKey, val p2: PrivateKey, val pk: Pu
 
 /**
  * Musig2 public nonce
- * We use nullable public keys here because we don't have a Point type...
- * Here null means 0, which is a valid point but not a valid public key
  */
-public data class IndividualNonce(val P1: PublicKey?, val P2: PublicKey?) {
-    public fun isValid(): Boolean = (P1?.isValid() ?: true) && (P2?.isValid() ?: true)
+public data class IndividualNonce(val P1: PublicKey, val P2: PublicKey) {
+    public fun isValid(): Boolean = P1.isValid() && P2.isValid()
 
-    public fun toByteArray(): ByteArray = (P1?.value?.toByteArray() ?: ByteArray(33)) + (P2?.value?.toByteArray() ?: ByteArray(33))
+    public fun toByteArray(): ByteArray = P1.value.toByteArray() + P2.value.toByteArray()
 
     public companion object {
         @JvmStatic
@@ -129,7 +127,7 @@ public data class IndividualNonce(val P1: PublicKey?, val P2: PublicKey?) {
             require(bin.size == 33 + 33)
             val P1 = bin.copyOfRange(0, 33)
             val P2 = bin.copyOfRange(33, 66)
-            return IndividualNonce(if (P1.contentEquals(ByteArray(33))) null else PublicKey(P1), if (P2.contentEquals(ByteArray(33))) null else PublicKey(P2))
+            return IndividualNonce(PublicKey(P1), PublicKey(P2))
         }
 
         @JvmStatic
@@ -137,13 +135,18 @@ public data class IndividualNonce(val P1: PublicKey?, val P2: PublicKey?) {
             for (i in nonces.indices) {
                 require(nonces[i].isValid()) { "invalid nonce at index $i" }
             }
-            val R1 = nonces.map { it.P1 }.reduce { a, b -> add(a, b) }
-            val R2 = nonces.map { it.P2 }.reduce { a, b -> add(a, b) }
+            val np: PublicKey? = null
+            val R1 = nonces.map { it.P1 }.fold(np) { a, b -> add(a, b) }
+            val R2 = nonces.map { it.P2 }.fold(np) { a, b -> add(a, b) }
             return AggregatedNonce(R1, R2)
         }
     }
 }
 
+/**
+ * Aggregated nonce.
+ * The sum of 2 public keys could be 0 (P + (-P)) which we represent with null (0 is a valid point but not a valid public key)
+ */
 public data class AggregatedNonce(val P1: PublicKey?, val P2: PublicKey?) {
     public fun isValid(): Boolean = (P1?.isValid() ?: true) && (P2?.isValid() ?: true)
 

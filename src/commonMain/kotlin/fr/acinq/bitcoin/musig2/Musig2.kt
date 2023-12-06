@@ -221,19 +221,19 @@ public data class SessionCtx(val aggnonce: AggregatedNonce, val pubkeys: List<Pu
     /**
      * @param secnonce secret nonce
      * @param sk private key
-     * @return a Musig2 partial signature
+     * @return a Musig2 partial signature, or null if the nonce does not match the private key or the partial signature cannot be verified 
      */
-    public fun sign(secnonce: SecretNonce, sk: PrivateKey): ByteVector32 {
+    public fun sign(secnonce: SecretNonce, sk: PrivateKey): ByteVector32? = runCatching {
         val (Q, gacc, _, b, R, e) = build()
         val (k1, k2) = if (R.isEven()) Pair(secnonce.p1, secnonce.p2) else Pair(-secnonce.p1, -secnonce.p2)
         val P = sk.publicKey()
-        require(P == secnonce.pk)
+        require(P == secnonce.pk) { "nonce and private key mismatch" }
         val a = getSessionKeyAggCoeff(P)
         val d = if (Q.isEven() == gacc) sk else -sk
         val s = k1 + b * k2 + e * a * d
         require(partialSigVerify(s.value, secnonce.publicNonce(), sk.publicKey())) { "partial signature verification failed" }
-        return s.value
-    }
+        s.value
+    }.getOrNull()
 
     /**
      * @param psig Musig2 partial signature
@@ -254,8 +254,9 @@ public data class SessionCtx(val aggnonce: AggregatedNonce, val pubkeys: List<Pu
     /**
      * @param psigs list of partial signatures
      * @return an aggregated signature, which is a valid Schnorr signature for the matching aggregated public key
+     * or null is one of the partial signatures is not valid
      */
-    public fun partialSigAgg(psigs: List<ByteVector32>): ByteVector64 {
+    public fun partialSigAgg(psigs: List<ByteVector32>): ByteVector64? = runCatching {
         val (Q, _, tacc, _, R, e) = build()
         for (i in psigs.indices) {
             require(PrivateKey(psigs[i]).isValid()) { "invalid partial signature at index $i" }
@@ -263,8 +264,8 @@ public data class SessionCtx(val aggnonce: AggregatedNonce, val pubkeys: List<Pu
         val s = psigs.reduce { a, b -> add(a, b) }
         val s1 = if (Q.isEven()) add(s, mul(e.value, tacc)) else minus(s, mul(e.value, tacc))
         val sig = ByteVector64(R.xOnly().value + s1)
-        return sig
-    }
+        sig
+    }.getOrNull()
 
     public companion object {
         private data class SessionValues(val Q: PublicKey, val gacc: Boolean, val tacc: ByteVector32, val b: PrivateKey, val R: PublicKey, val e: PrivateKey)

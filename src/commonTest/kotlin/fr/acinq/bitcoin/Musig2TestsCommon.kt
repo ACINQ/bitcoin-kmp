@@ -101,7 +101,7 @@ class Musig2TestsCommon {
                 listOf(),
                 msgs[it.jsonObject["msg_index"]!!.jsonPrimitive.int]
             )
-            val psig = ctx.sign(secnonces[keyIndices[signerIndex]], sk)
+            val psig = ctx.sign(secnonces[keyIndices[signerIndex]], sk)!!
             assertEquals(expected, psig)
             assertTrue {
                 ctx.partialSigVerify(psig, pnonces[nonceIndices[signerIndex]], pubkeys[keyIndices[signerIndex]])
@@ -110,15 +110,13 @@ class Musig2TestsCommon {
 
         tests.jsonObject["sign_error_test_cases"]!!.jsonArray.forEach {
             val keyIndices = it.jsonObject["key_indices"]!!.jsonArray.map { it.jsonPrimitive.int }
-            assertFails {
-                val ctx = SessionCtx(
-                    aggnonces[it.jsonObject["aggnonce_index"]!!.jsonPrimitive.int],
-                    keyIndices.map { pubkeys[it] },
-                    listOf(),
-                    msgs[it.jsonObject["msg_index"]!!.jsonPrimitive.int]
-                )
-                ctx.sign(secnonces[it.jsonObject["secnonce_index"]!!.jsonPrimitive.int], sk)
-            }
+            val ctx = SessionCtx(
+                aggnonces[it.jsonObject["aggnonce_index"]!!.jsonPrimitive.int],
+                keyIndices.map { pubkeys[it] },
+                listOf(),
+                msgs[it.jsonObject["msg_index"]!!.jsonPrimitive.int]
+            )
+            require(ctx.sign(secnonces[it.jsonObject["secnonce_index"]!!.jsonPrimitive.int], sk) == null)
         }
     }
 
@@ -146,7 +144,7 @@ class Musig2TestsCommon {
                 tweakIndices.zip(isXonly).map { tweaks[it.first] to it.second },
                 msg
             )
-            val aggsig = ctx.partialSigAgg(psigIndices.map { psigs[it] })
+            val aggsig = ctx.partialSigAgg(psigIndices.map { psigs[it] })!!
             assertEquals(expected, aggsig)
         }
         tests.jsonObject["error_test_cases"]!!.jsonArray.forEach {
@@ -157,15 +155,13 @@ class Musig2TestsCommon {
             val tweakIndices = it.jsonObject["tweak_indices"]!!.jsonArray.map { it.jsonPrimitive.int }
             val isXonly = it.jsonObject["is_xonly"]!!.jsonArray.map { it.jsonPrimitive.boolean }
             assertEquals(AggregatedNonce(it.jsonObject["aggnonce"]!!.jsonPrimitive.content), aggnonce)
-            assertFails {
-                val ctx = SessionCtx(
-                    aggnonce,
-                    keyIndices.map { pubkeys[it] },
-                    tweakIndices.zip(isXonly).map { tweaks[it.first] to it.second },
-                    msg
-                )
-                ctx.partialSigAgg(psigIndices.map { psigs[it] })
-            }
+            val ctx = SessionCtx(
+                aggnonce,
+                keyIndices.map { pubkeys[it] },
+                tweakIndices.zip(isXonly).map { tweaks[it.first] to it.second },
+                msg
+            )
+            require(ctx.partialSigAgg(psigIndices.map { psigs[it] }) == null)
         }
     }
 
@@ -199,7 +195,7 @@ class Musig2TestsCommon {
                 tweakIndices.zip(isXonly).map { tweaks[it.first] to it.second },
                 msg
             )
-            val psig = ctx.sign(secnonce, sk)
+            val psig = ctx.sign(secnonce, sk)!!
             assertEquals(expected, psig)
             assertTrue { ctx.partialSigVerify(psig, pnonces[nonceIndices[signerIndex]], pubkeys[keyIndices[signerIndex]]) }
         }
@@ -217,7 +213,7 @@ class Musig2TestsCommon {
                     tweakIndices.zip(isXonly).map { tweaks[it.first] to it.second },
                     msg
                 )
-                val psig = ctx.sign(secnonce, sk)
+                val psig = ctx.sign(secnonce, sk)!!
                 ctx.partialSigVerify(psig, pnonces[nonceIndices[signerIndex]], pubkeys[keyIndices[signerIndex]])
             }
         }
@@ -258,7 +254,7 @@ class Musig2TestsCommon {
 
             // create partial signatures
             val psigs = privkeys.indices.map {
-                ctx.sign(secnonces[it], privkeys[it])
+                ctx.sign(secnonces[it], privkeys[it])!!
             }
 
             // verify partial signatures
@@ -267,7 +263,7 @@ class Musig2TestsCommon {
             }
 
             // aggregate partial signatures
-            ctx.partialSigAgg(psigs)
+            ctx.partialSigAgg(psigs)!!
         }
 
         // aggregate public keys
@@ -312,9 +308,9 @@ class Musig2TestsCommon {
                 listOf(Pair(internalPubKey.tweak(Crypto.TaprootTweak.NoScriptTweak), true)),
                 msg
             )
-            val aliceSig = ctx.sign(aliceNonce, alicePrivKey)
-            val bobSig = ctx.sign(bobNonce, bobPrivKey)
-            ctx.partialSigAgg(listOf(aliceSig, bobSig))
+            val aliceSig = ctx.sign(aliceNonce, alicePrivKey)!!
+            val bobSig = ctx.sign(bobNonce, bobPrivKey)!!
+            ctx.partialSigAgg(listOf(aliceSig, bobSig))!!
         }
 
         // this tx looks like any other tx that spends a p2tr output, with a single signature
@@ -373,9 +369,9 @@ class Musig2TestsCommon {
                 txHash
             )
 
-            val userSig = ctx.sign(userNonce, userPrivateKey)
-            val serverSig = ctx.sign(serverNonce, serverPrivateKey)
-            val commonSig = ctx.partialSigAgg(listOf(userSig, serverSig))
+            val userSig = ctx.sign(userNonce, userPrivateKey)!!
+            val serverSig = ctx.sign(serverNonce, serverPrivateKey)!!
+            val commonSig = ctx.partialSigAgg(listOf(userSig, serverSig))!!
             val signedTx = tx.updateWitness(0, ScriptWitness(listOf(commonSig)))
             Transaction.correctlySpends(signedTx, swapInTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         }
@@ -394,7 +390,7 @@ class Musig2TestsCommon {
             val txHash = Transaction.hashForSigningSchnorr(tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, executionData)
 
             val sig = Crypto.signSchnorr(txHash, userRefundPrivateKey, Crypto.SchnorrTweak.NoTweak)
-            val signedTx = tx.updateWitness(0,  ScriptWitness.empty.push(sig).push(redeemScript).push(controlBlock))
+            val signedTx = tx.updateWitness(0, ScriptWitness.empty.push(sig).push(redeemScript).push(controlBlock))
             Transaction.correctlySpends(signedTx, swapInTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         }
     }

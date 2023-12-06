@@ -99,25 +99,30 @@ public object Script {
                             require(head.data.size() == head.code)
                             out.write(head.data.size())
                         }
+
                         head.code == 0x4c -> {
                             require(head.data.size() <= 0xff)
                             BtcSerializer.writeUInt8(0x4Cu, out)
                             BtcSerializer.writeUInt8(head.data.size().toUByte(), out)
                         }
+
                         head.code == 0x4d -> {
                             require(head.data.size() <= 0xffff)
                             BtcSerializer.writeUInt8(0x4Du, out)
                             BtcSerializer.writeUInt16(head.data.size().toUShort(), out)
                         }
+
                         head.code == 0x4e -> {
                             require(head.data.size() <= 0xffffffff)
                             BtcSerializer.writeUInt8(0x4Eu, out)
                             BtcSerializer.writeUInt32(head.data.size().toUInt(), out)
                         }
+
                         else -> error("invalid OP_PUSHADATA opcode ${head.code}")
                     }
                     out.write(head.data.toByteArray())
                 }
+
                 else -> {
                     out.write(head.code)
                 }
@@ -595,6 +600,34 @@ public object Script {
         }
     }
 
+    public object ControlBlock {
+        /**
+         * build a control block to add to the witness of a taproot transaction when spending with the script path.
+         * It includes information to re-compute the merkle root from the script you are using.
+         *
+         * For example, suppose you have the following script tree:
+         *     root
+         *     /   \
+         *    /  \   #3
+         *   #1  #2
+         *
+         * To recompute its merkle root you need to provide either:
+         * - if you're spending with script #1: leaves #2 and #3
+         * - if you're spending with script #2: leaves #1 and #3
+         * - if you're spending with script #3: branch(#1, #2)
+         *
+         * @param internalPubKey internal public key
+         * @param merkleRoot tapscript merkle root
+         * @param leaves list of partial script trees than are required to re-build the merkle root
+         */
+        @JvmStatic
+        public fun build(internalPubKey: XonlyPublicKey, merkleRoot: ByteVector32, leaves: List<ScriptTree<ScriptLeaf>> = listOf()): ByteArray {
+            val parity = internalPubKey.outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot)).second
+            val initialBlock = byteArrayOf((TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte()) + internalPubKey.value.toByteArray()
+            return leaves.fold(initialBlock) { block, tree -> block + ScriptTree.hash(tree).toByteArray() }
+        }
+    }
+
     public class Runner(
         public val context: Context,
         public val scriptFlag: Int = ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS,
@@ -659,6 +692,7 @@ public object Script {
                     require(result) { "Invalid Schnorr signature" }
                     result
                 }
+
                 else -> {
                     require((scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_PUBKEYTYPE) == 0) { "invalid pubkey type" }
                     sigBytes.isNotEmpty()
@@ -777,6 +811,7 @@ public object Script {
                     op == OP_IF && conditions.any { !it } -> {
                         conditions.add(0, false)
                     }
+
                     op == OP_IF && stack.isEmpty() -> throw RuntimeException("Invalid OP_IF construction")
                     op == OP_IF -> {
                         val stackhead = stack.removeFirst()
@@ -793,6 +828,7 @@ public object Script {
                     op == OP_NOTIF && conditions.any { !it } -> {
                         conditions.add(0, true)
                     }
+
                     op == OP_NOTIF && stack.isEmpty() -> throw RuntimeException("Invalid OP_NOTIF construction")
                     op == OP_NOTIF -> {
                         val stackhead = stack.removeFirst()
@@ -830,6 +866,7 @@ public object Script {
                     op == OP_1ADD -> {
                         stack[0] = encodeNumber(decodeNumber(stack.first()) + 1)
                     }
+
                     op == OP_1SUB && stack.isEmpty() -> throw RuntimeException("cannot run OP_1SUB on an empty stack")
                     op == OP_1SUB -> {
                         stack[0] = encodeNumber(decodeNumber(stack.first()) - 1)
@@ -884,6 +921,7 @@ public object Script {
                         if (locktime < 0) throw RuntimeException("CLTV lock time cannot be negative")
                         if (!checkLockTime(locktime, context.tx, context.inputIndex)) throw RuntimeException("unsatisfied CLTV lock time")
                     }
+
                     op == OP_CHECKLOCKTIMEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) -> throw RuntimeException("use of upgradable NOP is discouraged")
                     op == OP_CHECKLOCKTIMEVERIFY -> {}
 
@@ -906,6 +944,7 @@ public object Script {
                             if (!checkSequence(sequence, context.tx, context.inputIndex)) throw RuntimeException("unsatisfied CSV lock time")
                         }
                     }
+
                     op == OP_CHECKSEQUENCEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) -> throw RuntimeException("use of upgradable NOP is discouraged")
                     op == OP_CHECKSEQUENCEVERIFY -> {}
 
@@ -1299,6 +1338,7 @@ public object Script {
                     val finalStack = run(listOf(OP_DUP, OP_HASH160, OP_PUSHDATA(program), OP_EQUALVERIFY, OP_CHECKSIG), witness.stack.reversed(), SigVersion.SIGVERSION_WITNESS_V0)
                     checkFinalStack(finalStack)
                 }
+
                 witnessVersion == 0L && program.size == WITNESS_V0_SCRIPTHASH_SIZE -> {
                     // P2WPSH, program is the hash of the script, and witness is the stack + the script
                     val check = Crypto.sha256(witness.stack.last())
@@ -1306,6 +1346,7 @@ public object Script {
                     val finalStack = run(witness.stack.last(), witness.stack.dropLast(1).reversed(), SigVersion.SIGVERSION_WITNESS_V0)
                     checkFinalStack(finalStack)
                 }
+
                 witnessVersion == 0L -> throw IllegalArgumentException("Invalid witness program length: ${program.size}")
                 witnessVersion == 1L && program.size == WITNESS_V1_TAPROOT_SIZE && !isP2sh -> {
                     // BIP341 Taproot: 32-byte non-P2SH witness v1 program (which encodes a P2C-tweaked pubkey)
@@ -1369,6 +1410,7 @@ public object Script {
                         }
                     }
                 }
+
                 (scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM) != 0 -> throw IllegalArgumentException("Witness version $witnessVersion reserved for soft-fork upgrades")
                 else -> {
                     // Higher version witness scripts return true for future softfork compatibility
@@ -1404,6 +1446,7 @@ public object Script {
                     if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) == 0) throw RuntimeException("illegal script flag")
                     stack.size == 1
                 }
+
                 else -> true
             }
 
@@ -1438,6 +1481,7 @@ public object Script {
                         verifyWitnessProgram(witness, witnessVersion.toLong(), program.data.toByteArray(), isP2sh = false)
                         stack0.take(1)
                     }
+
                     else -> stack0
                 }
             } else stack0
@@ -1465,6 +1509,7 @@ public object Script {
                             verifyWitnessProgram(witness, witnessVersion.toLong(), (program[1] as OP_PUSHDATA).data.toByteArray(), isP2sh = true)
                             stackp2sh.take(1)
                         }
+
                         else -> stackp2sh
                     }
                 } else stackp2sh

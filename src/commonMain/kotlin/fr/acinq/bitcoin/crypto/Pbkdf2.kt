@@ -21,7 +21,6 @@ import kotlin.jvm.JvmStatic
 
 public expect object Pbkdf2 {
 
-    @JvmStatic
     public fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray
 
 }

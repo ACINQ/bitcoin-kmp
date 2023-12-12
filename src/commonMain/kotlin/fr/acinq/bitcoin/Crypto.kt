@@ -161,14 +161,14 @@ public object Crypto {
         /**
          * private key is used as-is
          */
-        public object NoTweak : SchnorrTweak()
+        public data object NoTweak : SchnorrTweak()
     }
 
     public sealed class TaprootTweak: SchnorrTweak() {
         /**
          * private key is tweaked with H_TapTweak(public key) (this is used for key path spending when no scripts are present)
          */
-        public object NoScriptTweak : TaprootTweak()
+        public data object NoScriptTweak : TaprootTweak()
 
         /**
          * private key is tweaked with H_TapTweak(public key || merkle_root) (this is used for key path spending, with specific Merkle root of the script tree).

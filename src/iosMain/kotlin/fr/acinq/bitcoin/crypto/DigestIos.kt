@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package fr.acinq.bitcoin.crypto
 
 import kotlinx.cinterop.*
@@ -8,7 +10,7 @@ private typealias Init<C> = (CValuesRef<C>?) -> Unit
 private typealias Update<C> = (CValuesRef<C>?, CValuesRef<*>?, CC_LONG) -> Unit
 private typealias Final<C> = (CValuesRef<UByteVar>?, CValuesRef<C>?) -> Unit
 
-@OptIn(ExperimentalUnsignedTypes::class)
+@OptIn(ExperimentalUnsignedTypes::class, ExperimentalForeignApi::class)
 internal class DigestIos<C : CVariable>(
     private val algorithmName: String,
     private val digestSize: Int,

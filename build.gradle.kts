@@ -4,15 +4,15 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "1.8.21"
-    id("org.jetbrains.dokka") version "1.8.10"
+    kotlin("multiplatform") version "1.9.22"
+    id("org.jetbrains.dokka") version "1.9.10"
     `maven-publish`
 }
 
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.15.0"
+version = "0.16.0-SNAPSHOT"
 
 repositories {
     google()
@@ -30,14 +30,22 @@ kotlin {
         }
     }
 
-    linuxX64("linux")
+    linuxX64()
 
-    ios {
+    iosX64 {
+        compilations["main"].cinterops.create("CoreCrypto")
+    }
+
+    iosArm64 {
+        compilations["main"].cinterops.create("CoreCrypto")
+    }
+
+    iosSimulatorArm64 {
         compilations["main"].cinterops.create("CoreCrypto")
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.12.0"
+        val secp256k1KmpVersion = "0.13.0-SNAPSHOT"
 
         val commonMain by getting {
             dependencies {
@@ -76,12 +84,18 @@ kotlin {
         compilations.all {
             kotlinOptions {
                 allWarningsAsErrors = true
+                // We use expect/actual for classes (see Chacha20Poly1305CipherFunctions). This feature is in beta and raises a warning.
+                // See https://youtrack.jetbrains.com/issue/KT-61573
+                kotlinOptions.freeCompilerArgs += "-Xexpect-actual-classes"
             }
         }
     }
 }
 
 configurations.forEach {
+    // do not cache changing (i.e. SNAPSHOT) dependencies
+    it.resolutionStrategy.cacheChangingModulesFor(0, TimeUnit.SECONDS)
+
     if (it.name.contains("testCompileClasspath")) {
         it.attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class.java, "java-runtime"))
     }
@@ -94,7 +108,7 @@ plugins.withId("org.jetbrains.kotlin.multiplatform") {
         val currentOs = org.gradle.internal.os.OperatingSystem.current()
         val targets = when {
             currentOs.isLinux -> listOf()
-            else -> listOf("linux")
+            else -> listOf("linuxX64")
         }.mapNotNull { kotlin.targets.findByName(it) as? org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget }
 
         configure(targets) {

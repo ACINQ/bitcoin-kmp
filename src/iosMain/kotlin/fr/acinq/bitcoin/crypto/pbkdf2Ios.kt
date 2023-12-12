@@ -1,5 +1,6 @@
 package fr.acinq.bitcoin.crypto
 
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.refTo
 import platform.KCoreCrypto.KCCKeyDerivationPBKDF
@@ -10,7 +11,7 @@ import platform.CoreCrypto.kCCPRFHmacAlgSHA512
 
 public actual object Pbkdf2 {
 
-    @OptIn(ExperimentalUnsignedTypes::class)
+    @OptIn(ExperimentalUnsignedTypes::class, ExperimentalForeignApi::class)
     public actual fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray {
         memScoped {
             val result = ByteArray(dkLen)

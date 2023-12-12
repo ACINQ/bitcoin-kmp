@@ -61,9 +61,9 @@ class DeriveWalletKeysTestsCommon {
 
     companion object {
         sealed class DerivationScheme {
-            object BIP44 : DerivationScheme()
-            object BIP49 : DerivationScheme()
-            object BIP84 : DerivationScheme()
+            data object BIP44 : DerivationScheme()
+            data object BIP49 : DerivationScheme()
+            data object BIP84 : DerivationScheme()
         }
 
         fun deriveAddresses(xpub: String, derivationScheme: DerivationScheme): List<String> {

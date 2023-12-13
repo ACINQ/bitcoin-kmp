@@ -27,10 +27,10 @@ class BlockTestsCommon {
     private val blockData = run {
         val file = TransactionTestsCommon.resourcesDir().resolve("block1.dat")
         file.openReadableFile().use {
-            val len = it.available
+            val len = it.size
             // workaround for a bug in kotlin memory file where dstOffset cannot be 0 but is still ignored...
             val buffer = ByteArray(len)
-            for (i in buffer.indices) buffer[i] = it.readByte()
+            it.readBytes(buffer, 0, buffer.size)
             buffer
         }
     }

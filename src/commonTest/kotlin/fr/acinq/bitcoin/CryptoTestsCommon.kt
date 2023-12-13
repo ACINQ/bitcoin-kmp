@@ -21,7 +21,7 @@ import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
 import org.kodein.memory.file.openReadableFile
 import org.kodein.memory.file.resolve
-import org.kodein.memory.io.readLine
+import org.kodein.memory.text.readLine
 import org.kodein.memory.use
 import kotlin.random.Random
 import kotlin.test.*

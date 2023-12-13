@@ -357,8 +357,8 @@ class TaprootTestsCommon {
     fun `parse and validate huge transaction`() {
         // this is the tx that broke btcd/lnd
         val file = resourcesDir().resolve("7393096d97bfee8660f4100ffd61874d62f9a65de9fb6acf740c4c386990ef73.bin").openReadableFile()
-        val buffer = ByteArray(file.available)
-        file.readBytes(buffer)
+        val buffer = ByteArray(file.size)
+        file.readBytes(buffer, 0, buffer.size)
         file.close()
         val tx = Transaction.read(buffer)
         assertEquals(1001, tx.txIn[0].witness.stack.size)
@@ -409,8 +409,8 @@ class TaprootTestsCommon {
     @Test
     fun `parse and validate large ordinals transaction`() {
         val file = resourcesDir().resolve("b5a7e05f28d00e4a791759ad7b6bd6799d856693293ceeaad9b0bb93c8851f7f.bin").openReadableFile()
-        val buffer = ByteArray(file.available)
-        file.readBytes(buffer)
+        val buffer = ByteArray(file.size)
+        file.readBytes(buffer,  0, buffer.size)
         file.close()
         val tx = Transaction.read(buffer)
         val parentTx = Transaction.read(

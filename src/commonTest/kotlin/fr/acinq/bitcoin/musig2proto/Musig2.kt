@@ -1,4 +1,4 @@
-package fr.acinq.bitcoin.musig2
+package fr.acinq.bitcoin.musig2proto
 
 import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.crypto.Pack

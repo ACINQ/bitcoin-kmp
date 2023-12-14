@@ -1,6 +1,6 @@
-package fr.acinq.bitcoin
+package fr.acinq.bitcoin.musig2proto
 
-import fr.acinq.bitcoin.musig2.*
+import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.reference.TransactionTestsCommon
 import fr.acinq.secp256k1.Hex
 import kotlinx.serialization.json.*

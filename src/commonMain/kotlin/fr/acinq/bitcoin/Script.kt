@@ -602,7 +602,7 @@ public object Script {
 
     public object ControlBlock {
         /**
-         * build a control block to add to the witness of a taproot transaction when spending with the script path.
+         * Build a control block to add to the witness of a taproot transaction when spending with the script path.
          * It includes information to re-compute the merkle root from the script you are using.
          *
          * For example, suppose you have the following script tree:
@@ -612,19 +612,21 @@ public object Script {
          *   #1  #2
          *
          * To recompute its merkle root you need to provide either:
-         * - if you're spending with script #1: leaves #2 and #3
-         * - if you're spending with script #2: leaves #1 and #3
-         * - if you're spending with script #3: branch(#1, #2)
+         *  - if you're spending with script #1: leaves #2 and #3
+         *  - if you're spending with script #2: leaves #1 and #3
+         *  - if you're spending with script #3: branch(#1, #2)
          *
-         * @param internalPubKey internal public key
-         * @param merkleRoot tapscript merkle root
-         * @param leaves list of partial script trees than are required to re-build the merkle root
+         * @param internalPubKey internal public key.
+         * @param scriptTree tapscript tree.
+         * @param spendingScript script leaf we're spending (must exist in the [scriptTree]).
          */
         @JvmStatic
-        public fun build(internalPubKey: XonlyPublicKey, merkleRoot: ByteVector32, leaves: List<ScriptTree<ScriptLeaf>> = listOf()): ByteArray {
-            val parity = internalPubKey.outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot)).second
-            val initialBlock = byteArrayOf((TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte()) + internalPubKey.value.toByteArray()
-            return leaves.fold(initialBlock) { block, tree -> block + ScriptTree.hash(tree).toByteArray() }
+        public fun build(internalPubKey: XonlyPublicKey, scriptTree: ScriptTree, spendingScript: ScriptTree.Leaf): ByteVector {
+            val (_, parity) = internalPubKey.outputKey(Crypto.TaprootTweak.ScriptTweak(scriptTree.hash()))
+            val controlByte = (spendingScript.leafVersion + (if (parity) 1 else 0)).toByte()
+            // NB: the spending script is included in a separate witness element, so we remove it from the control block.
+            val merkleProof = scriptTree.merkleProof(spendingScript.id).tail()
+            return ByteVector.empty.concat(controlByte).concat(internalPubKey.value).concat(merkleProof)
         }
     }
 
@@ -1373,7 +1375,7 @@ public object Script {
                         require((control.size() - 33) / 32 in 0..128) { "invalid control block size" }
                         val leafVersion = control[0].toInt() and TAPROOT_LEAF_MASK
                         val internalKey = XonlyPublicKey(control.slice(1, 33).toByteArray().byteVector32())
-                        val tapleafHash = ScriptLeaf(0, script, leafVersion).hash
+                        val tapleafHash = ScriptTree.Leaf(0, script, leafVersion).hash()
                         this.context.executionData = this.context.executionData.copy(tapleafHash = tapleafHash)
 
                         // split input buffer into 32 bytes chunks (input buffer size MUST be a multiple of 32 !!)

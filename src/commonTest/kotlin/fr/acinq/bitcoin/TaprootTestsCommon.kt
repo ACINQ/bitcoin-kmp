@@ -175,8 +175,8 @@ class TaprootTestsCommon {
         )
 
         // simple script tree with a single element
-        val scriptTree = ScriptTree.Leaf(ScriptLeaf(0, Script.write(script).byteVector(), Script.TAPROOT_LEAF_TAPSCRIPT))
-        val merkleRoot = ScriptTree.hash(scriptTree)
+        val scriptTree = ScriptTree.Leaf(0, script)
+        val merkleRoot = scriptTree.hash()
         // we choose a pubkey that does not have a corresponding private key: our funding tx can only be spent through the script path, not the key path
         val internalPubkey = XonlyPublicKey(PublicKey.fromHex("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"))
         val (tweakedKey, _) = internalPubkey.outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot))
@@ -196,25 +196,25 @@ class TaprootTestsCommon {
         // compute all 3 signatures
         val sigs = privs.map { Crypto.signSchnorr(hash, it, Crypto.SchnorrTweak.NoTweak) }
 
-        // control is the same for everyone since there are no specific merkle hashes to provide
-        val controlBlock = Script.ControlBlock.build(internalPubkey, merkleRoot)
+        // The control is the same for everyone since the script tree contains a single script.
+        val controlBlock = Script.ControlBlock.build(internalPubkey, scriptTree, scriptTree)
 
         // one signature is not enough
-        val tx = tmp.updateWitness(0, ScriptWitness(listOf(sigs[0], sigs[0], sigs[0], Script.write(script).byteVector(), controlBlock.byteVector())))
+        val tx = tmp.updateWitness(0, ScriptWitness(listOf(sigs[0], sigs[0], sigs[0], Script.write(script).byteVector(), controlBlock)))
         assertFails {
             Transaction.correctlySpends(tx, fundingTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         }
 
         // spend with sigs #0 and #1
-        val tx1 = tmp.updateWitness(0, ScriptWitness(listOf(ByteVector.empty, sigs[1], sigs[0], Script.write(script).byteVector(), controlBlock.byteVector())))
+        val tx1 = tmp.updateWitness(0, ScriptWitness(listOf(ByteVector.empty, sigs[1], sigs[0], Script.write(script).byteVector(), controlBlock)))
         Transaction.correctlySpends(tx1, fundingTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
         // spend with sigs #1 and #2
-        val tx2 = tmp.updateWitness(0, ScriptWitness(listOf(sigs[2], ByteVector.empty, sigs[0], Script.write(script).byteVector(), controlBlock.byteVector())))
+        val tx2 = tmp.updateWitness(0, ScriptWitness(listOf(sigs[2], ByteVector.empty, sigs[0], Script.write(script).byteVector(), controlBlock)))
         Transaction.correctlySpends(tx2, fundingTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
         // spend with sigs #0, #1 and #2
-        val tx3 = tmp.updateWitness(0, ScriptWitness(listOf(sigs[2], sigs[1], sigs[0], Script.write(script).byteVector(), controlBlock.byteVector())))
+        val tx3 = tmp.updateWitness(0, ScriptWitness(listOf(sigs[2], sigs[1], sigs[0], Script.write(script).byteVector(), controlBlock)))
         Transaction.correctlySpends(tx3, fundingTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
 
@@ -227,7 +227,7 @@ class TaprootTestsCommon {
             PrivateKey(ByteVector32("0101010101010101010101010101010101010101010101010101010101010103"))
         )
         val scripts = privs.map { listOf(OP_PUSHDATA(XonlyPublicKey(it.publicKey()).value), OP_CHECKSIG) }
-        val leaves = scripts.mapIndexed { idx, script -> ScriptTree.Leaf(ScriptLeaf(idx, Script.write(script).byteVector(), Script.TAPROOT_LEAF_TAPSCRIPT)) }
+        val leaves = scripts.mapIndexed { idx, script -> ScriptTree.Leaf(idx, script) }
         //     root
         //    /   \
         //  /  \   #3
@@ -236,7 +236,7 @@ class TaprootTestsCommon {
             ScriptTree.Branch(leaves[0], leaves[1]),
             leaves[2]
         )
-        val merkleRoot = ScriptTree.hash(scriptTree)
+        val merkleRoot = scriptTree.hash()
         val blockchain = Block.SignetGenesisBlock.hash
 
         // we use key #1 as our internal key
@@ -293,11 +293,10 @@ class TaprootTestsCommon {
                 txOut = listOf(TxOut(fundingTx1.txOut[0].amount - Satoshi(5000), sweepPublicKeyScript)),
                 lockTime = 0
             )
-            // to re-compute the merkle root we need to provide leaves #2 and #3
-            val controlBlock = Script.ControlBlock.build(internalPubkey, merkleRoot, listOf(leaves[1], leaves[2]))
-            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[0])))
+            val controlBlock = Script.ControlBlock.build(internalPubkey, scriptTree, leaves[0])
+            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, leaves[0].hash()))
             val sig = Crypto.signSchnorr(hash, privs[0], Crypto.SchnorrTweak.NoTweak)
-            tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[0]).byteVector(), controlBlock.byteVector())))
+            tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[0]).byteVector(), controlBlock)))
         }
 
         // see: https://mempool.space/signet/tx/5586515f9ed7fce8b7e8be97a8681c298a94166ff95e15edd94226edec50d9ea
@@ -322,11 +321,10 @@ class TaprootTestsCommon {
                 txOut = listOf(TxOut(fundingTx2.txOut[0].amount - Satoshi(5000), sweepPublicKeyScript)),
                 lockTime = 0
             )
-            // to re-compute the merkle root we need to provide leaves #1 and #3
-            val controlBlock = Script.ControlBlock.build(internalPubkey, merkleRoot, listOf(leaves[0], leaves[2]))
-            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx2.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[1])))
+            val controlBlock = Script.ControlBlock.build(internalPubkey, scriptTree, leaves[1])
+            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx2.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, leaves[1].hash()))
             val sig = Crypto.signSchnorr(hash, privs[1], Crypto.SchnorrTweak.NoTweak) // signature for script spend of leaf #2
-            tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[1]).byteVector(), controlBlock.byteVector())))
+            tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[1]).byteVector(), controlBlock)))
         }
 
         // see: https://mempool.space/signet/tx/5586515f9ed7fce8b7e8be97a8681c298a94166ff95e15edd94226edec50d9ea
@@ -350,11 +348,10 @@ class TaprootTestsCommon {
                 txOut = listOf(TxOut(fundingTx3.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7").result!!)),
                 lockTime = 0
             )
-            // to re-compute the merkle root we need to provide branch(#1, #2)
-            val controlBlock = Script.ControlBlock.build(internalPubkey, merkleRoot, listOf(ScriptTree.Branch(leaves[0], leaves[1])))
-            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx3.txOut[1]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, ScriptTree.hash(leaves[2])))
+            val controlBlock = Script.ControlBlock.build(internalPubkey, scriptTree, leaves[2])
+            val hash = hashForSigningSchnorr(tmp, 0, listOf(fundingTx3.txOut[1]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(null, leaves[2].hash()))
             val sig = Crypto.signSchnorr(hash, privs[2], Crypto.SchnorrTweak.NoTweak) // signature for script spend of leaf #3
-            tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[2]).byteVector(), controlBlock.byteVector())))
+            tmp.updateWitness(0, ScriptWitness(listOf(sig, Script.write(scripts[2]).byteVector(), controlBlock)))
         }
 
         // see: https://mempool.space/signet/tx/2eb421e044de0535aa3d14a5a4c325ba8b5181440bbd911b5b43718b686b09a8

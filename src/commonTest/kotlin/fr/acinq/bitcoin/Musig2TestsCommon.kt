@@ -330,8 +330,8 @@ class Musig2TestsCommon {
         // the redeem script is just the refund script. it is generated from this policy: and_v(v:pk(user),older(refundDelay))
         // it does not depend upon the user's or server's key, just the user's refund key and the refund delay
         val redeemScript = listOf(OP_PUSHDATA(userRefundPrivateKey.publicKey().xOnly()), OP_CHECKSIGVERIFY, OP_PUSHDATA(Script.encodeNumber(refundDelay)), OP_CHECKSEQUENCEVERIFY)
-        val scriptTree = ScriptTree.Leaf(ScriptLeaf(0, redeemScript, Script.TAPROOT_LEAF_TAPSCRIPT))
-        val merkleRoot = ScriptTree.hash(scriptTree)
+        val scriptTree = ScriptTree.Leaf(0, redeemScript)
+        val merkleRoot = scriptTree.hash()
 
         // the internal pubkey is the musig2 aggregation of the user's and server's public keys: it does not depend upon the user's refund's key
         val internalPubKey = Musig2.keyAgg(listOf(userPrivateKey.publicKey(), serverPrivateKey.publicKey())).Q.xOnly()
@@ -379,7 +379,7 @@ class Musig2TestsCommon {
         // Or it can be spent with only the user's signature, after a delay.
         run {
             val executionData = Script.ExecutionData(annex = null, tapleafHash = merkleRoot)
-            val controlBlock = Script.ControlBlock.build(internalPubKey, merkleRoot)
+            val controlBlock = Script.ControlBlock.build(internalPubKey, scriptTree, scriptTree)
 
             val tx = Transaction(
                 version = 2,

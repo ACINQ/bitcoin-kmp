@@ -54,7 +54,7 @@ class BIP341TestsCommon {
                 val internalPrivkey = PrivateKey.fromHex(given["internalPrivkey"]!!.jsonPrimitive.content)
                 val merkleRoot = nullOrBytes(given["merkleRoot"]?.jsonPrimitive?.content)
 
-                val internalPubkey = XonlyPublicKey(internalPrivkey.publicKey())
+                val internalPubkey = internalPrivkey.publicKey().xOnly()
                 val intermediary = it.jsonObject["intermediary"]!!.jsonObject
                 assertEquals(ByteVector32(intermediary["internalPubkey"]!!.jsonPrimitive.content), internalPubkey.value)
                 val tweak = internalPubkey.tweak(if (merkleRoot == null) Crypto.TaprootTweak.NoScriptTweak else Crypto.TaprootTweak.ScriptTweak(merkleRoot))
@@ -63,18 +63,15 @@ class BIP341TestsCommon {
                 val tweakedPrivateKey = internalPrivkey.tweak(tweak)
                 assertEquals(ByteVector32(intermediary["tweakedPrivkey"]!!.jsonPrimitive.content), tweakedPrivateKey.value)
 
-                val hash = Transaction.hashForSigningSchnorr(rawUnsignedTx, txinIndex, utxosSpent, hashType, 0)
+                val hash = Transaction.hashForSigningTaprootKeyPath(rawUnsignedTx, txinIndex, utxosSpent, hashType)
                 assertEquals(ByteVector32(intermediary["sigHash"]!!.jsonPrimitive.content), hash)
 
                 val sig = Crypto.signSchnorr(hash, internalPrivkey, if (merkleRoot == null) Crypto.TaprootTweak.NoScriptTweak else Crypto.TaprootTweak.ScriptTweak(merkleRoot))
-                val witness = when (hashType) {
-                    SigHash.SIGHASH_DEFAULT -> sig
-                    else -> (sig + byteArrayOf(hashType.toByte()))
-                }
+                val witness = Script.witnessKeyPathPay2tr(sig, hashType)
                 val expected = it.jsonObject["expected"]!!.jsonObject
                 val witnessStack = expected["witness"]!!.jsonArray.map { jsonElt -> ByteVector(jsonElt.jsonPrimitive.content) }
                 assertEquals(1, witnessStack.size)
-                assertEquals(witnessStack.first(), witness)
+                assertEquals(witnessStack.first(), witness.stack.first())
             }
         }
     }
@@ -91,14 +88,13 @@ class BIP341TestsCommon {
             }
 
             val intermediary = it.jsonObject["intermediary"]!!.jsonObject
-            val merkleRoot = scriptTree?.hash()
-            val (tweakedKey, _) = internalPubkey.outputKey(if (merkleRoot == null) Crypto.TaprootTweak.NoScriptTweak else Crypto.TaprootTweak.ScriptTweak(merkleRoot))
-            merkleRoot?.let { assertEquals(ByteVector32(intermediary["merkleRoot"]!!.jsonPrimitive.content), it) }
+            val (tweakedKey, _) = internalPubkey.outputKey(if (scriptTree == null) Crypto.TaprootTweak.NoScriptTweak else Crypto.TaprootTweak.ScriptTweak(scriptTree))
+            scriptTree?.let { assertEquals(ByteVector32(intermediary["merkleRoot"]!!.jsonPrimitive.content), it.hash()) }
             assertEquals(ByteVector32(intermediary["tweakedPubkey"]!!.jsonPrimitive.content), tweakedKey.value)
 
             val expected = it.jsonObject["expected"]!!.jsonObject
-            val script = Script.write(listOf(OP_1, OP_PUSHDATA(tweakedKey.value))).byteVector()
-            assertEquals(ByteVector(expected["scriptPubKey"]!!.jsonPrimitive.content), script)
+            val script = Script.pay2tr(internalPubkey, scriptTree)
+            assertEquals(ByteVector(expected["scriptPubKey"]!!.jsonPrimitive.content), Script.write(script).byteVector())
             val bip350Address = Bech32.encodeWitnessAddress("bc", 1.toByte(), tweakedKey.value.toByteArray())
             assertEquals(expected["bip350Address"]!!.jsonPrimitive.content, bip350Address)
 

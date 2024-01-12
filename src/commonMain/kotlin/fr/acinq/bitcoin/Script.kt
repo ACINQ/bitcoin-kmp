@@ -386,6 +386,20 @@ public object Script {
     @JvmStatic
     public fun isPay2wsh(script: ByteArray): Boolean = isPay2wsh(parse(script))
 
+    @JvmStatic
+    public fun isPay2tr(script: List<ScriptElt>): Boolean {
+        return when {
+            script.size == 2 && script[0] == OP_1 && script[1].isPush(32) -> true
+            else -> false
+        }
+    }
+
+    @JvmStatic
+    public fun isPay2tr(script: ByteArray): Boolean = isPay2tr(parse(script))
+
+    @JvmStatic
+    public fun isPay2tr(script: ByteVector): Boolean = isPay2tr(script.toByteArray())
+
     /**
      * @param pubKeyHash public key hash
      * @return a pay-to-public-key-hash script
@@ -404,7 +418,6 @@ public object Script {
     public fun pay2pkh(pubKey: PublicKey): List<ScriptElt> = pay2pkh(pubKey.hash160())
 
     /**
-     *
      * @param script bitcoin script
      * @return a pay-to-script script
      */
@@ -412,7 +425,6 @@ public object Script {
     public fun pay2sh(script: List<ScriptElt>): List<ScriptElt> = pay2sh(write(script))
 
     /**
-     *
      * @param script bitcoin script
      * @return a pay-to-script script
      */
@@ -420,7 +432,6 @@ public object Script {
     public fun pay2sh(script: ByteArray): List<ScriptElt> = listOf(OP_HASH160, OP_PUSHDATA(Crypto.hash160(script)), OP_EQUAL)
 
     /**
-     *
      * @param script bitcoin script
      * @return a pay-to-witness-script script
      */
@@ -428,7 +439,6 @@ public object Script {
     public fun pay2wsh(script: List<ScriptElt>): List<ScriptElt> = pay2wsh(write(script))
 
     /**
-     *
      * @param script bitcoin script
      * @return a pay-to-witness-script script
      */
@@ -436,7 +446,6 @@ public object Script {
     public fun pay2wsh(script: ByteArray): List<ScriptElt> = listOf(OP_0, OP_PUSHDATA(Crypto.sha256(script)))
 
     /**
-     *
      * @param script bitcoin script
      * @return a pay-to-witness-script script
      */
@@ -444,7 +453,6 @@ public object Script {
     public fun pay2wsh(script: ByteVector): List<ScriptElt> = pay2wsh(script.toByteArray())
 
     /**
-     *
      * @param pubKeyHash public key hash
      * @return a pay-to-witness-public-key-hash script
      */
@@ -455,19 +463,11 @@ public object Script {
     }
 
     /**
-     *
      * @param pubKey public key
      * @return a pay-to-witness-public-key-hash script
      */
     @JvmStatic
     public fun pay2wpkh(pubKey: PublicKey): List<ScriptElt> = pay2wpkh(pubKey.hash160())
-
-    /**
-     * @param pubkey x-only public key
-     * @return a pay-to-taproot script
-     */
-    @JvmStatic
-    public fun pay2tr(pubkey: XonlyPublicKey): List<ScriptElt> = listOf(OP_1, OP_PUSHDATA(pubkey.value))
 
     /**
      * @param pubKey public key
@@ -476,6 +476,47 @@ public object Script {
      */
     @JvmStatic
     public fun witnessPay2wpkh(pubKey: PublicKey, sig: ByteVector): ScriptWitness = ScriptWitness(listOf(sig, pubKey.value))
+
+    /**
+     * @param outputKey public key exposed by the taproot script (tweaked based on the tapscripts).
+     * @return a pay-to-taproot script.
+     */
+    @JvmStatic
+    public fun pay2tr(outputKey: XonlyPublicKey): List<ScriptElt> = listOf(OP_1, OP_PUSHDATA(outputKey.value))
+
+    /**
+     * @param internalKey internal public key that will be tweaked with the [scripts] provided.
+     * @param scripts optional spending scripts that can be used instead of key-path spending.
+     * @return the script and the tweak that must be applied to the private key for [internalKey] when signing.
+     */
+    @JvmStatic
+    public fun pay2tr(internalKey: XonlyPublicKey, scripts: ScriptTree?): List<ScriptElt> {
+        val tweak = when (scripts) {
+            null -> Crypto.TaprootTweak.NoScriptTweak
+            else -> Crypto.TaprootTweak.ScriptTweak(scripts.hash())
+        }
+        val (publicKey, _) = internalKey.outputKey(tweak)
+        return pay2tr(publicKey)
+    }
+
+    /** NB: callers must ensure that they use the correct [Crypto.TaprootTweak] when generating their signature. */
+    @JvmStatic
+    public fun witnessKeyPathPay2tr(sig: ByteVector64, sighash: Int = SigHash.SIGHASH_DEFAULT): ScriptWitness = when (sighash) {
+        SigHash.SIGHASH_DEFAULT -> ScriptWitness(listOf(sig))
+        else -> ScriptWitness(listOf(sig.concat(sighash.toByte())))
+    }
+
+    /**
+     * @param internalKey taproot internal public key.
+     * @param script script that is spent (must exist in the [scriptTree]).
+     * @param witness witness for the spent [script].
+     * @param scriptTree tapscript tree.
+     */
+    @JvmStatic
+    public fun witnessScriptPathPay2tr(internalKey: XonlyPublicKey, script: ScriptTree.Leaf, witness: ScriptWitness, scriptTree: ScriptTree): ScriptWitness {
+        val controlBlock = ControlBlock.build(internalKey, scriptTree, script)
+        return ScriptWitness(witness.stack + script.script + controlBlock)
+    }
 
     public fun removeSignature(script: List<ScriptElt>, signature: ByteVector): List<ScriptElt> {
         val toRemove = OP_PUSHDATA(signature)
@@ -622,7 +663,7 @@ public object Script {
          */
         @JvmStatic
         public fun build(internalPubKey: XonlyPublicKey, scriptTree: ScriptTree, spendingScript: ScriptTree.Leaf): ByteVector {
-            val (_, parity) = internalPubKey.outputKey(Crypto.TaprootTweak.ScriptTweak(scriptTree.hash()))
+            val (_, parity) = internalPubKey.outputKey(scriptTree)
             val controlByte = (spendingScript.leafVersion + (if (parity) 1 else 0)).toByte()
             // NB: the spending script is included in a separate witness element, so we remove it from the control block.
             val merkleProof = scriptTree.merkleProof(spendingScript.id).tail()
@@ -689,7 +730,16 @@ public object Script {
                 pubKey.size == 32 && sigBytes.isEmpty() -> false
                 pubKey.size == 32 -> {
                     val sighashType = sigHashType(sigBytes)
-                    val hash = Transaction.hashForSigningSchnorr(context.tx, context.inputIndex, context.prevouts, sighashType, signatureVersion, this.context.executionData)
+                    val hash = Transaction.hashForSigningSchnorr(
+                        context.tx,
+                        context.inputIndex,
+                        context.prevouts,
+                        sighashType,
+                        signatureVersion,
+                        context.executionData.tapleafHash,
+                        context.executionData.annex,
+                        context.executionData.codeSeparatorPos
+                    )
                     val result = Secp256k1.verifySchnorr(sigBytes.take(64).toByteArray(), hash.toByteArray(), pubKey)
                     require(result) { "Invalid Schnorr signature" }
                     result
@@ -1364,7 +1414,16 @@ public object Script {
                         val sig = stack.first()
                         val pub = XonlyPublicKey(program.byteVector32())
                         val hashType = sigHashType(sig)
-                        val hash = Transaction.hashForSigningSchnorr(context.tx, context.inputIndex, context.prevouts, hashType, SigVersion.SIGVERSION_TAPROOT, context.executionData)
+                        val hash = Transaction.hashForSigningSchnorr(
+                            context.tx,
+                            context.inputIndex,
+                            context.prevouts,
+                            hashType,
+                            SigVersion.SIGVERSION_TAPROOT,
+                            context.executionData.tapleafHash,
+                            context.executionData.annex,
+                            context.executionData.codeSeparatorPos
+                        )
                         require(Secp256k1.verifySchnorr(sig.take(64).toByteArray(), hash.toByteArray(), pub.value.toByteArray())) { " invalid Schnorr signature " }
                         return
                     } else {

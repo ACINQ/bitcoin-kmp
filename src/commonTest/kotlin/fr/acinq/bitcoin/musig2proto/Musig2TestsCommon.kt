@@ -29,14 +29,14 @@ class Musig2TestsCommon {
             val keyIndices = it.jsonObject["key_indices"]!!.jsonArray.map { it.jsonPrimitive.int }
             val expected = XonlyPublicKey(ByteVector32.fromValidHex(it.jsonObject["expected"]!!.jsonPrimitive.content))
             val ctx = Musig2.keyAgg(keyIndices.map { pubkeys[it] })
-            assertEquals(expected, ctx.Q.xOnly())
+            assertEquals(expected, ctx.xOnly())
         }
         tests.jsonObject["error_test_cases"]!!.jsonArray.forEach {
             val keyIndices = it.jsonObject["key_indices"]!!.jsonArray.map { it.jsonPrimitive.int }
             val tweakIndices = it.jsonObject["tweak_indices"]!!.jsonArray.map { it.jsonPrimitive.int }
             val isXonly = it.jsonObject["is_xonly"]!!.jsonArray.map { it.jsonPrimitive.boolean }
             assertFails {
-                var ctx = Musig2.keyAgg(keyIndices.map { pubkeys[it] })
+                var ctx = KeyAggCtx(keyIndices.map { pubkeys[it] })
                 tweakIndices.zip(isXonly).forEach { ctx = ctx.tweak(tweaks[it.first], it.second) }
             }
         }
@@ -267,7 +267,7 @@ class Musig2TestsCommon {
         }
 
         // aggregate public keys
-        val aggpub = Musig2.keyAgg(pubkeys)
+        val aggpub = KeyAggCtx(pubkeys)
             .tweak(plainTweak, false)
             .tweak(xonlyTweak, true)
 
@@ -277,51 +277,45 @@ class Musig2TestsCommon {
 
     @Test
     fun `use musig2 to replace multisig 2-of-2`() {
+        val random = Random.Default
         val alicePrivKey = PrivateKey(ByteArray(32) { 1 })
         val alicePubKey = alicePrivKey.publicKey()
         val bobPrivKey = PrivateKey(ByteArray(32) { 2 })
         val bobPubKey = bobPrivKey.publicKey()
 
-        // Alice and Bob exchange public keys and agree on a common aggregated key
-        val internalPubKey = Musig2.keyAgg(listOf(alicePubKey, bobPubKey)).Q.xOnly()
-        // we use the standard BIP86 tweak
-        val commonPubKey = internalPubKey.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
-
-        // this tx sends to a standard p2tr(commonPubKey) script
-        val tx = Transaction(2, listOf(), listOf(TxOut(Satoshi(10000), Script.pay2tr(commonPubKey))), 0)
+        // Alice and Bob exchange public keys and agree on a common aggregated key.
+        val aggregatedKey = Musig2.keyAgg(listOf(alicePubKey, bobPubKey)).xOnly()
+        // This tx sends to a taproot script that doesn't contain any script path.
+        val tx = Transaction(2, listOf(), listOf(TxOut(Satoshi(10000), Script.pay2tr(aggregatedKey, scripts = null))), 0)
 
         // this is how Alice and Bob would spend that tx
         val spendingTx = Transaction(2, listOf(TxIn(OutPoint(tx, 0), sequence = 0)), listOf(TxOut(Satoshi(10000), Script.pay2wpkh(alicePubKey))), 0)
+        val sig = run {
+            // The first step of a musig2 signing session is to exchange nonces.
+            // If participants are disconnected before the end of the signing session, they must start again with fresh nonces.
+            val aliceNonce = SecretNonce.generate(alicePrivKey, aggregatedKey, random.nextBytes(32).byteVector32())
+            val bobNonce = SecretNonce.generate(bobPrivKey, aggregatedKey, random.nextBytes(32).byteVector32())
 
-        val commonSig = run {
-            val random = Random.Default
-            val aliceNonce = SecretNonce.generate(alicePrivKey, alicePubKey, commonPubKey, null, null, random.nextBytes(32).byteVector32())
-            val bobNonce = SecretNonce.generate(bobPrivKey, bobPubKey, commonPubKey, null, null, random.nextBytes(32).byteVector32())
+            // Once they have each other's public nonce, they can produce partial signatures.
+            val publicNonces = listOf(aliceNonce.publicNonce(), bobNonce.publicNonce())
+            val aliceSig = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, tx.txOut, listOf(alicePubKey, bobPubKey), aliceNonce, publicNonces, scriptTree = null)!!
+            val bobSig = Musig2.signTaprootInput(bobPrivKey, spendingTx, 0, tx.txOut, listOf(alicePubKey, bobPubKey), bobNonce, publicNonces, scriptTree = null)!!
 
-            val aggnonce = IndividualNonce.aggregate(listOf(aliceNonce.publicNonce(), bobNonce.publicNonce()))
-            val msg = Transaction.hashForSigningTaprootKeyPath(spendingTx, 0, listOf(tx.txOut[0]), SigHash.SIGHASH_DEFAULT)
-
-            // we use the same ctx for Alice and Bob, they both know all the public keys that are used here
-            val ctx = SessionCtx(
-                aggnonce,
-                listOf(alicePubKey, bobPubKey),
-                listOf(Pair(internalPubKey.tweak(Crypto.TaprootTweak.NoScriptTweak), true)),
-                msg
-            )
-            val aliceSig = ctx.sign(aliceNonce, alicePrivKey)!!
-            val bobSig = ctx.sign(bobNonce, bobPrivKey)!!
-            ctx.partialSigAgg(listOf(aliceSig, bobSig))!!
+            // Once they have each other's partial signature, they can aggregate them into a valid signature.
+            Musig2.aggregateTaprootSignatures(listOf(aliceSig, bobSig), spendingTx, 0, tx.txOut, listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null)!!
         }
 
-        // this tx looks like any other tx that spends a p2tr output, with a single signature
-        val signedSpendingTx = spendingTx.updateWitness(0, ScriptWitness(listOf(commonSig)))
+        // This tx looks like any other tx that spends a p2tr output, with a single signature.
+        val signedSpendingTx = spendingTx.updateWitness(0, Script.witnessKeyPathPay2tr(sig))
         Transaction.correctlySpends(signedSpendingTx, tx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
 
     @Test
     fun `swap-in-potentiam example with musig2 and taproot`() {
         val userPrivateKey = PrivateKey(ByteArray(32) { 1 })
+        val userPublicKey = userPrivateKey.publicKey()
         val serverPrivateKey = PrivateKey(ByteArray(32) { 2 })
+        val serverPublicKey = serverPrivateKey.publicKey()
         val userRefundPrivateKey = PrivateKey(ByteArray(32) { 3 })
         val refundDelay = 25920
 
@@ -329,12 +323,12 @@ class Musig2TestsCommon {
 
         // the redeem script is just the refund script. it is generated from this policy: and_v(v:pk(user),older(refundDelay))
         // it does not depend upon the user's or server's key, just the user's refund key and the refund delay
-        val redeemScript = listOf(OP_PUSHDATA(userRefundPrivateKey.publicKey().xOnly()), OP_CHECKSIGVERIFY, OP_PUSHDATA(Script.encodeNumber(refundDelay)), OP_CHECKSEQUENCEVERIFY)
+        val redeemScript = listOf(OP_PUSHDATA(userRefundPrivateKey.xOnlyPublicKey()), OP_CHECKSIGVERIFY, OP_PUSHDATA(Script.encodeNumber(refundDelay)), OP_CHECKSEQUENCEVERIFY)
         val scriptTree = ScriptTree.Leaf(0, redeemScript)
 
         // the internal pubkey is the musig2 aggregation of the user's and server's public keys: it does not depend upon the user's refund's key
-        val internalPubKey = Musig2.keyAgg(listOf(userPrivateKey.publicKey(), serverPrivateKey.publicKey())).Q.xOnly()
-        val pubkeyScript = Script.pay2tr(internalPubKey, scriptTree)
+        val aggregatedKey = Musig2.keyAgg(listOf(userPublicKey, serverPublicKey)).xOnly()
+        val pubkeyScript = Script.pay2tr(aggregatedKey, scriptTree)
 
         val swapInTx = Transaction(
             version = 2,
@@ -348,27 +342,22 @@ class Musig2TestsCommon {
             val tx = Transaction(
                 version = 2,
                 txIn = listOf(TxIn(OutPoint(swapInTx, 0), sequence = TxIn.SEQUENCE_FINAL)),
-                txOut = listOf(TxOut(Satoshi(10000), Script.pay2wpkh(userPrivateKey.publicKey()))),
+                txOut = listOf(TxOut(Satoshi(10000), Script.pay2wpkh(userPublicKey))),
                 lockTime = 0
             )
-            // this is the beginning of an interactive musig2 signing session. if user and server are disconnected before they have exchanged partial
-            // signatures they will have to start again with fresh nonces
-            val userNonce = SecretNonce.generate(userPrivateKey, userPrivateKey.publicKey(), internalPubKey, null, null, random.nextBytes(32).byteVector32())
-            val serverNonce = SecretNonce.generate(serverPrivateKey, serverPrivateKey.publicKey(), internalPubKey, null, null, random.nextBytes(32).byteVector32())
+            // The first step of a musig2 signing session is to exchange nonces.
+            // If participants are disconnected before the end of the signing session, they must start again with fresh nonces.
+            val userNonce = SecretNonce.generate(userPrivateKey, aggregatedKey, random.nextBytes(32).byteVector32())
+            val serverNonce = SecretNonce.generate(serverPrivateKey, aggregatedKey, random.nextBytes(32).byteVector32())
 
-            val txHash = Transaction.hashForSigningTaprootKeyPath(tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT)
-            val commonNonce = IndividualNonce.aggregate(listOf(userNonce.publicNonce(), serverNonce.publicNonce()))
-            val ctx = SessionCtx(
-                commonNonce,
-                listOf(userPrivateKey.publicKey(), serverPrivateKey.publicKey()),
-                listOf(Pair(internalPubKey.tweak(Crypto.TaprootTweak.ScriptTweak(scriptTree)), true)),
-                txHash
-            )
+            // Once they have each other's public nonce, they can produce partial signatures.
+            val publicNonces = listOf(userNonce.publicNonce(), serverNonce.publicNonce())
+            val userSig = Musig2.signTaprootInput(userPrivateKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), userNonce, publicNonces, scriptTree)!!
+            val serverSig = Musig2.signTaprootInput(serverPrivateKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), serverNonce, publicNonces, scriptTree)!!
 
-            val userSig = ctx.sign(userNonce, userPrivateKey)!!
-            val serverSig = ctx.sign(serverNonce, serverPrivateKey)!!
-            val commonSig = ctx.partialSigAgg(listOf(userSig, serverSig))!!
-            val signedTx = tx.updateWitness(0, Script.witnessKeyPathPay2tr(commonSig))
+            // Once they have each other's partial signature, they can aggregate them into a valid signature.
+            val sig = Musig2.aggregateTaprootSignatures(listOf(userSig, serverSig), tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree)!!
+            val signedTx = tx.updateWitness(0, Script.witnessKeyPathPay2tr(sig))
             Transaction.correctlySpends(signedTx, swapInTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         }
 
@@ -377,11 +366,11 @@ class Musig2TestsCommon {
             val tx = Transaction(
                 version = 2,
                 txIn = listOf(TxIn(OutPoint(swapInTx, 0), sequence = refundDelay.toLong())),
-                txOut = listOf(TxOut(Satoshi(10000), Script.pay2wpkh(userPrivateKey.publicKey()))),
+                txOut = listOf(TxOut(Satoshi(10000), Script.pay2wpkh(userPublicKey))),
                 lockTime = 0
             )
             val sig = Crypto.signTaprootScriptPath(userRefundPrivateKey, tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, scriptTree.hash())
-            val witness = Script.witnessScriptPathPay2tr(internalPubKey, scriptTree, ScriptWitness(listOf(sig)), scriptTree)
+            val witness = Script.witnessScriptPathPay2tr(aggregatedKey, scriptTree, ScriptWitness(listOf(sig)), scriptTree)
             val signedTx = tx.updateWitness(0, witness)
             Transaction.correctlySpends(signedTx, swapInTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         }

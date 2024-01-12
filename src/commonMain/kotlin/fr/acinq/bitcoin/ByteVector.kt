@@ -18,6 +18,7 @@ package fr.acinq.bitcoin
 
 import fr.acinq.secp256k1.Hex
 import kotlin.experimental.or
+import kotlin.experimental.xor
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -151,6 +152,15 @@ public class ByteVector32(bytes: ByteArray, offset: Int) : ByteVector(bytes, off
 
         @JvmStatic
         public fun fromValidHex(input: String): ByteVector32 = ByteVector32(input)
+
+        @JvmStatic
+        public fun xor(a: ByteVector32, b: ByteVector32): ByteVector32 {
+            val result = ByteArray(32)
+            for (i in 0..31) {
+                result[i] = a[i].xor(b[i])
+            }
+            return result.byteVector32()
+        }
     }
 }
 

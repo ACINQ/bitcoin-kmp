@@ -4,9 +4,7 @@ import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
-import kotlin.experimental.xor
 import kotlin.jvm.JvmStatic
-
 
 /**
  * Key Aggregation Context
@@ -16,6 +14,9 @@ import kotlin.jvm.JvmStatic
  * @param tacc tweak accumulator
  */
 public data class KeyAggCtx(val Q: PublicKey, val gacc: Boolean, val tacc: ByteVector32) {
+    public constructor(Q: PublicKey) : this(Q, true, ByteVector32.Zeroes)
+    public constructor(pubkeys: List<PublicKey>) : this(Musig2.keyAgg(pubkeys))
+
     public fun tweak(tweak: ByteVector32, isXonly: Boolean): KeyAggCtx {
         require(tweak == ByteVector32.Zeroes || PrivateKey(tweak).isValid()) { "invalid tweak" }
         return if (isXonly && !Q.isEven()) {
@@ -30,15 +31,37 @@ public data class KeyAggCtx(val Q: PublicKey, val gacc: Boolean, val tacc: ByteV
 
 public object Musig2 {
     @JvmStatic
-    public fun keyAgg(pubkeys: List<PublicKey>): KeyAggCtx {
+    public fun keyAgg(pubkeys: List<PublicKey>): PublicKey {
         val pk2 = getSecondKey(pubkeys)
         val a = pubkeys.map { keyAggCoeffInternal(pubkeys, it, pk2) }
-        val Q = pubkeys.zip(a).map { it.first.times(PrivateKey(it.second)) }.reduce { p1, p2 -> p1 + p2 }
-        return KeyAggCtx(Q, true, ByteVector32.Zeroes)
+        return pubkeys.zip(a).map { it.first.times(PrivateKey(it.second)) }.reduce { p1, p2 -> p1 + p2 }
     }
 
     @JvmStatic
     public fun keySort(pubkeys: List<PublicKey>): List<PublicKey> = pubkeys.sortedWith { a, b -> LexicographicalOrdering.compare(a, b) }
+
+    private fun taprootSessionCtx(tx: Transaction, inputIndex: Int, inputs: List<TxOut>, pubkeys: List<PublicKey>, publicNonces: List<IndividualNonce>, scriptTree: ScriptTree?): SessionCtx {
+        val aggregatedNonce = IndividualNonce.aggregate(publicNonces)
+        val aggregatedKey = keyAgg(pubkeys).xOnly()
+        val tweak = when (scriptTree) {
+            null -> Pair(aggregatedKey.tweak(Crypto.TaprootTweak.NoScriptTweak), true)
+            else -> Pair(aggregatedKey.tweak(Crypto.TaprootTweak.ScriptTweak(scriptTree)), true)
+        }
+        val txHash = Transaction.hashForSigningTaprootKeyPath(tx, inputIndex, inputs, SigHash.SIGHASH_DEFAULT)
+        return SessionCtx(aggregatedNonce, pubkeys, listOf(tweak), txHash)
+    }
+
+    @JvmStatic
+    public fun signTaprootInput(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: List<TxOut>, pubkeys: List<PublicKey>, secretNonce: SecretNonce, publicNonces: List<IndividualNonce>, scriptTree: ScriptTree?): ByteVector32? {
+        val ctx = taprootSessionCtx(tx, inputIndex, inputs, pubkeys, publicNonces, scriptTree)
+        return ctx.sign(secretNonce, privateKey)
+    }
+
+    @JvmStatic
+    public fun aggregateTaprootSignatures(partialSigs: List<ByteVector32>, tx: Transaction, inputIndex: Int, inputs: List<TxOut>, pubkeys: List<PublicKey>, publicNonces: List<IndividualNonce>, scriptTree: ScriptTree?): ByteVector64? {
+        val ctx = taprootSessionCtx(tx, inputIndex, inputs, pubkeys, publicNonces, scriptTree)
+        return ctx.partialSigAgg(partialSigs)
+    }
 }
 
 /**
@@ -70,17 +93,8 @@ public data class SecretNonce(val data: ByteVector) {
          */
         @JvmStatic
         public fun generate(sk: PrivateKey?, pk: PublicKey, aggpk: XonlyPublicKey?, msg: ByteArray?, extraInput: ByteArray?, randprime: ByteVector32): SecretNonce {
-
-            fun xor(a: ByteVector32, b: ByteVector32): ByteVector32 {
-                val result = ByteArray(32)
-                for (i in 0..31) {
-                    result[i] = a[i].xor(b[i])
-                }
-                return result.byteVector32()
-            }
-
             val rand = if (sk != null) {
-                xor(sk.value, Crypto.taggedHash(randprime.toByteArray(), "MuSig/aux"))
+                ByteVector32.xor(sk.value, Crypto.taggedHash(randprime.toByteArray(), "MuSig/aux"))
             } else {
                 randprime
             }
@@ -101,6 +115,11 @@ public data class SecretNonce(val data: ByteVector) {
             require(k2 != ByteVector32.Zeroes)
             val secnonce = SecretNonce(PrivateKey(k1).value + PrivateKey(k2).value + pk.value)
             return secnonce
+        }
+
+        @JvmStatic
+        public fun generate(sk: PrivateKey, aggregatedKey: XonlyPublicKey, rand: ByteVector32): SecretNonce {
+            return generate(sk, sk.publicKey(), aggregatedKey, null, null, rand)
         }
     }
 }
@@ -192,7 +211,6 @@ internal fun add(a: PublicKey?, b: PublicKey?): PublicKey? = when {
     else -> a + b
 }
 
-
 internal fun mul(a: PublicKey?, b: PrivateKey): PublicKey? = a?.times(b)
 
 /**
@@ -204,7 +222,7 @@ internal fun mul(a: PublicKey?, b: PrivateKey): PublicKey? = a?.times(b)
  */
 public data class SessionCtx(val aggnonce: AggregatedNonce, val pubkeys: List<PublicKey>, val tweaks: List<Pair<ByteVector32, Boolean>>, val message: ByteVector) {
     private fun build(): SessionValues {
-        val keyAggCtx0 = Musig2.keyAgg(pubkeys)
+        val keyAggCtx0 = KeyAggCtx(pubkeys)
         val keyAggCtx = tweaks.fold(keyAggCtx0) { ctx, tweak -> ctx.tweak(tweak.first, tweak.second) }
         val (Q, gacc, tacc) = keyAggCtx
         val b = PrivateKey(Crypto.taggedHash((aggnonce.toByteArray().byteVector() + Q.xOnly().value + message).toByteArray(), "MuSig/noncecoef"))
@@ -221,7 +239,7 @@ public data class SessionCtx(val aggnonce: AggregatedNonce, val pubkeys: List<Pu
     /**
      * @param secnonce secret nonce
      * @param sk private key
-     * @return a Musig2 partial signature, or null if the nonce does not match the private key or the partial signature cannot be verified 
+     * @return a Musig2 partial signature, or null if the nonce does not match the private key or the partial signature cannot be verified
      */
     public fun sign(secnonce: SecretNonce, sk: PrivateKey): ByteVector32? = runCatching {
         val (Q, gacc, _, b, R, e) = build()

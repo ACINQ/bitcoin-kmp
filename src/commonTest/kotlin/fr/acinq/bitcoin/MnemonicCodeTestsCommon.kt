@@ -44,12 +44,21 @@ class MnemonicCodeTestsCommon {
     fun `reference tests`() {
         val tests = TransactionTestsCommon.readData("bip39_vectors.json")
 
-        tests.jsonObject["english"]!!.jsonArray.map {
-            val raw = it.jsonArray[0].jsonPrimitive.content
-            val mnemonics = it.jsonArray[1].jsonPrimitive.content
-            val seed = it.jsonArray[2].jsonPrimitive.content
-            assertEquals(toMnemonics(Hex.decode(raw)).joinToString(" "), mnemonics)
-            assertEquals(Hex.encode(toSeed(toMnemonics(Hex.decode(raw)), "TREZOR")), seed)
+        val pairs: Map<String, MnemonicLanguage> = mapOf(
+            "english" to MnemonicLanguage.English,
+            "czech" to MnemonicLanguage.Czech,
+            "french" to MnemonicLanguage.French,
+            "spanish" to MnemonicLanguage.Spanish
+        )
+        for ((name, language) in pairs) {
+            tests.jsonObject[name]!!.jsonArray.map {
+                val raw = it.jsonArray[0].jsonPrimitive.content
+                val mnemonics = it.jsonArray[1].jsonPrimitive.content
+                val seed = it.jsonArray[2].jsonPrimitive.content
+                val calculatedMnemonics = toMnemonics(Hex.decode(raw), language)
+                assertEquals(calculatedMnemonics.joinToString(" "), mnemonics)
+                assertEquals(Hex.encode(toSeed(calculatedMnemonics, "TREZOR")), seed)
+            }
         }
     }
 

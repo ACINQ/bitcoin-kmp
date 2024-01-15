@@ -487,13 +487,19 @@ public object Script {
     /**
      * @param internalKey internal public key that will be tweaked with the [scripts] provided.
      * @param scripts optional spending scripts that can be used instead of key-path spending.
-     * @return the script and the tweak that must be applied to the private key for [internalKey] when signing.
      */
     @JvmStatic
-    public fun pay2tr(internalKey: XonlyPublicKey, scripts: ScriptTree?): List<ScriptElt> {
-        val tweak = when (scripts) {
+    public fun pay2tr(internalKey: XonlyPublicKey, scripts: ScriptTree?): List<ScriptElt> = pay2tr(internalKey, scripts?.hash())
+
+    /**
+     * @param internalKey internal public key that will be tweaked with the [scriptsRoot] provided.
+     * @param scriptsRoot optional merkle root of the spending scripts that can be used instead of key-path spending.
+     */
+    @JvmStatic
+    public fun pay2tr(internalKey: XonlyPublicKey, scriptsRoot: ByteVector32?): List<ScriptElt> {
+        val tweak = when (scriptsRoot) {
             null -> Crypto.TaprootTweak.NoScriptTweak
-            else -> Crypto.TaprootTweak.ScriptTweak(scripts.hash())
+            else -> Crypto.TaprootTweak.ScriptTweak(scriptsRoot)
         }
         val (publicKey, _) = internalKey.outputKey(tweak)
         return pay2tr(publicKey)

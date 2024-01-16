@@ -101,11 +101,18 @@ class BIP341TestsCommon {
             when (expected["scriptPathControlBlocks"]) {
                 null, JsonNull -> Unit
                 else -> {
+
+                    /** Return the first script leaf with the corresponding id, if any. */
+                    fun findScript(tree: ScriptTree, id: Int): ScriptTree.Leaf? = when (tree) {
+                        is ScriptTree.Leaf -> if (tree.id == id) tree else null
+                        is ScriptTree.Branch -> findScript(tree.left, id) ?: findScript(tree.right, id)
+                    }
+
                     // When control blocks are provided, recompute them for each script tree leaf and check that they match.
                     assertNotNull(scriptTree)
                     val controlBlocks = expected["scriptPathControlBlocks"]!!.jsonArray.map { ByteVector.fromHex(it.jsonPrimitive.content) }
                     controlBlocks.forEachIndexed { index, expectedControlBlock ->
-                        val scriptLeaf = scriptTree.findScript(index)
+                        val scriptLeaf = findScript(scriptTree, index)
                         assertNotNull(scriptLeaf)
                         val computedControlBlock = Script.ControlBlock.build(internalPubkey, scriptTree, scriptLeaf)
                         assertEquals(expectedControlBlock, computedControlBlock)

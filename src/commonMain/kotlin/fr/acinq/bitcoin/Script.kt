@@ -669,11 +669,9 @@ public object Script {
          */
         @JvmStatic
         public fun build(internalPubKey: XonlyPublicKey, scriptTree: ScriptTree, spendingScript: ScriptTree.Leaf): ByteVector {
-            val (_, parity) = internalPubKey.outputKey(scriptTree)
-            val controlByte = (spendingScript.leafVersion + (if (parity) 1 else 0)).toByte()
-            // NB: the spending script is included in a separate witness element, so we remove it from the control block.
-            val merkleProof = scriptTree.merkleProof(spendingScript.id).tail()
-            return ByteVector.empty.concat(controlByte).concat(internalPubKey.value).concat(merkleProof)
+            val merkleProof = scriptTree.merkleProof(spendingScript)
+            require(merkleProof != null) { "cannot compute a proof for the spending script leaf" }
+            return build(internalPubKey, scriptTree.hash(), merkleProof, spendingScript.leafVersion)
         }
 
         /**
@@ -684,6 +682,12 @@ public object Script {
          */
         @JvmStatic
         public fun build(internalPubKey: XonlyPublicKey, merkleRoot: ByteVector32, merkleProof: List<ByteVector32>, leafVersion: Int): ByteVector {
+            return build(internalPubKey, merkleRoot, merkleProof.fold(ByteVector.empty){ a, b -> a + b }.toByteArray(), leafVersion)
+        }
+
+        @JvmStatic
+        public fun build(internalPubKey: XonlyPublicKey, merkleRoot: ByteVector32, merkleProof: ByteArray, leafVersion: Int): ByteVector {
+            require(merkleRoot.size().mod(32) == 0) { "merkle proof size must be N * 32 bytes" }
             val (_, parity) = internalPubKey.outputKey(merkleRoot)
             val controlByte = (leafVersion + (if (parity) 1 else 0)).toByte()
             return ByteVector.empty.concat(controlByte).concat(internalPubKey.value).concat(merkleProof)

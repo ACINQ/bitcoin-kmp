@@ -16,6 +16,7 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.io.ByteArrayOutput
+import kotlin.jvm.JvmStatic
 
 /** Simple binary tree structure containing taproot spending scripts. */
 public sealed class ScriptTree {
@@ -42,6 +43,7 @@ public sealed class ScriptTree {
             BtcSerializer.writeScript(this.script, buffer)
             Crypto.taggedHash(buffer.toByteArray(), "TapLeaf")
         }
+
         is Branch -> {
             val h1 = this.left.hash()
             val h2 = this.right.hash()
@@ -50,32 +52,36 @@ public sealed class ScriptTree {
         }
     }
 
-    /** Return the first script leaf with the corresponding id, if any. */
-    public fun findScript(id: Int): Leaf? = when (this) {
-        is Leaf -> if (this.id == id) this else null
-        is Branch -> this.left.findScript(id) ?: this.right.findScript(id)
-    }
+    /**
+     * @param leafHash target leaf hash
+     * @return a merkle proof for the target leaf hash, or null if it cannot be found in the tree
+     */
+    public fun merkleProof(leafHash: ByteVector32): ByteArray? = merkleProof(this, leafHash)
 
     /**
-     * Compute a merkle proof for the given script leaf.
-     * Note that this proof starts with the target leaf at the beginning of the resulting list.
-     * Callers may need to drop that element in some cases.
+     * @param leaf target leaf
+     * @return a merkle proof for the target leaf, or null if it cannot be found in the tree
      */
-    public fun merkleProof(leafId: Int): List<ByteVector32> {
-        return when {
-            this is Leaf && this.id == leafId -> {
-                // We found our leaf: we can now walk up the tree to build the rest of the proof.
-                listOf(this.hash())
+    public fun merkleProof(leaf: Leaf): ByteArray? = merkleProof(this, leaf)
+
+    public companion object {
+        /**
+         * @param tree script tree
+         * @param leafHash target leaf hash
+         * @return a merkle proof for the target leaf hash, or null if it cannot be found in the tree
+         */
+        @JvmStatic
+        public fun merkleProof(tree: ScriptTree, leafHash: ByteVector32): ByteArray? {
+
+            fun loop(t: ScriptTree, p: ByteArray): ByteArray? = when (t) {
+                is Leaf -> if (t.hash() == leafHash) p else null
+                is Branch -> loop(t.left, t.right.hash().toByteArray() + p) ?: loop(t.right, t.left.hash().toByteArray() + p)
             }
-            this is Branch && this.left.merkleProof(leafId).isNotEmpty() -> {
-                // Our target leaf is in that subtree: we add its sibling to the proof.
-                this.left.merkleProof(leafId) + this.right.hash()
-            }
-            this is Branch && this.right.merkleProof(leafId).isNotEmpty() -> {
-                // Our target leaf is in that subtree: we add its sibling to the proof.
-                this.right.merkleProof(leafId) + this.left.hash()
-            }
-            else -> listOf()
+
+            return loop(tree, ByteArray(0))
         }
+
+        @JvmStatic
+        public fun merkleProof(tree: ScriptTree, leaf: Leaf): ByteArray? = merkleProof(tree, leaf.hash())
     }
 }

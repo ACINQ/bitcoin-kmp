@@ -675,6 +675,19 @@ public object Script {
             val merkleProof = scriptTree.merkleProof(spendingScript.id).tail()
             return ByteVector.empty.concat(controlByte).concat(internalPubKey.value).concat(merkleProof)
         }
+
+        /**
+         * @param internalPubKey internal public key.
+         * @param merkleRoot merkle root of the tapscript tree.
+         * @param merkleProof merkle proof of the spent script leaf: must not contain the script leaf nor the merkle root.
+         * @param leafVersion script version of the spent script leaf.
+         */
+        @JvmStatic
+        public fun build(internalPubKey: XonlyPublicKey, merkleRoot: ByteVector32, merkleProof: List<ByteVector32>, leafVersion: Int): ByteVector {
+            val (_, parity) = internalPubKey.outputKey(merkleRoot)
+            val controlByte = (leafVersion + (if (parity) 1 else 0)).toByte()
+            return ByteVector.empty.concat(controlByte).concat(internalPubKey.value).concat(merkleProof)
+        }
     }
 
     public class Runner(

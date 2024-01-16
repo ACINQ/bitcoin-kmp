@@ -79,7 +79,7 @@ class Musig2TestsCommon {
     }
 
     @Test
-    fun `sign`() {
+    fun sign() {
         val tests = TransactionTestsCommon.readData("musig2/sign_verify_vectors.json")
         val sk = PrivateKey.fromHex(tests.jsonObject["sk"]!!.jsonPrimitive.content)
         val pubkeys = tests.jsonObject["pubkeys"]!!.jsonArray.map { PublicKey(ByteVector(it.jsonPrimitive.content)) }
@@ -221,7 +221,7 @@ class Musig2TestsCommon {
 
     @Test
     fun `simple musig2 example`() {
-        val random = kotlin.random.Random.Default
+        val random = Random.Default
         val msg = random.nextBytes(32).byteVector32()
 
         val privkeys = listOf(
@@ -294,12 +294,12 @@ class Musig2TestsCommon {
         val spendingTx = Transaction(2, listOf(TxIn(OutPoint(tx, 0), sequence = 0)), listOf(TxOut(Satoshi(10000), Script.pay2wpkh(alicePubKey))), 0)
 
         val commonSig = run {
-            val random = kotlin.random.Random.Default
+            val random = Random.Default
             val aliceNonce = SecretNonce.generate(alicePrivKey, alicePubKey, commonPubKey, null, null, random.nextBytes(32).byteVector32())
             val bobNonce = SecretNonce.generate(bobPrivKey, bobPubKey, commonPubKey, null, null, random.nextBytes(32).byteVector32())
 
             val aggnonce = IndividualNonce.aggregate(listOf(aliceNonce.publicNonce(), bobNonce.publicNonce()))
-            val msg = Transaction.hashForSigningSchnorr(spendingTx, 0, listOf(tx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPROOT)
+            val msg = Transaction.hashForSigningTaprootKeyPath(spendingTx, 0, listOf(tx.txOut[0]), SigHash.SIGHASH_DEFAULT)
 
             // we use the same ctx for Alice and Bob, they both know all the public keys that are used here
             val ctx = SessionCtx(
@@ -325,20 +325,16 @@ class Musig2TestsCommon {
         val userRefundPrivateKey = PrivateKey(ByteArray(32) { 3 })
         val refundDelay = 25920
 
-        val random = Random
+        val random = Random.Default
 
         // the redeem script is just the refund script. it is generated from this policy: and_v(v:pk(user),older(refundDelay))
         // it does not depend upon the user's or server's key, just the user's refund key and the refund delay
         val redeemScript = listOf(OP_PUSHDATA(userRefundPrivateKey.publicKey().xOnly()), OP_CHECKSIGVERIFY, OP_PUSHDATA(Script.encodeNumber(refundDelay)), OP_CHECKSEQUENCEVERIFY)
-        val scriptTree = ScriptTree.Leaf(ScriptLeaf(0, redeemScript, Script.TAPROOT_LEAF_TAPSCRIPT))
-        val merkleRoot = ScriptTree.hash(scriptTree)
+        val scriptTree = ScriptTree.Leaf(0, redeemScript)
 
         // the internal pubkey is the musig2 aggregation of the user's and server's public keys: it does not depend upon the user's refund's key
         val internalPubKey = Musig2.keyAgg(listOf(userPrivateKey.publicKey(), serverPrivateKey.publicKey())).Q.xOnly()
-
-        // it is tweaked with the script's merkle root to get the pubkey that will be exposed
-        val (commonPubKey, _) = internalPubKey.outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot))
-        val pubkeyScript: List<ScriptElt> = Script.pay2tr(commonPubKey)
+        val pubkeyScript = Script.pay2tr(internalPubKey, scriptTree)
 
         val swapInTx = Transaction(
             version = 2,
@@ -360,37 +356,33 @@ class Musig2TestsCommon {
             val userNonce = SecretNonce.generate(userPrivateKey, userPrivateKey.publicKey(), internalPubKey, null, null, random.nextBytes(32).byteVector32())
             val serverNonce = SecretNonce.generate(serverPrivateKey, serverPrivateKey.publicKey(), internalPubKey, null, null, random.nextBytes(32).byteVector32())
 
-            val txHash = Transaction.hashForSigningSchnorr(tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPROOT)
+            val txHash = Transaction.hashForSigningTaprootKeyPath(tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT)
             val commonNonce = IndividualNonce.aggregate(listOf(userNonce.publicNonce(), serverNonce.publicNonce()))
             val ctx = SessionCtx(
                 commonNonce,
                 listOf(userPrivateKey.publicKey(), serverPrivateKey.publicKey()),
-                listOf(Pair(internalPubKey.tweak(Crypto.TaprootTweak.ScriptTweak(merkleRoot)), true)),
+                listOf(Pair(internalPubKey.tweak(Crypto.TaprootTweak.ScriptTweak(scriptTree)), true)),
                 txHash
             )
 
             val userSig = ctx.sign(userNonce, userPrivateKey)!!
             val serverSig = ctx.sign(serverNonce, serverPrivateKey)!!
             val commonSig = ctx.partialSigAgg(listOf(userSig, serverSig))!!
-            val signedTx = tx.updateWitness(0, ScriptWitness(listOf(commonSig)))
+            val signedTx = tx.updateWitness(0, Script.witnessKeyPathPay2tr(commonSig))
             Transaction.correctlySpends(signedTx, swapInTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         }
 
         // Or it can be spent with only the user's signature, after a delay.
         run {
-            val executionData = Script.ExecutionData(annex = null, tapleafHash = merkleRoot)
-            val controlBlock = Script.ControlBlock.build(internalPubKey, merkleRoot)
-
             val tx = Transaction(
                 version = 2,
                 txIn = listOf(TxIn(OutPoint(swapInTx, 0), sequence = refundDelay.toLong())),
                 txOut = listOf(TxOut(Satoshi(10000), Script.pay2wpkh(userPrivateKey.publicKey()))),
                 lockTime = 0
             )
-            val txHash = Transaction.hashForSigningSchnorr(tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, executionData)
-
-            val sig = Crypto.signSchnorr(txHash, userRefundPrivateKey, Crypto.SchnorrTweak.NoTweak)
-            val signedTx = tx.updateWitness(0, ScriptWitness.empty.push(sig).push(redeemScript).push(controlBlock))
+            val sig = Crypto.signTaprootScriptPath(userRefundPrivateKey, tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, scriptTree.hash())
+            val witness = Script.witnessScriptPathPay2tr(internalPubKey, scriptTree, ScriptWitness(listOf(sig)), scriptTree)
+            val signedTx = tx.updateWitness(0, witness)
             Transaction.correctlySpends(signedTx, swapInTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         }
     }

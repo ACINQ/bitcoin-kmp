@@ -731,7 +731,8 @@ public data class Transaction(
          * @param inputs UTXOs spent by this transaction
          * @param sighashType signature hash type
          * @param sigVersion signature version
-         * @param executionData execution context of a transaction script
+         * @param tapleaf when spending a tapscript, the hash of the corresponding script leaf must be provided
+         * @param annex (optional) taproot annex
          */
         @JvmStatic
         public fun hashForSigningSchnorr(
@@ -740,7 +741,9 @@ public data class Transaction(
             inputs: List<TxOut>,
             sighashType: Int,
             sigVersion: Int,
-            executionData: Script.ExecutionData = Script.ExecutionData.empty
+            tapleaf: ByteVector32? = null,
+            annex: ByteVector? = null,
+            codeSeparatorPos: Long? = null,
         ): ByteVector32 {
             val out = ByteArrayOutput()
             out.write(0)
@@ -753,7 +756,7 @@ public data class Transaction(
                 SigVersion.SIGVERSION_TAPSCRIPT -> Pair(1, 0)
                 else -> Pair(0, 0)
             }
-            val spendType = 2 * extFlag + (if (executionData.annex != null) 1 else 0)
+            val spendType = 2 * extFlag + (if (annex != null) 1 else 0)
             out.write(spendType)
             val inputType = sighashType and SigHash.SIGHASH_INPUT_MASK
             if (inputType == SigHash.SIGHASH_ANYONECANPAY) {
@@ -763,9 +766,9 @@ public data class Transaction(
             } else {
                 writeUInt32(inputIndex.toUInt(), out)
             }
-            if (executionData.annex != null) {
+            if (annex != null) {
                 val buffer = ByteArrayOutput()
-                writeScript(executionData.annex, buffer)
+                writeScript(annex, buffer)
                 val annexHash = Crypto.sha256(buffer.toByteArray())
                 out.write(annexHash)
             }
@@ -774,13 +777,25 @@ public data class Transaction(
                 out.write(Crypto.sha256(TxOut.write(tx.txOut[inputIndex])))
             }
             if (sigVersion == SigVersion.SIGVERSION_TAPSCRIPT) {
-                require(executionData.tapleafHash != null) { "tapleaf hash is missing" }
-                out.write(executionData.tapleafHash.toByteArray())
+                require(tapleaf != null) { "tapleaf hash is missing" }
+                out.write(tapleaf.toByteArray())
                 out.write(keyVersion)
-                writeUInt32(executionData.codeSeparatorPos.toUInt(), out)
+                writeUInt32((codeSeparatorPos ?: 0xFFFFFFFFL).toUInt(), out)
             }
             val preimage = out.toByteArray()
             return Crypto.taggedHash(preimage, "TapSighash")
+        }
+
+        /** Use this function when spending a taproot key path. */
+        @JvmStatic
+        public fun hashForSigningTaprootKeyPath(tx: Transaction, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, annex: ByteVector? = null): ByteVector32 {
+            return hashForSigningSchnorr(tx, inputIndex, inputs, sighashType, SigVersion.SIGVERSION_TAPROOT, annex = annex)
+        }
+
+        /** Use this function when spending a taproot script path. */
+        @JvmStatic
+        public fun hashForSigningTaprootScriptPath(tx: Transaction, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, tapleaf: ByteVector32, annex: ByteVector? = null): ByteVector32 {
+            return hashForSigningSchnorr(tx, inputIndex, inputs, sighashType, SigVersion.SIGVERSION_TAPSCRIPT, tapleaf, annex)
         }
 
         @JvmStatic

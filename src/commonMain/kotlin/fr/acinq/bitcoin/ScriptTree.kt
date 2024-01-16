@@ -16,46 +16,56 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.io.ByteArrayOutput
-import kotlin.jvm.JvmStatic
 
-/**
- * leaf of a script tree used to create and spend tapscript transactions
- * @param id leaf id
- * @param script serialized bitcoin script
- * @param leafVersion tapscript version
- */
-public data class ScriptLeaf(val id: Int, val script: ByteVector, val leafVersion: Int) {
-    public constructor(id: Int, script: List<ScriptElt>, leafVersion: Int) : this(id, Script.write(script).byteVector(), leafVersion)
+/** Simple binary tree structure containing taproot spending scripts. */
+public sealed class ScriptTree {
     /**
-     * tapleaf hash of this leaf
+     * Multiple spending scripts can be placed in the leaves of a taproot tree. When using one of those scripts to spend
+     * funds, we only need to reveal that specific script and a merkle proof that it is a leaf of the tree.
+     *
+     * @param id id that isn't used in the hash, but can be used by the caller to reference specific scripts.
+     * @param script serialized spending script.
+     * @param leafVersion tapscript version.
      */
-    val hash: ByteVector32 = run {
-        val buffer = ByteArrayOutput()
-        buffer.write(leafVersion)
-        BtcSerializer.writeScript(script, buffer)
-        Crypto.taggedHash(buffer.toByteArray(), "TapLeaf")
+    public data class Leaf(val id: Int, val script: ByteVector, val leafVersion: Int) : ScriptTree() {
+        public constructor(id: Int, script: List<ScriptElt>) : this(id, script, Script.TAPROOT_LEAF_TAPSCRIPT)
+        public constructor(id: Int, script: List<ScriptElt>, leafVersion: Int) : this(id, Script.write(script).byteVector(), leafVersion)
     }
-}
 
-/**
- * Simple binary tree structure
- */
-public sealed class ScriptTree<T> {
-    public data class Leaf<T>(val value: T) : ScriptTree<T>()
-    public data class Branch<T>(val left: ScriptTree<T>, val right: ScriptTree<T>) : ScriptTree<T>()
+    public data class Branch(val left: ScriptTree, val right: ScriptTree) : ScriptTree()
 
-    public companion object {
-        /**
-         * @return the hash of the input merkle tree
-         */
-        @JvmStatic
-        public fun hash(tree: ScriptTree<ScriptLeaf>): ByteVector32 = when (tree) {
-            is Leaf -> tree.value.hash
-            is Branch -> {
-                val h1 = hash(tree.left)
-                val h2 = hash(tree.right)
-                Crypto.taggedHash((if (LexicographicalOrdering.isLessThan(h1, h2)) h1 + h2 else h2 + h1).toByteArray(), "TapBranch")
-            }
+    /** Compute the merkle root of the script tree. */
+    public fun hash(): ByteVector32 = when (this) {
+        is Leaf -> {
+            val buffer = ByteArrayOutput()
+            buffer.write(this.leafVersion)
+            BtcSerializer.writeScript(this.script, buffer)
+            Crypto.taggedHash(buffer.toByteArray(), "TapLeaf")
         }
+        is Branch -> {
+            val h1 = this.left.hash()
+            val h2 = this.right.hash()
+            val toHash = if (LexicographicalOrdering.isLessThan(h1, h2)) h1 + h2 else h2 + h1
+            Crypto.taggedHash(toHash.toByteArray(), "TapBranch")
+        }
+    }
+
+    /** Return the first script leaf with the corresponding id, if any. */
+    public fun findScript(id: Int): Leaf? = when (this) {
+        is Leaf -> if (this.id == id) this else null
+        is Branch -> this.left.findScript(id) ?: this.right.findScript(id)
+    }
+
+    /**
+     * Compute a merkle proof for the given script leaf.
+     * This merkle proof is encoded for creating control blocks in taproot script path witnesses.
+     * If the leaf doesn't belong to the script tree, this function will return null.
+     */
+    public fun merkleProof(leafHash: ByteVector32): ByteArray? {
+        fun loop(tree: ScriptTree, proof: ByteArray): ByteArray? = when (tree) {
+            is Leaf -> if (tree.hash() == leafHash) proof else null
+            is Branch -> loop(tree.left, tree.right.hash().toByteArray() + proof) ?: loop(tree.right, tree.left.hash().toByteArray() + proof)
+        }
+        return loop(this, ByteArray(0))
     }
 }

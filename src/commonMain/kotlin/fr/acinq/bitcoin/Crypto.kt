@@ -164,7 +164,7 @@ public object Crypto {
         public object NoTweak : SchnorrTweak()
     }
 
-    public sealed class TaprootTweak: SchnorrTweak() {
+    public sealed class TaprootTweak : SchnorrTweak() {
         /**
          * private key is tweaked with H_TapTweak(public key) (this is used for key path spending when no scripts are present)
          */
@@ -173,8 +173,11 @@ public object Crypto {
         /**
          * private key is tweaked with H_TapTweak(public key || merkle_root) (this is used for key path spending, with specific Merkle root of the script tree).
          */
-        public data class ScriptTweak(val merkleRoot: ByteVector32) : TaprootTweak()
+        public data class ScriptTweak(val merkleRoot: ByteVector32) : TaprootTweak() {
+            public constructor(scriptTree: ScriptTree) : this(scriptTree.hash())
+        }
     }
+
     /**
      * @param data data to sign (32 bytes)
      * @param privateKey private key
@@ -184,7 +187,7 @@ public object Crypto {
      */
     @JvmStatic
     public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey, schnorrTweak: SchnorrTweak, auxrand32: ByteVector32? = null): ByteVector64 {
-        val priv = when(schnorrTweak)  {
+        val priv = when (schnorrTweak) {
             SchnorrTweak.NoTweak -> privateKey
             is TaprootTweak.NoScriptTweak -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(schnorrTweak))
             is TaprootTweak.ScriptTweak -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(schnorrTweak))
@@ -192,6 +195,24 @@ public object Crypto {
         val sig = Secp256k1.signSchnorr(data.toByteArray(), priv.value.toByteArray(), auxrand32?.toByteArray()).byteVector64()
         require(verifySignatureSchnorr(data, sig, priv.xOnlyPublicKey())) { "Cannot create Schnorr signature" }
         return sig
+    }
+
+    /** Produce a signature that will be included in the witness of a taproot key path spend. */
+    @JvmStatic
+    public fun signTaprootKeyPath(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, scriptTree: ScriptTree?, annex: ByteVector? = null, auxrand32: ByteVector32? = null): ByteVector64 {
+        val data = Transaction.hashForSigningTaprootKeyPath(tx, inputIndex, inputs, sighashType, annex)
+        val tweak = when (scriptTree) {
+            null -> TaprootTweak.NoScriptTweak
+            else -> TaprootTweak.ScriptTweak(scriptTree.hash())
+        }
+        return signSchnorr(data, privateKey, tweak, auxrand32)
+    }
+
+    /** Produce a signature that will be included in the witness of a taproot script path spend. */
+    @JvmStatic
+    public fun signTaprootScriptPath(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, tapleaf: ByteVector32, annex: ByteVector? = null, auxrand32: ByteVector32? = null): ByteVector64 {
+        val data = Transaction.hashForSigningTaprootScriptPath(tx, inputIndex, inputs, sighashType, tapleaf, annex)
+        return signSchnorr(data, privateKey, SchnorrTweak.NoTweak, auxrand32)
     }
 
     @JvmStatic

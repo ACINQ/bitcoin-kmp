@@ -62,28 +62,20 @@ public sealed class ScriptTree {
      * Callers may need to drop that element in some cases.
      */
     public fun merkleProof(leafId: Int): List<ByteVector32> {
-        return when (this) {
-            is Leaf -> when (this.id) {
+        return when {
+            this is Leaf && this.id == leafId -> {
                 // We found our leaf: we can now walk up the tree to build the rest of the proof.
-                leafId -> listOf(this.hash())
-                // We reached a leaf that doesn't match our target: we're not on the right path.
-                else -> listOf()
+                listOf(this.hash())
             }
-            is Branch -> {
-                val leftProof = this.left.merkleProof(leafId)
-                if (leftProof.isNotEmpty()) {
-                    // Our target leaf is in that subtree: we add its sibling to the proof.
-                    leftProof + this.right.hash()
-                } else {
-                    val rightProof = this.right.merkleProof(leafId)
-                    if (rightProof.isNotEmpty()) {
-                        // Our target leaf is in that subtree: we add its sibling to the proof.
-                        rightProof + this.left.hash()
-                    } else {
-                        listOf()
-                    }
-                }
+            this is Branch && this.left.merkleProof(leafId).isNotEmpty() -> {
+                // Our target leaf is in that subtree: we add its sibling to the proof.
+                this.left.merkleProof(leafId) + this.right.hash()
             }
+            this is Branch && this.right.merkleProof(leafId).isNotEmpty() -> {
+                // Our target leaf is in that subtree: we add its sibling to the proof.
+                this.right.merkleProof(leafId) + this.left.hash()
+            }
+            else -> listOf()
         }
     }
 }

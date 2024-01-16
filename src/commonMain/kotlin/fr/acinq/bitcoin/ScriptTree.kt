@@ -58,24 +58,14 @@ public sealed class ScriptTree {
 
     /**
      * Compute a merkle proof for the given script leaf.
-     * Note that this proof starts with the target leaf at the beginning of the resulting list.
-     * Callers may need to drop that element in some cases.
+     * This merkle proof is encoded for creating control blocks in taproot script path witnesses.
+     * If the leaf doesn't belong to the script tree, this function will return null.
      */
-    public fun merkleProof(leafId: Int): List<ByteVector32> {
-        return when {
-            this is Leaf && this.id == leafId -> {
-                // We found our leaf: we can now walk up the tree to build the rest of the proof.
-                listOf(this.hash())
-            }
-            this is Branch && this.left.merkleProof(leafId).isNotEmpty() -> {
-                // Our target leaf is in that subtree: we add its sibling to the proof.
-                this.left.merkleProof(leafId) + this.right.hash()
-            }
-            this is Branch && this.right.merkleProof(leafId).isNotEmpty() -> {
-                // Our target leaf is in that subtree: we add its sibling to the proof.
-                this.right.merkleProof(leafId) + this.left.hash()
-            }
-            else -> listOf()
+    public fun merkleProof(leafHash: ByteVector32): ByteArray? {
+        fun loop(tree: ScriptTree, proof: ByteArray): ByteArray? = when (tree) {
+            is Leaf -> if (tree.hash() == leafHash) proof else null
+            is Branch -> loop(tree.left, tree.right.hash().toByteArray() + proof) ?: loop(tree.right, tree.left.hash().toByteArray() + proof)
         }
+        return loop(this, ByteArray(0))
     }
 }

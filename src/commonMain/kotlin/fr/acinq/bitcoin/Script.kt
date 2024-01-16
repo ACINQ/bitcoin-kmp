@@ -669,11 +669,9 @@ public object Script {
          */
         @JvmStatic
         public fun build(internalPubKey: XonlyPublicKey, scriptTree: ScriptTree, spendingScript: ScriptTree.Leaf): ByteVector {
-            val (_, parity) = internalPubKey.outputKey(scriptTree)
-            val controlByte = (spendingScript.leafVersion + (if (parity) 1 else 0)).toByte()
-            // NB: the spending script is included in a separate witness element, so we remove it from the control block.
-            val merkleProof = scriptTree.merkleProof(spendingScript.id).tail()
-            return ByteVector.empty.concat(controlByte).concat(internalPubKey.value).concat(merkleProof)
+            val merkleProof = scriptTree.merkleProof(spendingScript.hash())
+            require(merkleProof != null) { "cannot build control block: the spending script leaf cannot be found in the script tree provided" }
+            return build(internalPubKey, scriptTree.hash(), merkleProof, spendingScript.leafVersion)
         }
 
         /**
@@ -683,7 +681,7 @@ public object Script {
          * @param leafVersion script version of the spent script leaf.
          */
         @JvmStatic
-        public fun build(internalPubKey: XonlyPublicKey, merkleRoot: ByteVector32, merkleProof: List<ByteVector32>, leafVersion: Int): ByteVector {
+        public fun build(internalPubKey: XonlyPublicKey, merkleRoot: ByteVector32, merkleProof: ByteArray, leafVersion: Int): ByteVector {
             val (_, parity) = internalPubKey.outputKey(merkleRoot)
             val controlByte = (leafVersion + (if (parity) 1 else 0)).toByte()
             return ByteVector.empty.concat(controlByte).concat(internalPubKey.value).concat(merkleProof)

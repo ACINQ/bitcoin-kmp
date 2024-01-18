@@ -169,3 +169,67 @@ public data class AggregatedNonce(val data: ByteVector) {
 
     public fun toByteArray(): ByteArray = data.toByteArray()
 }
+
+public object Musig2 {
+    /** Aggregate the public keys of a musig2 session into a single public key. */
+    public fun aggregateKeys(publicKeys: List<PublicKey>): PublicKey = KeyAggCache.add(publicKeys, cache = null).first.publicKey
+
+    /**
+     * @param sessionId a random, unique session ID.
+     * @param aggregatePublicKey aggregate public key of all participants of the musig2 session.
+     */
+    public fun generateNonce(sessionId: ByteVector32, privateKey: PrivateKey, aggregatePublicKey: PublicKey): SecretNonce = SecretNonce.generate(sessionId, privateKey, aggregatePublicKey, null, null, null).first
+
+    /**
+     * @param sessionId a random, unique session ID.
+     * @param publicKeys public keys of all participants of the musig2 session.
+     */
+    public fun generateNonce(sessionId: ByteVector32, privateKey: PrivateKey, publicKeys: List<PublicKey>): SecretNonce = generateNonce(sessionId, privateKey, aggregateKeys(publicKeys))
+
+    private fun taprootSession(tx: Transaction, inputIndex: Int, inputs: List<TxOut>, publicKeys: List<PublicKey>, publicNonces: List<IndividualNonce>, scriptTree: ScriptTree?): Session {
+        val aggregatedNonce = IndividualNonce.aggregate(publicNonces)
+        val (aggregatedKey, keyAggCache) = KeyAggCache.add(publicKeys, cache = null)
+        val tweak = when (scriptTree) {
+            null -> aggregatedKey.tweak(Crypto.TaprootTweak.NoScriptTweak)
+            else -> aggregatedKey.tweak(Crypto.TaprootTweak.ScriptTweak(scriptTree))
+        }
+        val txHash = Transaction.hashForSigningTaprootKeyPath(tx, inputIndex, inputs, SigHash.SIGHASH_DEFAULT)
+        return Session.build(aggregatedNonce, txHash, keyAggCache.tweak(tweak, isXonly = true).first)
+    }
+
+    /**
+     * Create a partial musig2 signature for the given taproot input key path.
+     *
+     * @param privateKey private key of the signing participant.
+     * @param tx transaction spending the target taproot input.
+     * @param inputIndex index of the taproot input to spend.
+     * @param inputs all inputs of the spending transaction.
+     * @param publicKeys public keys of all participants of the musig2 session.
+     * @param secretNonce secret nonce of the signing participant.
+     * @param publicNonces public nonces of all participants of the musig2 session.
+     * @param scriptTree tapscript tree of the taproot input, if it has script paths.
+     */
+    public fun signTaprootInput(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: List<TxOut>, publicKeys: List<PublicKey>, secretNonce: SecretNonce, publicNonces: List<IndividualNonce>, scriptTree: ScriptTree?): ByteVector32? {
+        val session = taprootSession(tx, inputIndex, inputs, publicKeys, publicNonces, scriptTree)
+        return session.sign(secretNonce, privateKey, TODO()) // keyAggCache requirement is really weird
+    }
+
+    /**
+     * Aggregate partial musig2 signatures into a valid schnorr signature for the given taproot input key path.
+     *
+     * @param partialSigs partial musig2 signatures of all participants of the musig2 session.
+     * @param tx transaction spending the target taproot input.
+     * @param inputIndex index of the taproot input to spend.
+     * @param inputs all inputs of the spending transaction.
+     * @param publicKeys public keys of all participants of the musig2 session.
+     * @param publicNonces public nonces of all participants of the musig2 session.
+     * @param scriptTree tapscript tree of the taproot input, if it has script paths.
+     */
+    @JvmStatic
+    public fun aggregateTaprootSignatures(partialSigs: List<ByteVector32>, tx: Transaction, inputIndex: Int, inputs: List<TxOut>, publicKeys: List<PublicKey>, publicNonces: List<IndividualNonce>, scriptTree: ScriptTree?): ByteVector64 {
+        val session = taprootSession(tx, inputIndex, inputs, publicKeys, publicNonces, scriptTree)
+        // TODO: this may return errors on invalid partial sigs, it should be reflected in the types
+        return session.add(partialSigs)
+    }
+
+}

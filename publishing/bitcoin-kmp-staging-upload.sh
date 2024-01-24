@@ -18,9 +18,10 @@ read -p "Password : " -s OSS_PASSWORD
 
 for i in 	bitcoin-kmp \
 		bitcoin-kmp-iosarm64 \
+		bitcoin-kmp-iossimulatorarm64 \
 		bitcoin-kmp-iosx64 \
 		bitcoin-kmp-jvm \
-		bitcoin-kmp-linux
+		bitcoin-kmp-linuxx64
 do
 	pushd .
 	cd release/fr/acinq/bitcoin/$i/$VERSION &&\

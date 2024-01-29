@@ -1,6 +1,7 @@
 package fr.acinq.bitcoin.crypto.musig2
 
 import fr.acinq.bitcoin.*
+import fr.acinq.bitcoin.utils.Either
 import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmStatic
@@ -23,14 +24,16 @@ public data class KeyAggCache(val data: ByteVector) {
      * @param isXonly true if the tweak is an x-only tweak
      * @return an updated cache, and the tweaked aggregated public key
      */
-    public fun tweak(tweak: ByteVector32, isXonly: Boolean): Pair<KeyAggCache, PublicKey> {
+    public fun tweak(tweak: ByteVector32, isXonly: Boolean): Either<Throwable, Pair<KeyAggCache, PublicKey>> = try {
         val localCache = toByteArray()
         val tweaked = if (isXonly) {
             Secp256k1.musigPubkeyXonlyTweakAdd(localCache, tweak.toByteArray())
         } else {
             Secp256k1.musigPubkeyTweakAdd(localCache, tweak.toByteArray())
         }
-        return Pair(KeyAggCache(localCache), PublicKey.parse(tweaked))
+        Either.Right(Pair(KeyAggCache(localCache), PublicKey.parse(tweaked)))
+    } catch (t: Throwable) {
+        Either.Left(t)
     }
 
     public companion object {
@@ -40,10 +43,12 @@ public data class KeyAggCache(val data: ByteVector) {
          * @return a new (if cache was null) or updated cache, and the aggregated public key
          */
         @JvmStatic
-        public fun add(pubkeys: List<PublicKey>, cache: KeyAggCache?): Pair<XonlyPublicKey, KeyAggCache> {
+        public fun add(pubkeys: List<PublicKey>, cache: KeyAggCache? = null): Either<Throwable, Pair<XonlyPublicKey, KeyAggCache>> = try {
             val localCache = cache?.data?.toByteArray() ?: ByteArray(Secp256k1.MUSIG2_PUBLIC_KEYAGG_CACHE_SIZE)
             val aggkey = Secp256k1.musigPubkeyAgg(pubkeys.map { it.value.toByteArray() }.toTypedArray(), localCache)
-            return Pair(XonlyPublicKey(aggkey.byteVector32()), KeyAggCache(localCache.byteVector()))
+            Either.Right(Pair(XonlyPublicKey(aggkey.byteVector32()), KeyAggCache(localCache.byteVector())))
+        } catch (t: Throwable) {
+            Either.Left(t)
         }
     }
 }
@@ -64,8 +69,10 @@ public data class Session(val data: ByteVector) {
      * @param aggCache key aggregation cache
      * @return a Musig2 partial signature
      */
-    public fun sign(secretNonce: SecretNonce, pk: PrivateKey, aggCache: KeyAggCache): ByteVector32 {
-        return Secp256k1.musigPartialSign(secretNonce.data.toByteArray(), pk.value.toByteArray(), aggCache.data.toByteArray(), toByteArray()).byteVector32()
+    public fun sign(secretNonce: SecretNonce, pk: PrivateKey, aggCache: KeyAggCache): Either<Throwable, ByteVector32> = try {
+        Either.Right(Secp256k1.musigPartialSign(secretNonce.data.toByteArray(), pk.value.toByteArray(), aggCache.data.toByteArray(), toByteArray()).byteVector32())
+    } catch (t: Throwable) {
+        Either.Left(t)
     }
 
     /**
@@ -75,17 +82,22 @@ public data class Session(val data: ByteVector) {
      * @param cache key aggregation cache
      * @return true if the partial signature is valid
      */
-    public fun verify(psig: ByteVector32, pubnonce: IndividualNonce, pubkey: PublicKey, cache: KeyAggCache): Boolean {
-        return Secp256k1.musigPartialSigVerify(psig.toByteArray(), pubnonce.toByteArray(), pubkey.value.toByteArray(), cache.data.toByteArray(), toByteArray()) == 1
+    public fun verify(psig: ByteVector32, pubnonce: IndividualNonce, pubkey: PublicKey, cache: KeyAggCache): Boolean = try {
+        Secp256k1.musigPartialSigVerify(psig.toByteArray(), pubnonce.toByteArray(), pubkey.value.toByteArray(), cache.data.toByteArray(), toByteArray()) == 1
+    } catch (t: Throwable) {
+        false
     }
 
     /**
      * @param psigs partial signatures
      * @return the aggregate of all input partial signatures
      */
-    public fun add(psigs: List<ByteVector32>): ByteVector64 {
-        return Secp256k1.musigPartialSigAgg(toByteArray(), psigs.map { it.toByteArray() }.toTypedArray()).byteVector64()
+    public fun add(psigs: List<ByteVector32>): Either<Throwable, ByteVector64> = try {
+        Either.Right(Secp256k1.musigPartialSigAgg(toByteArray(), psigs.map { it.toByteArray() }.toTypedArray()).byteVector64())
+    } catch (t: Throwable) {
+        Either.Left(t)
     }
+
 
     public companion object {
         /**
@@ -95,9 +107,11 @@ public data class Session(val data: ByteVector) {
          * @return a Musig signing session
          */
         @JvmStatic
-        public fun build(aggregatedNonce: AggregatedNonce, msg: ByteVector32, cache: KeyAggCache): Session {
+        public fun build(aggregatedNonce: AggregatedNonce, msg: ByteVector32, cache: KeyAggCache): Either<Throwable, Session> = try {
             val session = Secp256k1.musigNonceProcess(aggregatedNonce.toByteArray(), msg.toByteArray(), cache.data.toByteArray())
-            return Session(session.byteVector())
+            Either.Right(Session(session.byteVector()))
+        } catch (t: Throwable) {
+            Either.Left(t)
         }
     }
 }
@@ -125,9 +139,13 @@ public data class SecretNonce(val data: ByteVector) {
          * @return a (secret nonce, public nonce) tuple
          */
         @JvmStatic
-        public fun generate(sessionId: ByteVector32, seckey: PrivateKey?, pubkey: PublicKey, msg: ByteVector32?, cache: KeyAggCache?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
+        public fun generate(sessionId: ByteVector32, seckey: PrivateKey?, pubkey: PublicKey, msg: ByteVector32?, cache: KeyAggCache?, extraInput: ByteVector32?): Either<Throwable, Pair<SecretNonce, IndividualNonce>> = try {
             val nonce = Secp256k1.musigNonceGen(sessionId.toByteArray(), seckey?.value?.toByteArray(), pubkey.value.toByteArray(), msg?.toByteArray(), cache?.data?.toByteArray(), extraInput?.toByteArray())
-            return Pair(SecretNonce(nonce.copyOfRange(0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE)), IndividualNonce(nonce.copyOfRange(Secp256k1.MUSIG2_SECRET_NONCE_SIZE, Secp256k1.MUSIG2_SECRET_NONCE_SIZE + Secp256k1.MUSIG2_PUBLIC_NONCE_SIZE)))
+            val secretNonce = SecretNonce(nonce.copyOfRange(0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE))
+            val publicNonce = IndividualNonce(nonce.copyOfRange(Secp256k1.MUSIG2_SECRET_NONCE_SIZE, Secp256k1.MUSIG2_SECRET_NONCE_SIZE + Secp256k1.MUSIG2_PUBLIC_NONCE_SIZE))
+            Either.Right(Pair(secretNonce, publicNonce))
+        } catch (t: Throwable) {
+            Either.Left(t)
         }
     }
 }
@@ -148,9 +166,11 @@ public data class IndividualNonce(val data: ByteVector) {
 
     public companion object {
         @JvmStatic
-        public fun aggregate(nonces: List<IndividualNonce>): AggregatedNonce {
+        public fun aggregate(nonces: List<IndividualNonce>): Either<Throwable, AggregatedNonce> = try {
             val agg = Secp256k1.musigNonceAgg(nonces.map { it.toByteArray() }.toTypedArray())
-            return AggregatedNonce(agg)
+            Either.Right(AggregatedNonce(agg))
+        } catch (t: Throwable) {
+            Either.Left(t)
         }
     }
 }

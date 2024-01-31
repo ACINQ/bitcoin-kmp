@@ -197,24 +197,6 @@ public object Crypto {
         return sig
     }
 
-    /** Produce a signature that will be included in the witness of a taproot key path spend. */
-    @JvmStatic
-    public fun signTaprootKeyPath(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, scriptTree: ScriptTree?, annex: ByteVector? = null, auxrand32: ByteVector32? = null): ByteVector64 {
-        val data = Transaction.hashForSigningTaprootKeyPath(tx, inputIndex, inputs, sighashType, annex)
-        val tweak = when (scriptTree) {
-            null -> TaprootTweak.NoScriptTweak
-            else -> TaprootTweak.ScriptTweak(scriptTree.hash())
-        }
-        return signSchnorr(data, privateKey, tweak, auxrand32)
-    }
-
-    /** Produce a signature that will be included in the witness of a taproot script path spend. */
-    @JvmStatic
-    public fun signTaprootScriptPath(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, tapleaf: ByteVector32, annex: ByteVector? = null, auxrand32: ByteVector32? = null): ByteVector64 {
-        val data = Transaction.hashForSigningTaprootScriptPath(tx, inputIndex, inputs, sighashType, tapleaf, annex)
-        return signSchnorr(data, privateKey, SchnorrTweak.NoTweak, auxrand32)
-    }
-
     @JvmStatic
     public fun verifySignatureSchnorr(data: ByteVector32, signature: ByteVector, publicKey: XonlyPublicKey): Boolean {
         return Secp256k1.verifySchnorr(signature.toByteArray(), data.toByteArray(), publicKey.value.toByteArray())

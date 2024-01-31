@@ -798,6 +798,53 @@ public data class Transaction(
             return hashForSigningSchnorr(tx, inputIndex, inputs, sighashType, SigVersion.SIGVERSION_TAPSCRIPT, tapleaf, annex)
         }
 
+        /**
+         * Sign a taproot tx input, using the internal key path.
+         *
+         * @param privateKey private key.
+         * @param tx input transaction.
+         * @param inputIndex index of the tx input that is being signed.
+         * @param inputs list of all UTXOs spent by this transaction.
+         * @param sighashType signature hash type, which will be appended to the signature (if not default).
+         * @param scriptTree tapscript tree of the signed input, if it has script paths.
+         * @return the schnorr signature of this tx for this specific tx input.
+         */
+        @JvmStatic
+        public fun signInputTaprootKeyPath(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, scriptTree: ScriptTree?, annex: ByteVector? = null, auxrand32: ByteVector32? = null): ByteVector64 {
+            val data = hashForSigningTaprootKeyPath(tx, inputIndex, inputs, sighashType, annex)
+            val tweak = when (scriptTree) {
+                null -> Crypto.TaprootTweak.NoScriptTweak
+                else -> Crypto.TaprootTweak.ScriptTweak(scriptTree.hash())
+            }
+            return Crypto.signSchnorr(data, privateKey, tweak, auxrand32)
+        }
+
+        /**
+         * Sign a taproot tx input, using one of its script paths.
+         *
+         * @param privateKey private key.
+         * @param tx input transaction.
+         * @param inputIndex index of the tx input that is being signed.
+         * @param inputs list of all UTXOs spent by this transaction.
+         * @param sighashType signature hash type, which will be appended to the signature (if not default).
+         * @param tapleaf tapscript leaf hash of the script that is being spent.
+         * @return the schnorr signature of this tx for this specific tx input and the given script leaf.
+         */
+        @JvmStatic
+        public fun signInputTaprootScriptPath(
+            privateKey: PrivateKey,
+            tx: Transaction,
+            inputIndex: Int,
+            inputs: List<TxOut>,
+            sighashType: Int,
+            tapleaf: ByteVector32,
+            annex: ByteVector? = null,
+            auxrand32: ByteVector32? = null
+        ): ByteVector64 {
+            val data = hashForSigningTaprootScriptPath(tx, inputIndex, inputs, sighashType, tapleaf, annex)
+            return Crypto.signSchnorr(data, privateKey, Crypto.SchnorrTweak.NoTweak, auxrand32)
+        }
+
         @JvmStatic
         public fun correctlySpends(tx: Transaction, previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int) {
             val prevouts = tx.txIn.map { previousOutputs[it.outPoint]!! }

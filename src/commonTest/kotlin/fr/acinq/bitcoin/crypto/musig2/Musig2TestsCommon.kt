@@ -346,20 +346,17 @@ class Musig2TestsCommon {
             val userNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), userPrivateKey, listOf(userPublicKey, serverPublicKey))
             val serverNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), serverPrivateKey, listOf(userPublicKey, serverPublicKey))
 
-            val txHash = Transaction.hashForSigningSchnorr(tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPROOT)
+            // Once they have each other's public nonce, they can produce partial signatures.
+            val publicNonces = listOf(userNonce.second, serverNonce.second)
+            val userSig = Musig2.signTaprootInput(userPrivateKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), userNonce.first, publicNonces, scriptTree).right
+            assertNotNull(userSig)
+            val serverSig = Musig2.signTaprootInput(serverPrivateKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), serverNonce.first, publicNonces, scriptTree).right
+            assertNotNull(serverSig)
 
-            val commonSig = IndividualNonce.aggregate(listOf(userNonce.second, serverNonce.second))
-                .flatMap { commonNonce ->
-                    cache.tweak(internalPubKey.tweak(Crypto.TaprootTweak.ScriptTweak(merkleRoot)), true)
-                        .flatMap { (cache1, _) ->
-                            val session = Session.build(commonNonce, txHash, cache1)
-                            val userSig = session.sign(userNonce.first, userPrivateKey, cache1)
-                            val serverSig = session.sign(serverNonce.first, serverPrivateKey, cache1)
-                            session.add(listOf(userSig, serverSig))
-                        }
-                }
-
-            val signedTx = tx.updateWitness(0, ScriptWitness(listOf(commonSig.right!!)))
+            // Once they have each other's partial signature, they can aggregate them into a valid signature.
+            val aggregateSig = Musig2.aggregateTaprootSignatures(listOf(userSig, serverSig), tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree).right
+            assertNotNull(aggregateSig)
+            val signedTx = tx.updateWitness(0, Script.witnessKeyPathPay2tr(aggregateSig))
             Transaction.correctlySpends(signedTx, swapInTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         }
 

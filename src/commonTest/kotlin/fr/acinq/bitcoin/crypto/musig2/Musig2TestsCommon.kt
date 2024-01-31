@@ -21,7 +21,7 @@ class Musig2TestsCommon {
         tests.jsonObject["valid_test_cases"]!!.jsonArray.forEach {
             val keyIndices = it.jsonObject["key_indices"]!!.jsonArray.map { it.jsonPrimitive.int }
             val expected = XonlyPublicKey(ByteVector32.fromValidHex(it.jsonObject["expected"]!!.jsonPrimitive.content))
-            val (aggkey, _) = KeyAggCache.add(keyIndices.map { pubkeys[it] }).right!!
+            val (aggkey, _) = KeyAggCache.add(keyIndices.map { pubkeys[it] })
             assertEquals(expected, aggkey)
         }
         tests.jsonObject["error_test_cases"]!!.jsonArray.forEach {
@@ -29,7 +29,7 @@ class Musig2TestsCommon {
             val tweakIndices = it.jsonObject["tweak_indices"]!!.jsonArray.map { it.jsonPrimitive.int }
             val isXonly = it.jsonObject["is_xonly"]!!.jsonArray.map { it.jsonPrimitive.boolean }
             assertFails {
-                var (_, cache) = KeyAggCache.add(keyIndices.map { pubkeys[it] }).right!!
+                var (_, cache) = KeyAggCache.add(keyIndices.map { pubkeys[it] })
                 tweakIndices.zip(isXonly).forEach { cache = cache.tweak(tweaks[it.first], it.second).right!!.first }
             }
         }
@@ -48,7 +48,7 @@ class Musig2TestsCommon {
             //val expectedSecnonce = SecretNonce(it.jsonObject["expected_secnonce"]!!.jsonPrimitive.content)
             val expectedPubnonce = IndividualNonce(it.jsonObject["expected_pubnonce"]!!.jsonPrimitive.content)
             if (aggpk == null) {
-                val (_, pubnonce) = SecretNonce.generate(randprime, sk, pk, msg?.byteVector32(), null, extraInput?.byteVector32()).right!!
+                val (_, pubnonce) = SecretNonce.generate(randprime, sk, pk, msg?.byteVector32(), null, extraInput?.byteVector32())
                 // assertEquals(expectedSecnonce, secnonce)
                 assertEquals(expectedPubnonce, pubnonce)
             }
@@ -92,13 +92,13 @@ class Musig2TestsCommon {
             val isXonly = it.jsonObject["is_xonly"]!!.jsonArray.map { it.jsonPrimitive.boolean }
             assertEquals(AggregatedNonce(it.jsonObject["aggnonce"]!!.jsonPrimitive.content), aggnonce)
             val cache = run {
-                var (_, c) = KeyAggCache.add(keyIndices.map { pubkeys[it] }).right!!
+                var (_, c) = KeyAggCache.add(keyIndices.map { pubkeys[it] })
                 tweakIndices.zip(isXonly).map { tweaks[it.first] to it.second }.forEach { (tweak, isXonly) ->
                     c = c.tweak(tweak, isXonly).right!!.first
                 }
                 c
             }
-            val session = Session.build(aggnonce, msg, cache).right!!
+            val session = Session.build(aggnonce, msg, cache)
             val aggsig = session.add(psigIndices.map { psigs[it] }).right!!
             assertEquals(expected, aggsig)
         }
@@ -111,13 +111,13 @@ class Musig2TestsCommon {
             val isXonly = it.jsonObject["is_xonly"]!!.jsonArray.map { it.jsonPrimitive.boolean }
             assertEquals(AggregatedNonce(it.jsonObject["aggnonce"]!!.jsonPrimitive.content), aggnonce)
             val cache = run {
-                var (_, c) = KeyAggCache.add(keyIndices.map { pubkeys[it] }).right!!
+                var (_, c) = KeyAggCache.add(keyIndices.map { pubkeys[it] })
                 tweakIndices.zip(isXonly).map { tweaks[it.first] to it.second }.forEach { (tweak, isXonly) ->
                     c = c.tweak(tweak, isXonly).right!!.first
                 }
                 c
             }
-            val session = Session.build(aggnonce, msg, cache).right!!
+            val session = Session.build(aggnonce, msg, cache)
             assertTrue {
                 session.add(psigIndices.map { psigs[it] }).isLeft
             }
@@ -141,7 +141,7 @@ class Musig2TestsCommon {
 
         val aggsig = run {
             val nonces = privkeys.map {
-                SecretNonce.generate(random.nextBytes(32).byteVector32(), it, it.publicKey(), null, null, null).right!!
+                SecretNonce.generate(random.nextBytes(32).byteVector32(), it, it.publicKey(), null, null, null)
             }
             val secnonces = nonces.map { it.first }
             val pubnonces = nonces.map { it.second }
@@ -149,15 +149,15 @@ class Musig2TestsCommon {
             // aggregate public nonces
             val aggnonce = IndividualNonce.aggregate(pubnonces).right!!
             val cache = run {
-                val (_, c) = KeyAggCache.add(pubkeys).right!!
+                val (_, c) = KeyAggCache.add(pubkeys)
                 val (c1, _) = c.tweak(plainTweak, false).right!!
                 val (c2, _) = c1.tweak(xonlyTweak, true).right!!
                 c2
             }
-            val session = Session.build(aggnonce, msg, cache).right!!
+            val session = Session.build(aggnonce, msg, cache)
             // create partial signatures
             val psigs = privkeys.indices.map {
-                session.sign(secnonces[it], privkeys[it], cache).right!!
+                session.sign(secnonces[it], privkeys[it], cache)
             }
 
             // verify partial signatures
@@ -171,7 +171,7 @@ class Musig2TestsCommon {
 
         // aggregate public keys
         val aggpub = run {
-            val (_, c) = KeyAggCache.add(pubkeys).right!!
+            val (_, c) = KeyAggCache.add(pubkeys)
             val (c1, _) = c.tweak(plainTweak, false).right!!
             val (_, p) = c1.tweak(xonlyTweak, true).right!!
             p
@@ -189,7 +189,7 @@ class Musig2TestsCommon {
         val bobPubKey = bobPrivKey.publicKey()
 
         // Alice and Bob exchange public keys and agree on a common aggregated key
-        val (internalPubKey, cache) = KeyAggCache.add(listOf(alicePubKey, bobPubKey)).right!!
+        val (internalPubKey, cache) = KeyAggCache.add(listOf(alicePubKey, bobPubKey))
         // we use the standard BIP86 tweak
         val commonPubKey = internalPubKey.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
 
@@ -201,17 +201,17 @@ class Musig2TestsCommon {
 
         val commonSig = run {
             val random = Random.Default
-            val aliceNonce = SecretNonce.generate(random.nextBytes(32).byteVector32(), alicePrivKey, alicePubKey, null, cache, null).right!!
-            val bobNonce = SecretNonce.generate(random.nextBytes(32).byteVector32(), bobPrivKey, bobPubKey, null, null, null).right!!
+            val aliceNonce = SecretNonce.generate(random.nextBytes(32).byteVector32(), alicePrivKey, alicePubKey, null, cache, null)
+            val bobNonce = SecretNonce.generate(random.nextBytes(32).byteVector32(), bobPrivKey, bobPubKey, null, null, null)
 
             val aggnonce = IndividualNonce.aggregate(listOf(aliceNonce.second, bobNonce.second)).right!!
             val msg = Transaction.hashForSigningSchnorr(spendingTx, 0, listOf(tx.txOut[0]), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPROOT)
 
             // we use the same ctx for Alice and Bob, they both know all the public keys that are used here
             val (cache1, _) = cache.tweak(internalPubKey.tweak(Crypto.TaprootTweak.NoScriptTweak), true).right!!
-            val session = Session.build(aggnonce, msg, cache1).right!!
-            val aliceSig = session.sign(aliceNonce.first, alicePrivKey, cache1).right!!
-            val bobSig = session.sign(bobNonce.first, bobPrivKey, cache1).right!!
+            val session = Session.build(aggnonce, msg, cache1)
+            val aliceSig = session.sign(aliceNonce.first, alicePrivKey, cache1)
+            val bobSig = session.sign(bobNonce.first, bobPrivKey, cache1)
             session.add(listOf(aliceSig, bobSig)).right!!
         }
 
@@ -236,7 +236,7 @@ class Musig2TestsCommon {
         val merkleRoot = scriptTree.hash()
 
         // the internal pubkey is the musig2 aggregation of the user's and server's public keys: it does not depend upon the user's refund's key
-        val (internalPubKey, cache) = KeyAggCache.add(listOf(userPrivateKey.publicKey(), serverPrivateKey.publicKey())).right!!
+        val (internalPubKey, cache) = KeyAggCache.add(listOf(userPrivateKey.publicKey(), serverPrivateKey.publicKey()))
 
         // it is tweaked with the script's merkle root to get the pubkey that will be exposed
         val pubkeyScript: List<ScriptElt> = Script.pay2tr(internalPubKey, merkleRoot)
@@ -258,8 +258,8 @@ class Musig2TestsCommon {
             )
             // this is the beginning of an interactive musig2 signing session. if user and server are disconnected before they have exchanged partial
             // signatures they will have to start again with fresh nonces
-            val userNonce = SecretNonce.generate(random.nextBytes(32).byteVector32(), userPrivateKey, userPrivateKey.publicKey(), null, cache, null).right!!
-            val serverNonce = SecretNonce.generate(random.nextBytes(32).byteVector32(), serverPrivateKey, serverPrivateKey.publicKey(), null, cache, null).right!!
+            val userNonce = SecretNonce.generate(random.nextBytes(32).byteVector32(), userPrivateKey, userPrivateKey.publicKey(), null, cache, null)
+            val serverNonce = SecretNonce.generate(random.nextBytes(32).byteVector32(), serverPrivateKey, serverPrivateKey.publicKey(), null, cache, null)
 
             val txHash = Transaction.hashForSigningSchnorr(tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPROOT)
 
@@ -267,16 +267,13 @@ class Musig2TestsCommon {
                 .flatMap { commonNonce ->
                     cache.tweak(internalPubKey.tweak(Crypto.TaprootTweak.ScriptTweak(merkleRoot)), true)
                         .flatMap { (cache1, _) ->
-                            Session.build(commonNonce, txHash, cache1)
-                                .flatMap { session ->
-                                    session.sign(userNonce.first, userPrivateKey, cache1)
-                                        .flatMap { userSig ->
-                                            session.sign(serverNonce.first, serverPrivateKey, cache1)
-                                                .flatMap { serverSig -> session.add(listOf(userSig, serverSig)) }
-                                        }
-                                }
+                            val session = Session.build(commonNonce, txHash, cache1)
+                            val userSig = session.sign(userNonce.first, userPrivateKey, cache1)
+                            val serverSig = session.sign(serverNonce.first, serverPrivateKey, cache1)
+                            session.add(listOf(userSig, serverSig))
                         }
                 }
+
             val signedTx = tx.updateWitness(0, ScriptWitness(listOf(commonSig.right!!)))
             Transaction.correctlySpends(signedTx, swapInTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         }

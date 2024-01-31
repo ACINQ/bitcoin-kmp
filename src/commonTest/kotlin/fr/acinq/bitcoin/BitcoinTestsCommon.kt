@@ -71,10 +71,10 @@ class BitcoinTestsCommon {
         assertEquals(addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())).right, Script.pay2pkh(pub))
 
         // wrong chain
-        assertEquals(addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())).left, BitcoinException.ChainHashMismatch)
-        assertEquals(addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())).left, BitcoinException.ChainHashMismatch)
-        assertEquals(addressToPublicKeyScript(Block.SignetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())).left, BitcoinException.ChainHashMismatch)
-        assertEquals(addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())).left, BitcoinException.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())).left, BitcoinError.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())).left, BitcoinError.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.SignetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())).left, BitcoinError.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160())).left, BitcoinError.ChainHashMismatch)
 
         // p2sh
         val script = Script.write(Script.pay2wpkh(pub))
@@ -86,10 +86,10 @@ class BitcoinTestsCommon {
         assertEquals(addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))).right, Script.pay2sh(script))
 
         // wrong chain
-        assertEquals(addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, Crypto.hash160(script))).left, BitcoinException.ChainHashMismatch)
-        assertEquals(addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))).left, BitcoinException.ChainHashMismatch)
-        assertEquals(addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))).left, BitcoinException.ChainHashMismatch)
-        assertEquals(addressToPublicKeyScript(Block.SignetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))).left, BitcoinException.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, Crypto.hash160(script))).left, BitcoinError.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))).left, BitcoinError.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))).left, BitcoinError.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.SignetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))).left, BitcoinError.ChainHashMismatch)
     }
 
     @Test
@@ -103,10 +103,10 @@ class BitcoinTestsCommon {
         assertEquals(addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Bech32.encodeWitnessAddress("bcrt", 0, pub.hash160())).right, Script.pay2wpkh(pub))
 
         // wrong chain
-        assertEquals(addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Bech32.encodeWitnessAddress("bc", 0, pub.hash160())).left, BitcoinException.ChainHashMismatch)
-        assertEquals(addressToPublicKeyScript(Block.SignetGenesisBlock.hash, Bech32.encodeWitnessAddress("bc", 0, pub.hash160())).left, BitcoinException.ChainHashMismatch)
-        assertEquals(addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Bech32.encodeWitnessAddress("tb", 0, pub.hash160())).left, BitcoinException.ChainHashMismatch)
-        assertEquals(addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Bech32.encodeWitnessAddress("bcrt", 0, pub.hash160())).left, BitcoinException.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, Bech32.encodeWitnessAddress("bc", 0, pub.hash160())).left, BitcoinError.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.SignetGenesisBlock.hash, Bech32.encodeWitnessAddress("bc", 0, pub.hash160())).left, BitcoinError.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Bech32.encodeWitnessAddress("tb", 0, pub.hash160())).left, BitcoinError.ChainHashMismatch)
+        assertEquals(addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Bech32.encodeWitnessAddress("bcrt", 0, pub.hash160())).left, BitcoinError.ChainHashMismatch)
 
         val script = Script.write(Script.pay2wpkh(pub))
         assertEquals(addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Bech32.encodeWitnessAddress("bc", 0, Crypto.sha256(script))).right, Script.pay2wsh(script))

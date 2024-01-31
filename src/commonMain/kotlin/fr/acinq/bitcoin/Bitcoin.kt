@@ -27,14 +27,45 @@ public fun <T> List<T>.updated(i: Int, t: T): List<T> = when (i) {
     else -> this.take(i) + t + this.drop(i + 1)
 }
 
-public sealed class BitcoinException(message: String, cause: Throwable?) : Exception(message, cause) {
-    public data object InvalidChainHash : BitcoinException("invalid chain hash", null)
-    public data object ChainHashMismatch : BitcoinException("chain hash mismatch", null)
-    public data object InvalidScript : BitcoinException("invalid script", null)
-    public data object InvalidAddress : BitcoinException("invalid address", null)
-    public data object InvalidBech32Address : BitcoinException("invalid address", null)
-    public data class InvalidWitnessVersion(val version: Int) : BitcoinException("invalid witness version $version", null)
-    public data class GenericError(override val message: String, override val cause: Throwable?) : BitcoinException(message, cause)
+public sealed class BitcoinError {
+    public abstract val message: String
+    public abstract val cause: Throwable?
+    override fun toString(): String = when (cause) {
+        null -> message
+        else -> "$message: ${cause?.message}"
+    }
+
+    public data object InvalidChainHash : BitcoinError() {
+        override val message: String = "invalid chain hash"
+        override val cause: Throwable? = null
+    }
+
+    public data object ChainHashMismatch : BitcoinError() {
+        override val message: String = "chain hash mismatch"
+        override val cause: Throwable? = null
+    }
+
+    public data object InvalidScript : BitcoinError() {
+        override val message: String = "invalid script"
+        override val cause: Throwable? = null
+    }
+
+    public data object InvalidAddress : BitcoinError() {
+        override val message: String = "invalid address"
+        override val cause: Throwable? = null
+    }
+
+    public data object InvalidBech32Address : BitcoinError() {
+        override val message: String = "invalid bech32 address"
+        override val cause: Throwable? = null
+    }
+
+    public data class InvalidWitnessVersion(val version: Int) : BitcoinError() {
+        override val message: String = "invalid witness version $version"
+        override val cause: Throwable? = null
+    }
+
+    public data class GenericError(override val message: String, override val cause: Throwable?) : BitcoinError()
 }
 
 public object Bitcoin {
@@ -73,14 +104,14 @@ public object Bitcoin {
      * @param pubkeyScript public key script
      */
     @JvmStatic
-    public fun addressFromPublicKeyScript(chainHash: BlockHash, pubkeyScript: List<ScriptElt>): Either<BitcoinException, String> {
+    public fun addressFromPublicKeyScript(chainHash: BlockHash, pubkeyScript: List<ScriptElt>): Either<BitcoinError, String> {
         try {
             return when {
                 Script.isPay2pkh(pubkeyScript) -> {
                     val prefix = when (chainHash) {
                         Block.LivenetGenesisBlock.hash -> Base58.Prefix.PubkeyAddress
                         Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> Base58.Prefix.PubkeyAddressTestnet
-                        else -> return Either.Left(BitcoinException.InvalidChainHash)
+                        else -> return Either.Left(BitcoinError.InvalidChainHash)
                     }
                     Either.Right(Base58Check.encode(prefix, (pubkeyScript[2] as OP_PUSHDATA).data))
                 }
@@ -89,7 +120,7 @@ public object Bitcoin {
                     val prefix = when (chainHash) {
                         Block.LivenetGenesisBlock.hash -> Base58.Prefix.ScriptAddress
                         Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> Base58.Prefix.ScriptAddressTestnet
-                        else -> return Either.Left(BitcoinException.InvalidChainHash)
+                        else -> return Either.Left(BitcoinError.InvalidChainHash)
                     }
                     Either.Right(Base58Check.encode(prefix, (pubkeyScript[1] as OP_PUSHDATA).data))
                 }
@@ -100,7 +131,7 @@ public object Bitcoin {
                     when (pubkeyScript[0]) {
                         is OP_0 -> when {
                             Script.isPay2wpkh(pubkeyScript) || Script.isPay2wsh(pubkeyScript) -> Either.Right(Bech32.encodeWitnessAddress(hrp, 0, witnessScript))
-                            else -> return Either.Left(BitcoinException.InvalidScript)
+                            else -> return Either.Left(BitcoinError.InvalidScript)
                         }
 
                         is OP_1 -> Either.Right(Bech32.encodeWitnessAddress(hrp, 1, witnessScript))
@@ -119,31 +150,31 @@ public object Bitcoin {
                         is OP_14 -> Either.Right(Bech32.encodeWitnessAddress(hrp, 14, witnessScript))
                         is OP_15 -> Either.Right(Bech32.encodeWitnessAddress(hrp, 15, witnessScript))
                         is OP_16 -> Either.Right(Bech32.encodeWitnessAddress(hrp, 16, witnessScript))
-                        else -> return Either.Left(BitcoinException.InvalidScript)
+                        else -> return Either.Left(BitcoinError.InvalidScript)
                     }
                 }
 
-                else -> return Either.Left(BitcoinException.InvalidScript)
+                else -> return Either.Left(BitcoinError.InvalidScript)
             }
         } catch (t: Throwable) {
-            return Either.Left(BitcoinException.GenericError("", t))
+            return Either.Left(BitcoinError.GenericError("", t))
         }
     }
 
     @JvmStatic
-    public fun addressFromPublicKeyScript(chainHash: BlockHash, pubkeyScript: ByteArray): Either<BitcoinException, String> {
+    public fun addressFromPublicKeyScript(chainHash: BlockHash, pubkeyScript: ByteArray): Either<BitcoinError, String> {
         return runCatching { Script.parse(pubkeyScript) }.fold(
             onSuccess = {
                 addressFromPublicKeyScript(chainHash, it)
             },
             onFailure = {
-                Either.Left(BitcoinException.InvalidScript)
+                Either.Left(BitcoinError.InvalidScript)
             }
         )
     }
 
     @JvmStatic
-    public fun addressToPublicKeyScript(chainHash: BlockHash, address: String): Either<BitcoinException, List<ScriptElt>> {
+    public fun addressToPublicKeyScript(chainHash: BlockHash, address: String): Either<BitcoinError, List<ScriptElt>> {
         val witnessVersions = mapOf(
             0.toByte() to OP_0,
             1.toByte() to OP_1,
@@ -179,7 +210,7 @@ public object Bitcoin {
                     it.first == Base58.Prefix.ScriptAddress && chainHash == Block.LivenetGenesisBlock.hash ->
                         Either.Right(listOf(OP_HASH160, OP_PUSHDATA(it.second), OP_EQUAL))
 
-                    else -> Either.Left(BitcoinException.ChainHashMismatch)
+                    else -> Either.Left(BitcoinError.ChainHashMismatch)
                 }
             },
             onFailure = { _ ->
@@ -187,17 +218,17 @@ public object Bitcoin {
                     onSuccess = {
                         val witnessVersion = witnessVersions[it.second]
                         when {
-                            witnessVersion == null -> Either.Left(BitcoinException.InvalidWitnessVersion(it.second.toInt()))
-                            it.third.size != 20 && it.third.size != 32 -> Either.Left(BitcoinException.InvalidBech32Address)
+                            witnessVersion == null -> Either.Left(BitcoinError.InvalidWitnessVersion(it.second.toInt()))
+                            it.third.size != 20 && it.third.size != 32 -> Either.Left(BitcoinError.InvalidBech32Address)
                             it.first == "bc" && chainHash == Block.LivenetGenesisBlock.hash -> Either.Right(listOf(witnessVersion, OP_PUSHDATA(it.third)))
                             it.first == "tb" && chainHash == Block.TestnetGenesisBlock.hash -> Either.Right(listOf(witnessVersion, OP_PUSHDATA(it.third)))
                             it.first == "tb" && chainHash == Block.SignetGenesisBlock.hash -> Either.Right(listOf(witnessVersion, OP_PUSHDATA(it.third)))
                             it.first == "bcrt" && chainHash == Block.RegtestGenesisBlock.hash -> Either.Right(listOf(witnessVersion, OP_PUSHDATA(it.third)))
-                            else -> Either.Left(BitcoinException.ChainHashMismatch)
+                            else -> Either.Left(BitcoinError.ChainHashMismatch)
                         }
                     },
                     onFailure = {
-                        Either.Left(BitcoinException.InvalidAddress)
+                        Either.Left(BitcoinError.InvalidAddress)
                     }
                 )
             }

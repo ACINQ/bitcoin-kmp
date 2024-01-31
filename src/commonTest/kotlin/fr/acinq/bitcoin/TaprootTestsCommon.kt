@@ -87,7 +87,7 @@ class TaprootTestsCommon {
         assertEquals(Script.pay2tr(internalKey, scripts = null), Script.parse(tx.txOut[1].publicKeyScript))
 
         // we want to spend
-        val outputScript = addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, "tb1pn3g330w4n5eut7d4vxq0pp303267qc6vg8d2e0ctjuqre06gs3yqnc5yx0").result!!
+        val outputScript = addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, "tb1pn3g330w4n5eut7d4vxq0pp303267qc6vg8d2e0ctjuqre06gs3yqnc5yx0").right!!
         val tx1 = Transaction(
             2,
             listOf(TxIn(OutPoint(tx, 1), TxIn.SEQUENCE_FINAL)),
@@ -188,7 +188,7 @@ class TaprootTestsCommon {
         val tmp = Transaction(
             version = 2,
             txIn = listOf(TxIn(OutPoint(fundingTx, 0), TxIn.SEQUENCE_FINAL)),
-            txOut = listOf(TxOut(fundingTx.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, "bcrt1qdtu5cwyngza8hw8s5uk2erlrkh8ceh3msp768v").result!!)),
+            txOut = listOf(TxOut(fundingTx.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, "bcrt1qdtu5cwyngza8hw8s5uk2erlrkh8ceh3msp768v").right!!)),
             lockTime = 0
         )
 
@@ -242,7 +242,7 @@ class TaprootTestsCommon {
         val script = Script.pay2tr(internalPubkey, scriptTree)
         val bip350Address = Bech32.encodeWitnessAddress(hrp(blockchain), 1.toByte(), tweakedKey.value.toByteArray())
         assertEquals(bip350Address, "tb1p78gx95syx0qz8w5nftk8t7nce78zlpqpsxugcvq5xpfy4tvn6rasd7wk0y")
-        val sweepPublicKeyScript = addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7").result!!
+        val sweepPublicKeyScript = addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7").right!!
 
         // see https://mempool.space/signet/tx/c284010f06b5182e9f4722ce3474980339b1fc76e5ff29ece812f5d2162595c1
         val fundingTx = Transaction.read(
@@ -251,7 +251,7 @@ class TaprootTestsCommon {
 
         // output #1 is the one we want to spend
         assertEquals(fundingTx.txOut[0].publicKeyScript, Script.write(script).byteVector())
-        assertEquals(addressToPublicKeyScript(blockchain, bip350Address).result, script)
+        assertEquals(addressToPublicKeyScript(blockchain, bip350Address).right, script)
 
         // spending with the key path: no need to provide any script
         val tx = run {
@@ -337,7 +337,7 @@ class TaprootTestsCommon {
             val tmp = Transaction(
                 version = 2,
                 txIn = listOf(TxIn(OutPoint(fundingTx3, 1), TxIn.SEQUENCE_FINAL)),
-                txOut = listOf(TxOut(fundingTx3.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7").result!!)),
+                txOut = listOf(TxOut(fundingTx3.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7").right!!)),
                 lockTime = 0
             )
             val sig = Crypto.signTaprootScriptPath(privs[2], tmp, 0, listOf(fundingTx3.txOut[1]), SigHash.SIGHASH_DEFAULT, leaves[2].hash())

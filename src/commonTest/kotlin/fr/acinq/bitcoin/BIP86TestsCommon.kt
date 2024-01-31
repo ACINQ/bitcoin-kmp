@@ -23,7 +23,7 @@ class BIP86TestsCommon {
         assertEquals(outputKey.value, ByteVector32("a60869f0dbcf1dc659c9cecbaf8050135ea9e8cdc487053f1dc6880949dc684c"))
         val script = listOf(OP_1, OP_PUSHDATA(outputKey.value))
         assertEquals(Script.write(script).byteVector(), ByteVector("5120a60869f0dbcf1dc659c9cecbaf8050135ea9e8cdc487053f1dc6880949dc684c"))
-        assertEquals(Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script), AddressFromPublicKeyScriptResult.Success("bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr"))
+        assertEquals(Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).right, "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr")
 
         val key1 = DeterministicWallet.derivePrivateKey(accountKey, listOf(0L, 1L))
         assertEquals(key1.secretkeybytes, DeterministicWallet.derivePrivateKey(master, KeyPath("m/86'/0'/0'/0/1")).secretkeybytes)
@@ -33,7 +33,7 @@ class BIP86TestsCommon {
         assertEquals(outputKey1.value, ByteVector32("a82f29944d65b86ae6b5e5cc75e294ead6c59391a1edc5e016e3498c67fc7bbb"))
         val script1 = listOf(OP_1, OP_PUSHDATA(outputKey1.value))
         assertEquals(Script.write(script1).byteVector(), ByteVector("5120a82f29944d65b86ae6b5e5cc75e294ead6c59391a1edc5e016e3498c67fc7bbb"))
-        assertEquals(Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script1), AddressFromPublicKeyScriptResult.Success("bc1p4qhjn9zdvkux4e44uhx8tc55attvtyu358kutcqkudyccelu0was9fqzwh"))
+        assertEquals(Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script1).right, "bc1p4qhjn9zdvkux4e44uhx8tc55attvtyu358kutcqkudyccelu0was9fqzwh")
 
         val key2 = DeterministicWallet.derivePrivateKey(accountKey, listOf(1L, 0L))
         assertEquals(key2.secretkeybytes, DeterministicWallet.derivePrivateKey(master, KeyPath("m/86'/0'/0'/1/0")).secretkeybytes)
@@ -43,7 +43,7 @@ class BIP86TestsCommon {
         assertEquals(outputKey2.value, ByteVector32("882d74e5d0572d5a816cef0041a96b6c1de832f6f9676d9605c44d5e9a97d3dc"))
         val script2 = listOf(OP_1, OP_PUSHDATA(outputKey2.value))
         assertEquals(Script.write(script2).byteVector(), ByteVector("5120882d74e5d0572d5a816cef0041a96b6c1de832f6f9676d9605c44d5e9a97d3dc"))
-        assertEquals(Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script2), AddressFromPublicKeyScriptResult.Success("bc1p3qkhfews2uk44qtvauqyr2ttdsw7svhkl9nkm9s9c3x4ax5h60wqwruhk7"))
+        assertEquals(Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script2).right, "bc1p3qkhfews2uk44qtvauqyr2ttdsw7svhkl9nkm9s9c3x4ax5h60wqwruhk7")
     }
 
     @Test

@@ -34,24 +34,23 @@ public sealed class Either<out L, out R> {
 
     public inline fun <X> map(f: (R) -> X): Either<L, X> = transform({ it }, f)
 
-    public data class Left<out L, Nothing>(val value: L) : Either<L, Nothing>() {
+    public data class Left<out L>(val value: L) : Either<L, Nothing>() {
         override val isLeft: Boolean = true
         override val isRight: Boolean = false
-        override val left: L? = value
+        override val left: L = value
         override val right: Nothing? = null
     }
 
-    public data class Right<Nothing, out R>(val value: R) : Either<Nothing, R>() {
+    public data class Right<out R>(val value: R) : Either<Nothing, R>() {
         override val isLeft: Boolean = false
         override val isRight: Boolean = true
         override val left: Nothing? = null
-        override val right: R? = value
+        override val right: R = value
     }
 }
 
-@Suppress("UNCHECKED_CAST")
 public inline fun <L, R, X> Either<L, R>.flatMap(f: (R) -> Either<L, X>): Either<L, X> = when (this) {
-    is Either.Left -> this as Either<L, X>
+    is Either.Left -> this
     is Either.Right -> f(this.value)
 }
 
@@ -63,4 +62,15 @@ public inline fun <L, R> Either<L, R>.getOrElse(onLeft: (L) -> R): R = when (thi
 public fun <L, R> Either<L, R>.getOrDefault(defaultValue: R): R = when (this) {
     is Either.Left -> defaultValue
     is Either.Right -> this.value
+}
+
+public fun <R> Result<R>.toEither(): Either<Throwable, R> = try {
+    Either.Right(getOrThrow())
+} catch (t: Throwable) {
+    Either.Left(t)
+}
+
+public fun <L : Throwable, R> Either<L, R>.toResult(): Result<R> = when (this) {
+    is Either.Left -> Result.failure(this.value)
+    is Either.Right -> Result.success(this.value)
 }

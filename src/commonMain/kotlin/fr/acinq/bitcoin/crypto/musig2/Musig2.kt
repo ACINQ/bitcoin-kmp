@@ -214,6 +214,7 @@ public object Musig2 {
      *
      * @param publicKeys public keys of all participants: callers must verify that all public keys are valid.
      */
+    @JvmStatic
     public fun aggregateKeys(publicKeys: List<PublicKey>): XonlyPublicKey = KeyAggCache.create(publicKeys).first
 
     /**
@@ -221,6 +222,7 @@ public object Musig2 {
      * @param privateKey signer's private key.
      * @param publicKeys public keys of all participants: callers must verify that all public keys are valid.
      */
+    @JvmStatic
     public fun generateNonce(sessionId: ByteVector32, privateKey: PrivateKey, publicKeys: List<PublicKey>): Pair<SecretNonce, IndividualNonce> {
         val (_, keyAggCache) = KeyAggCache.create(publicKeys)
         return SecretNonce.generate(sessionId, privateKey, privateKey.publicKey(), message = null, keyAggCache, extraInput = null)
@@ -252,6 +254,7 @@ public object Musig2 {
      * @param publicNonces public nonces of all participants of the musig2 session.
      * @param scriptTree tapscript tree of the taproot input, if it has script paths.
      */
+    @JvmStatic
     public fun signTaprootInput(
         privateKey: PrivateKey,
         tx: Transaction,

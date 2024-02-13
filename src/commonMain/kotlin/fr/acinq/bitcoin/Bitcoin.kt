@@ -234,4 +234,18 @@ public object Bitcoin {
             }
         )
     }
+
+    public sealed class Chain(public val name: String, private val genesis: Block) {
+        public object Regtest : Chain("Regtest", Block.RegtestGenesisBlock)
+        public object Testnet : Chain("Testnet", Block.TestnetGenesisBlock)
+        public object Signet : Chain("Signet", Block.SignetGenesisBlock)
+        public object Mainnet : Chain("Mainnet", Block.LivenetGenesisBlock)
+
+        public fun isMainnet(): Boolean = this is Mainnet
+        public fun isTestnet(): Boolean = this is Testnet
+
+        public val chainHash: BlockHash get() = genesis.hash
+
+        override fun toString(): String = name
+    }
 }

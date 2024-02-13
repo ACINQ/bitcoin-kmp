@@ -122,4 +122,12 @@ class BitcoinTestsCommon {
         assertEquals(Block.TestnetGenesisBlock.blockId, BlockId("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"))
         assertEquals(Block.LivenetGenesisBlock.blockId, BlockId("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"))
     }
+
+    @Test
+    fun `check Chain objects`() {
+        assertEquals(Block.RegtestGenesisBlock.hash, Bitcoin.Chain.Regtest.chainHash)
+        assertEquals(Block.SignetGenesisBlock.hash, Bitcoin.Chain.Signet.chainHash)
+        assertEquals(Block.TestnetGenesisBlock.hash, Bitcoin.Chain.Testnet.chainHash)
+        assertEquals(Block.LivenetGenesisBlock.hash, Bitcoin.Chain.Mainnet.chainHash)
+    }
 }

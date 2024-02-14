@@ -95,7 +95,7 @@ class TaprootTestsCommon {
             0
         )
         val sigHashType = 0
-        val sig = Crypto.signTaprootKeyPath(privateKey, tx1, 0, listOf(tx.txOut[1]), sigHashType, scriptTree = null)
+        val sig = Transaction.signInputTaprootKeyPath(privateKey, tx1, 0, listOf(tx.txOut[1]), sigHashType, scriptTree = null)
         val tx2 = tx1.updateWitness(0, Script.witnessKeyPathPay2tr(sig))
         Transaction.correctlySpends(tx2, tx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
@@ -193,7 +193,7 @@ class TaprootTestsCommon {
         )
 
         // compute all 3 signatures
-        val sigs = privs.map { Crypto.signTaprootScriptPath(it, tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, scriptTree.hash()) }
+        val sigs = privs.map { Transaction.signInputTaprootScriptPath(it, tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, scriptTree.hash()) }
 
         // one signature is not enough
         val tx = tmp.updateWitness(0, Script.witnessScriptPathPay2tr(internalPubkey, scriptTree, ScriptWitness(listOf(sigs[0], sigs[0], sigs[0])), scriptTree))
@@ -262,7 +262,7 @@ class TaprootTestsCommon {
                 lockTime = 0
             )
             // We still need to provide the tapscript tree because it is used to tweak the private key.
-            val sig = Crypto.signTaprootKeyPath(privs[0], tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, scriptTree)
+            val sig = Transaction.signInputTaprootKeyPath(privs[0], tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, scriptTree)
             tmp.updateWitness(0, Script.witnessKeyPathPay2tr(sig))
         }
 
@@ -287,7 +287,7 @@ class TaprootTestsCommon {
                 txOut = listOf(TxOut(fundingTx1.txOut[0].amount - Satoshi(5000), sweepPublicKeyScript)),
                 lockTime = 0
             )
-            val sig = Crypto.signTaprootScriptPath(privs[0], tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, leaves[0].hash())
+            val sig = Transaction.signInputTaprootScriptPath(privs[0], tmp, 0, listOf(fundingTx.txOut[0]), SigHash.SIGHASH_DEFAULT, leaves[0].hash())
             val witness = Script.witnessScriptPathPay2tr(internalPubkey, leaves[0], ScriptWitness(listOf(sig)), scriptTree)
             tmp.updateWitness(0, witness)
         }
@@ -314,7 +314,7 @@ class TaprootTestsCommon {
                 txOut = listOf(TxOut(fundingTx2.txOut[0].amount - Satoshi(5000), sweepPublicKeyScript)),
                 lockTime = 0
             )
-            val sig = Crypto.signTaprootScriptPath(privs[1], tmp, 0, listOf(fundingTx2.txOut[0]), SigHash.SIGHASH_DEFAULT, leaves[1].hash())
+            val sig = Transaction.signInputTaprootScriptPath(privs[1], tmp, 0, listOf(fundingTx2.txOut[0]), SigHash.SIGHASH_DEFAULT, leaves[1].hash())
             val witness = Script.witnessScriptPathPay2tr(internalPubkey, leaves[1], ScriptWitness(listOf(sig)), scriptTree)
             tmp.updateWitness(0, witness)
         }
@@ -340,7 +340,7 @@ class TaprootTestsCommon {
                 txOut = listOf(TxOut(fundingTx3.txOut[0].amount - Satoshi(5000), addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7").right!!)),
                 lockTime = 0
             )
-            val sig = Crypto.signTaprootScriptPath(privs[2], tmp, 0, listOf(fundingTx3.txOut[1]), SigHash.SIGHASH_DEFAULT, leaves[2].hash())
+            val sig = Transaction.signInputTaprootScriptPath(privs[2], tmp, 0, listOf(fundingTx3.txOut[1]), SigHash.SIGHASH_DEFAULT, leaves[2].hash())
             val witness = Script.witnessScriptPathPay2tr(internalPubkey, leaves[2], ScriptWitness(listOf(sig)), scriptTree)
             tmp.updateWitness(0, witness)
         }
@@ -410,7 +410,7 @@ class TaprootTestsCommon {
     fun `parse and validate large ordinals transaction`() {
         val file = resourcesDir().resolve("b5a7e05f28d00e4a791759ad7b6bd6799d856693293ceeaad9b0bb93c8851f7f.bin").openReadableFile()
         val buffer = ByteArray(file.size)
-        file.readBytes(buffer,  0, buffer.size)
+        file.readBytes(buffer, 0, buffer.size)
         file.close()
         val tx = Transaction.read(buffer)
         val parentTx = Transaction.read(

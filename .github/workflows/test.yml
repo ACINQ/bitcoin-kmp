@@ -26,7 +26,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macOS-latest]
+        os: [ ubuntu-latest, macOS-latest, windows-latest ]
     steps:
       - name: Check out
         uses: actions/checkout@v2
@@ -48,5 +48,10 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
+      - name: Set up shell
+        if: matrix.os == 'windows-latest'
+        run: |
+          echo "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          rm.exe "C:/WINDOWS/system32/bash.EXE"
       - name: Check
         run: ./gradlew check

@@ -32,6 +32,16 @@ kotlin {
 
     linuxX64()
 
+    mingwX64()
+
+    macosX64 {
+        compilations["main"].cinterops.create("CoreCrypto")
+    }
+
+    macosArm64 {
+        compilations["main"].cinterops.create("CoreCrypto")
+    }
+
     iosX64 {
         compilations["main"].cinterops.create("CoreCrypto")
     }
@@ -45,7 +55,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.13.0"
+        val secp256k1KmpVersion = "0.14.0-SNAPSHOT"
 
         val commonMain by getting {
             dependencies {

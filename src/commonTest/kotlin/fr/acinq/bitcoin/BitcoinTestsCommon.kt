@@ -125,9 +125,9 @@ class BitcoinTestsCommon {
 
     @Test
     fun `check Chain objects`() {
-        assertEquals(Block.RegtestGenesisBlock.hash, Bitcoin.Chain.Regtest.chainHash)
-        assertEquals(Block.SignetGenesisBlock.hash, Bitcoin.Chain.Signet.chainHash)
-        assertEquals(Block.TestnetGenesisBlock.hash, Bitcoin.Chain.Testnet.chainHash)
-        assertEquals(Block.LivenetGenesisBlock.hash, Bitcoin.Chain.Mainnet.chainHash)
+        assertEquals(Block.RegtestGenesisBlock.hash, Chain.Regtest.chainHash)
+        assertEquals(Block.SignetGenesisBlock.hash, Chain.Signet.chainHash)
+        assertEquals(Block.TestnetGenesisBlock.hash, Chain.Testnet.chainHash)
+        assertEquals(Block.LivenetGenesisBlock.hash, Chain.Mainnet.chainHash)
     }
 }

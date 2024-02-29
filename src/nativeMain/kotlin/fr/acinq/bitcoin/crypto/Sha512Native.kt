@@ -16,7 +16,7 @@
 
 package fr.acinq.bitcoin.crypto
 
-public class Sha512Linux : Digest {
+public class Sha512Native : Digest {
 
     private val DIGEST_LENGTH = 64
 

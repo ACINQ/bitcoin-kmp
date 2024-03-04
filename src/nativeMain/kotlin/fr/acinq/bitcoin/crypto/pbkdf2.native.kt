@@ -2,8 +2,7 @@ package fr.acinq.bitcoin.crypto
 
 import kotlin.experimental.xor
 
-
-public actual object Pbkdf2 {
+public object Pbkdf2Native {
 
     private interface Prf {
         fun outputLen(): Int
@@ -47,6 +46,6 @@ public actual object Pbkdf2 {
         return t
     }
 
-    public actual fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray =
+    public fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray =
         generate(salt, count, dkLen, Hmac512(password))
 }

@@ -12,7 +12,7 @@ plugins {
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.18.0"
+version = "0.19.0-SNAPSHOT"
 
 repositories {
     google()
@@ -32,6 +32,10 @@ kotlin {
 
     linuxX64()
 
+    macosX64()
+    
+    macosArm64()
+
     iosX64 {
         compilations["main"].cinterops.create("CoreCrypto")
     }
@@ -45,7 +49,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.14.0"
+        val secp256k1KmpVersion = "0.15.0"
 
         val commonMain by getting {
             dependencies {

@@ -16,7 +16,7 @@
 
 package fr.acinq.bitcoin.crypto
 
-public class Sha256Linux : Digest {
+public class Sha256Native : Digest {
     private val xBuf = ByteArray(4)
     private var xBufOff = 0
 

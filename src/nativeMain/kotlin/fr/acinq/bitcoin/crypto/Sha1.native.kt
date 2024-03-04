@@ -1,6 +1,6 @@
 package fr.acinq.bitcoin.crypto
 
-internal class Sha1Linux : Digest {
+internal class Sha1Native : Digest {
     private var H1 = 0
     private var H2 = 0
     private var H3 = 0

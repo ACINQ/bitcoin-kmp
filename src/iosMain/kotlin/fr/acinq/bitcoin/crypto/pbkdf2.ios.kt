@@ -5,7 +5,6 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.refTo
 import platform.KCoreCrypto.KCCKeyDerivationPBKDF
 import platform.CoreCrypto.kCCPBKDF2
-import platform.CoreCrypto.kCCPRFHmacAlgSHA256
 import platform.CoreCrypto.kCCPRFHmacAlgSHA512
 
 

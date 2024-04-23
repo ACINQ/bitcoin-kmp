@@ -98,6 +98,12 @@ public object Bitcoin {
     @JvmStatic
     public fun computeBIP84Address(pub: PublicKey, chainHash: BlockHash): String = computeP2WpkhAddress(pub, chainHash)
 
+    @JvmStatic
+    public fun computeBIP86Address(pub: PublicKey, chainHash: BlockHash): String = pub.p2trAddress(chainHash)
+
+    @JvmStatic
+    public fun computeBIP86Address(pub: XonlyPublicKey, chainHash: BlockHash): String = pub.p2trAddress(chainHash)
+
     /**
      * Compute an address from a public key script
      * @param chainHash chain hash (i.e. hash of the genesis block of the chain we're on)

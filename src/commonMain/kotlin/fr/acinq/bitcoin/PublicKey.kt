@@ -106,6 +106,12 @@ public data class PublicKey(@JvmField val value: ByteVector) {
         return Bech32.encodeWitnessAddress(Bech32.hrp(chainHash), 0, hash160())
     }
 
+    /**
+     * @param chainHash chain hash (i.e. hash of the genesis block of the chain we're on)
+     * @return the BIP86 address for this key (i.e. the p2tr address for this key with an explicit absence of scripts).
+     */
+    public fun p2trAddress(chainHash: BlockHash): String = xOnly().p2trAddress(chainHash)
+
     public fun toHex(): String = value.toHex()
 
     override fun toString(): String = value.toString()

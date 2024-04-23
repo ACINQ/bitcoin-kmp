@@ -48,6 +48,15 @@ public data class XonlyPublicKey(@JvmField val value: ByteVector32) {
     public fun outputKey(merkleRoot: ByteVector32): Pair<XonlyPublicKey, Boolean> = outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot))
 
     /**
+     * @param chainHash chain hash (i.e. hash of the genesis block of the chain we're on)
+     * @return the BIP86 address for this key (i.e. the p2tr address for this key with an explicit absence of scripts).
+     */
+    public fun p2trAddress(chainHash: BlockHash): String {
+        val (outputKey, _) = outputKey(Crypto.TaprootTweak.NoScriptTweak)
+        return Bech32.encodeWitnessAddress(Bech32.hrp(chainHash), 1, outputKey.value.toByteArray())
+    }
+
+    /**
      * add a public key to this x-only key
      * @param that public key
      * @return a (key, parity) pair where `key` is the x-only-pubkey for `this` + `that` and `parity` is true if `this` + `that` is odd

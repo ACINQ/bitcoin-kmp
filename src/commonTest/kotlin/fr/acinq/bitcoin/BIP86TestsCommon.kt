@@ -21,9 +21,10 @@ class BIP86TestsCommon {
         assertEquals(internalKey.value, ByteVector32("cc8a4bc64d897bddc5fbc2f670f7a8ba0b386779106cf1223c6fc5d7cd6fc115"))
         val outputKey = internalKey.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
         assertEquals(outputKey.value, ByteVector32("a60869f0dbcf1dc659c9cecbaf8050135ea9e8cdc487053f1dc6880949dc684c"))
-        val script = listOf(OP_1, OP_PUSHDATA(outputKey.value))
+        val script = Script.pay2tr(outputKey)
         assertEquals(Script.write(script).byteVector(), ByteVector("5120a60869f0dbcf1dc659c9cecbaf8050135ea9e8cdc487053f1dc6880949dc684c"))
         assertEquals(Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script).right, "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr")
+        assertEquals(internalKey.publicKey.p2trAddress(Block.LivenetGenesisBlock.hash), "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr")
 
         val key1 = DeterministicWallet.derivePrivateKey(accountKey, listOf(0L, 1L))
         assertEquals(key1.secretkeybytes, DeterministicWallet.derivePrivateKey(master, KeyPath("m/86'/0'/0'/0/1")).secretkeybytes)
@@ -31,9 +32,10 @@ class BIP86TestsCommon {
         assertEquals(internalKey1.value, ByteVector32("83dfe85a3151d2517290da461fe2815591ef69f2b18a2ce63f01697a8b313145"))
         val outputKey1 = internalKey1.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
         assertEquals(outputKey1.value, ByteVector32("a82f29944d65b86ae6b5e5cc75e294ead6c59391a1edc5e016e3498c67fc7bbb"))
-        val script1 = listOf(OP_1, OP_PUSHDATA(outputKey1.value))
+        val script1 = Script.pay2tr(outputKey1)
         assertEquals(Script.write(script1).byteVector(), ByteVector("5120a82f29944d65b86ae6b5e5cc75e294ead6c59391a1edc5e016e3498c67fc7bbb"))
         assertEquals(Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script1).right, "bc1p4qhjn9zdvkux4e44uhx8tc55attvtyu358kutcqkudyccelu0was9fqzwh")
+        assertEquals(Bitcoin.computeBIP86Address(internalKey1.publicKey, Block.LivenetGenesisBlock.hash), "bc1p4qhjn9zdvkux4e44uhx8tc55attvtyu358kutcqkudyccelu0was9fqzwh")
 
         val key2 = DeterministicWallet.derivePrivateKey(accountKey, listOf(1L, 0L))
         assertEquals(key2.secretkeybytes, DeterministicWallet.derivePrivateKey(master, KeyPath("m/86'/0'/0'/1/0")).secretkeybytes)
@@ -41,9 +43,10 @@ class BIP86TestsCommon {
         assertEquals(internalKey2.value, ByteVector32("399f1b2f4393f29a18c937859c5dd8a77350103157eb880f02e8c08214277cef"))
         val outputKey2 = internalKey2.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
         assertEquals(outputKey2.value, ByteVector32("882d74e5d0572d5a816cef0041a96b6c1de832f6f9676d9605c44d5e9a97d3dc"))
-        val script2 = listOf(OP_1, OP_PUSHDATA(outputKey2.value))
+        val script2 = Script.pay2tr(outputKey2)
         assertEquals(Script.write(script2).byteVector(), ByteVector("5120882d74e5d0572d5a816cef0041a96b6c1de832f6f9676d9605c44d5e9a97d3dc"))
         assertEquals(Bitcoin.addressFromPublicKeyScript(Block.LivenetGenesisBlock.hash, script2).right, "bc1p3qkhfews2uk44qtvauqyr2ttdsw7svhkl9nkm9s9c3x4ax5h60wqwruhk7")
+        assertEquals(internalKey2.p2trAddress(Block.LivenetGenesisBlock.hash), "bc1p3qkhfews2uk44qtvauqyr2ttdsw7svhkl9nkm9s9c3x4ax5h60wqwruhk7")
     }
 
     @Test
@@ -53,6 +56,7 @@ class BIP86TestsCommon {
         val internalKey = XonlyPublicKey(key.publicKey)
         val outputKey = internalKey.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
         assertEquals("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c", Bech32.encodeWitnessAddress("tb", 1, outputKey.value.toByteArray()))
+        assertEquals("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c", internalKey.p2trAddress(Block.TestnetGenesisBlock.hash))
     }
 
     @Test
@@ -74,9 +78,7 @@ class BIP86TestsCommon {
         val (_, master) = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPdyyuveRPhVYogdPXBDqRiUXDo5TcLKe3f9YfonipqbgJD7pCXdovZTfTyj6SjZ928SkPunnDTiXV7Y2HSsG9XAGki6n8dRF")
         for (i in 0 until  10) {
             val key = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0/$i")
-            val internalKey = XonlyPublicKey(key.publicKey)
-            val outputKey = internalKey.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
-            assertEquals(expected[i], Bech32.encodeWitnessAddress("tb", 1, outputKey.value.toByteArray()))
+            assertEquals(expected[i], key.publicKey.p2trAddress(Block.TestnetGenesisBlock.hash))
         }
     }
 }

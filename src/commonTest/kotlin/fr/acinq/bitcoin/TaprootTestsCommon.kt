@@ -34,7 +34,7 @@ class TaprootTestsCommon {
         val internalKey = key.publicKey.xOnly()
         val script = Script.pay2tr(internalKey, scripts = null)
         val outputKey = internalKey.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
-        assertEquals("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c", Bech32.encodeWitnessAddress("tb", 1, outputKey.value.toByteArray()))
+        assertEquals("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c", internalKey.p2trAddress(Block.TestnetGenesisBlock.hash))
         assertEquals(script, Script.pay2tr(outputKey))
 
         // tx sends to tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c
@@ -76,9 +76,7 @@ class TaprootTestsCommon {
     fun `send to and spend from taproot addresses`() {
         val privateKey = PrivateKey(ByteVector32("0101010101010101010101010101010101010101010101010101010101010101"))
         val internalKey = privateKey.publicKey().xOnly()
-        val outputKey = internalKey.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
-        val address = Bech32.encodeWitnessAddress("tb", 1, outputKey.value.toByteArray())
-        assertEquals("tb1p33wm0auhr9kkahzd6l0kqj85af4cswn276hsxg6zpz85xe2r0y8snwrkwy", address)
+        assertEquals("tb1p33wm0auhr9kkahzd6l0kqj85af4cswn276hsxg6zpz85xe2r0y8snwrkwy", privateKey.publicKey().p2trAddress(Block.TestnetGenesisBlock.hash))
 
         // this tx sends to tb1p33wm0auhr9kkahzd6l0kqj85af4cswn276hsxg6zpz85xe2r0y8snwrkwy
         val tx = Transaction.read(

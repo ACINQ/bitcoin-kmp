@@ -15,10 +15,22 @@
  */
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.ByteArrayOutput
+import fr.acinq.bitcoin.io.Input
+import fr.acinq.bitcoin.io.Output
+import kotlin.jvm.JvmStatic
 
 /** Simple binary tree structure containing taproot spending scripts. */
 public sealed class ScriptTree {
+    public abstract fun write(output: Output): Output
+
+    public fun write(): ByteArray {
+        val output = ByteArrayOutput()
+        write(output)
+        return output.toByteArray()
+    }
+
     /**
      * Multiple spending scripts can be placed in the leaves of a taproot tree. When using one of those scripts to spend
      * funds, we only need to reveal that specific script and a merkle proof that it is a leaf of the tree.
@@ -30,9 +42,24 @@ public sealed class ScriptTree {
     public data class Leaf(val id: Int, val script: ByteVector, val leafVersion: Int) : ScriptTree() {
         public constructor(id: Int, script: List<ScriptElt>) : this(id, script, Script.TAPROOT_LEAF_TAPSCRIPT)
         public constructor(id: Int, script: List<ScriptElt>, leafVersion: Int) : this(id, Script.write(script).byteVector(), leafVersion)
+
+        public override fun write(output: Output): Output {
+            output.write(0)
+            BtcSerializer.writeVarint(id, output)
+            BtcSerializer.writeScript(script, output)
+            output.write(leafVersion)
+            return output
+        }
     }
 
-    public data class Branch(val left: ScriptTree, val right: ScriptTree) : ScriptTree()
+    public data class Branch(val left: ScriptTree, val right: ScriptTree) : ScriptTree() {
+        public override fun write(output: Output): Output {
+            output.write(1)
+            left.write(output)
+            right.write(output)
+            return output
+        }
+    }
 
     /** Compute the merkle root of the script tree. */
     public fun hash(): ByteVector32 = when (this) {
@@ -42,6 +69,7 @@ public sealed class ScriptTree {
             BtcSerializer.writeScript(this.script, buffer)
             Crypto.taggedHash(buffer.toByteArray(), "TapLeaf")
         }
+
         is Branch -> {
             val h1 = this.left.hash()
             val h2 = this.right.hash()
@@ -67,5 +95,17 @@ public sealed class ScriptTree {
             is Branch -> loop(tree.left, tree.right.hash().toByteArray() + proof) ?: loop(tree.right, tree.left.hash().toByteArray() + proof)
         }
         return loop(this, ByteArray(0))
+    }
+
+    public companion object {
+        @JvmStatic
+        public fun read(input: Input): ScriptTree = when (val tag = input.read()) {
+            0 -> Leaf(BtcSerializer.varint(input).toInt(), BtcSerializer.script(input).byteVector(), input.read())
+            1 -> Branch(read(input), read(input))
+            else -> error("cannot deserialize script tree: invalid tag $tag")
+        }
+
+        @JvmStatic
+        public fun read(input: ByteArray): ScriptTree = read(ByteArrayInput(input))
     }
 }

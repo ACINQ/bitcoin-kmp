@@ -68,7 +68,13 @@ public object LexicographicalOrdering {
     public fun isLessThan(a: PublicKey, b: PublicKey): Boolean = isLessThan(a.value, b.value)
 
     @JvmStatic
+    public fun isLessThan(a: XonlyPublicKey, b: XonlyPublicKey): Boolean = isLessThan(a.value, b.value)
+
+    @JvmStatic
     public fun compare(a: PublicKey, b: PublicKey): Int = if (a == b) 0 else if (isLessThan(a, b)) -1 else 1
+
+    @JvmStatic
+    public fun compare(a: XonlyPublicKey, b: XonlyPublicKey): Int = if (a == b) 0 else if (isLessThan(a, b)) -1 else 1
 
     /**
      * @param tx input transaction

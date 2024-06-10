@@ -24,6 +24,8 @@ import fr.acinq.bitcoin.SigHash.SIGHASH_SINGLE
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.flatMap
 import fr.acinq.secp256k1.Hex
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
 
 class PsbtTestsCommon {
@@ -711,7 +713,7 @@ class PsbtTestsCommon {
                     ),
                     listOf(OP_2DROP),
                     listOf(OP_1),
-                    setOf(), setOf(), setOf(), setOf(), listOf()
+                    setOf(), setOf(), setOf(), setOf(), null, mapOf(), null, listOf()
                 ),
                 Input.WitnessInput.PartiallySignedWitnessInput(
                     inputTx2.txOut[0],
@@ -721,7 +723,7 @@ class PsbtTestsCommon {
                     mapOf(),
                     listOf(OP_RETURN),
                     listOf(OP_8),
-                    setOf(), setOf(), setOf(), setOf(), listOf()
+                    setOf(), setOf(), setOf(), setOf(), null, mapOf(), null, listOf()
                 )
             ),
             listOf(
@@ -733,7 +735,7 @@ class PsbtTestsCommon {
                     ),
                     listOf()
                 ),
-                Output.WitnessOutput(listOf(OP_4), listOf(OP_ADD), mapOf(), listOf())
+                Output.WitnessOutput(listOf(OP_4), listOf(OP_ADD), mapOf(), null, mapOf(), listOf())
             )
         )
         assertEquals(combined.right, expected)
@@ -886,9 +888,9 @@ class PsbtTestsCommon {
             0
         )
         val psbt = Psbt(globalTx)
-        assertEquals(psbt.getInput(2), Input.PartiallySignedInputWithoutUtxo(null, mapOf(), setOf(), setOf(), setOf(), setOf(), listOf()))
+        assertEquals(psbt.getInput(2), Input.PartiallySignedInputWithoutUtxo(null, mapOf(), setOf(), setOf(), setOf(), setOf(), null, mapOf(), null, listOf()))
         assertNull(psbt.getInput(6))
-        assertEquals(psbt.getInput(OutPoint(inputTx, 1)), Input.PartiallySignedInputWithoutUtxo(null, mapOf(), setOf(), setOf(), setOf(), setOf(), listOf()))
+        assertEquals(psbt.getInput(OutPoint(inputTx, 1)), Input.PartiallySignedInputWithoutUtxo(null, mapOf(), setOf(), setOf(), setOf(), setOf(), null, mapOf(), null, listOf()))
         assertNull(psbt.getInput(OutPoint(TxHash(ByteVector32.Zeroes), 0)))
 
         // We can't sign the psbt before adding the utxo details (updater role).
@@ -1216,6 +1218,147 @@ class PsbtTestsCommon {
         assertEquals(updated.inputs[1].derivationPaths, mapOf(priv2.publicKey() to KeyPathWithMaster(0, KeyPath("m/5'"))))
         assertEquals(updated.outputs[0].derivationPaths, mapOf(priv1.publicKey() to KeyPathWithMaster(0, KeyPath("m/6'"))))
         assertEquals(updated.outputs[1].derivationPaths, mapOf(priv2.publicKey() to KeyPathWithMaster(0, KeyPath("m/7'"))))
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun readPsbt(base64: String): Psbt = Psbt.read(Base64.decode(StringBuilder(base64))).right!!
+
+    @Test
+    fun `update and sign BIP84 transactions`() {
+        val (_, xprv) = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPcxF57E46D8PbHjCT52N8k3MMv866bLMSb8JE5WyQfmTwZysBpCM2GxPjnHaj2rknNASmQXzACfXv6WSGCYTgHrVqjFFFLkZ")
+        val unsigned =
+            "cHNidP8BAJoCAAAAAk9/vNA/BH6KortUyvRY2vwTyXJIj7gk0H9IqLUrgzfBAAAAAAD9////gToNNEw2bL6QvOs2jkyKddHoJirxi4rCXrMTE1v+ReYAAAAAAP3///8CADtMAAAAAAAWABRAQtq+BJH+5C8o6/TnlJLJqQeBgUB4fQEAAAAAFgAUIc3AXNCi5djPdVHJa/mgkpEI04wAAAAAAAEAcQIAAAABdSEVHlJ9Ew9DAOcKbHiwjChVe+5PcPNThXdhk3mdD2YBAAAAAP3///8CAC0xAQAAAAAWABReCUIlAdwsMi1K4Fo1h48jv+au+GAXPCgBAAAAFgAU9DPe48u3pTRG0fdURX+4iPVjATiGAAAAAQEfAC0xAQAAAAAWABReCUIlAdwsMi1K4Fo1h48jv+au+CIGAoTn1edGP2J/n+wBG1X+7wLkW2QvytthcpL18w6nfZUeGBptno9UAACAAQAAgAAAAIAAAAAABAAAAAABAHECAAAAAWVylKM/oSuybxSZTFuCDpaQQtQbn6ryUoHlnCixBHVOAQAAAAD9////AoCWmAAAAAAAFgAUJIPtpCTZrH7xfUzaGOCPu833FutgFzwoAQAAABYAFLQYho7ZH1c4eTEi5Weist4VYeGrmQAAAAEBH4CWmAAAAAAAFgAUJIPtpCTZrH7xfUzaGOCPu833FusiBgOQNU/Ja9jwChLrkTcpjgDflY/HJ3PiBLLFbelWHiR/ghgabZ6PVAAAgAEAAIAAAACAAAAAAAMAAAAAIgIDUWh+lhIj3q3i7d5FQ0bo6rKFCCmun7KvXithtO/vjAwYGm2ej1QAAIABAACAAAAAgAEAAAAEAAAAACICAqZl0TkJI9ELk6ENXE4AB/Ks4D3Q/fZUFDrE9R6lwBTeGBptno9UAACAAQAAgAAAAIABAAAAAwAAAAA="
+        val psbt = readPsbt(unsigned)
+        // all inputs our ours
+        psbt.inputs.forEach { input ->
+            val spentAddress = Bitcoin.addressFromPublicKeyScript(Block.RegtestGenesisBlock.hash, input.witnessUtxo!!.publicKeyScript.toByteArray()).right!!
+            input.derivationPaths.forEach {
+                val address = Bitcoin.computeBIP84Address(it.key, Block.RegtestGenesisBlock.hash)
+                assertEquals(spentAddress, address)
+                val privateKey = DeterministicWallet.derivePrivateKey(xprv, it.value.keyPath)
+                assertEquals(privateKey.publicKey, it.key)
+            }
+        }
+        // output #0 is ours
+        run {
+            val output = psbt.outputs.get(0)
+            assertEquals(1, output.derivationPaths.size)
+            val pub = output.derivationPaths.keys.first()
+            val path = output.derivationPaths.values.first().keyPath
+            val privateKey = DeterministicWallet.derivePrivateKey(xprv, path)
+            assertEquals(pub, privateKey.publicKey)
+        }
+        val privateKey0 = DeterministicWallet.derivePrivateKey(xprv, "m/84'/1'/0'/0/4").privateKey
+        val privateKey1 = DeterministicWallet.derivePrivateKey(xprv, "m/84'/1'/0'/0/3").privateKey
+        val signedTx = psbt.updateWitnessInput(psbt.global.tx.txIn.get(0).outPoint, psbt.inputs[0].witnessUtxo!!, witnessScript = Script.pay2pkh(privateKey0.publicKey()))
+            .flatMap { it.updateWitnessInput(psbt.global.tx.txIn.get(1).outPoint, psbt.inputs[1].witnessUtxo!!, witnessScript = Script.pay2pkh(privateKey1.publicKey())) }
+            .flatMap { it.sign(privateKey0, 0) }
+            .flatMap { it.psbt.sign(privateKey1, 1) }
+            .flatMap {
+                val sig0 = it.psbt.inputs[0].partialSigs[privateKey0.publicKey()]!!
+                it.psbt.finalizeWitnessInput(0, Script.witnessPay2wpkh(privateKey0.publicKey(), sig0))
+            }
+            .flatMap {
+                val sig1 = it.inputs[1].partialSigs[privateKey1.publicKey()]!!
+                it.finalizeWitnessInput(1, Script.witnessPay2wpkh(privateKey1.publicKey(), sig1))
+            }
+            .flatMap { it.extract() }.right!!
+
+        val spent = psbt.global.tx.txIn.mapIndexed { i, input -> input.outPoint to psbt.inputs[i].witnessUtxo!! }.toMap()
+        Transaction.correctlySpends(signedTx, spent, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    }
+
+    @Test
+    fun `update and sign BIP86 transactions`() {
+        val (_, xprv) = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPcxF57E46D8PbHjCT52N8k3MMv866bLMSb8JE5WyQfmTwZysBpCM2GxPjnHaj2rknNASmQXzACfXv6WSGCYTgHrVqjFFFLkZ")
+        val unsigned =
+            "cHNidP8BALICAAAAAnUhFR5SfRMPQwDnCmx4sIwoVXvuT3DzU4V3YZN5nQ9mAAAAAAD9////ZXKUoz+hK7JvFJlMW4IOlpBC1BufqvJSgeWcKLEEdU4AAAAAAP3///8CQHh9AQAAAAAiUSAch/yYu5X/xhIE0dJBpxXmcoO7apfuWe9h5r8TUgarmrA6TAAAAAAAIlEgumvX915DsXN95wy9i1NwNIHRD5FvsZS0MhYJSc6scEMAAAAAAAEBK4CWmAAAAAAAIlEgA5k6sLVM+T6e9de+9yNooBVxOTk7z66oI/d6zSK2KD4hFsLRgzgW8EenrwQnN/PEbArhJKNuS9ReeGO20zZ+Wg42GQAabZ6PVgAAgAEAAIAAAACAAAAAAAAAAAABFyDC0YM4FvBHp68EJzfzxGwK4SSjbkvUXnhjttM2floONgABASsALTEBAAAAACJRIJ2xWJk+z3wCH+bPz6YWMzwpL64NCTbnGfGEj43RURvwIRZ5NDy7Cbeva2F/gQNs7M+iMbpZS2Hzi+KLLTwnE7ozJhkAGm2ej1YAAIABAACAAAAAgAAAAAABAAAAARcgeTQ8uwm3r2thf4EDbOzPojG6WUth84viiy08JxO6MyYAAQUgeLISjnykqyiWLXYOkmgNeyCwi4+YZ6hfz9qPzarjrsIhB3iyEo58pKsoli12DpJoDXsgsIuPmGeoX8/aj82q467CGQAabZ6PVgAAgAEAAIAAAACAAQAAAAAAAAAAAQUg+5RjG+KiYu+L/qzi6MhAxq+zbB0bLXmgMBK4bF2xxcwhB/uUYxviomLvi/6s4ujIQMavs2wdGy15oDASuGxdscXMGQAabZ6PVgAAgAEAAIAAAACAAQAAAAEAAAAA"
+        val psbt = readPsbt(unsigned)
+        // all inputs our ours
+        psbt.inputs.forEach { input ->
+            val spentAddress = Bitcoin.addressFromPublicKeyScript(Block.RegtestGenesisBlock.hash, input.witnessUtxo!!.publicKeyScript.toByteArray()).right!!
+            input.taprootDerivationPaths.forEach {
+                val address = Bitcoin.computeBIP86Address(it.key, Block.RegtestGenesisBlock.hash)
+                assertEquals(spentAddress, address)
+                val privateKey = DeterministicWallet.derivePrivateKey(xprv, it.value.keyPath)
+                assertEquals(privateKey.publicKey.xOnly(), input.taprootInternalKey)
+            }
+        }
+        // output #0 is ours
+        run {
+            val output = psbt.outputs.get(0)
+            val path = output.taprootDerivationPaths[output.taprootInternalKey!!]!!
+            val privateKey = DeterministicWallet.derivePrivateKey(xprv, path.keyPath)
+            assertEquals(output.taprootInternalKey!!, privateKey.publicKey.xOnly())
+        }
+        val privateKey0 = DeterministicWallet.derivePrivateKey(xprv, "m/86'/1'/0'/0/0").privateKey
+        val privateKey1 = DeterministicWallet.derivePrivateKey(xprv, "m/86'/1'/0'/0/1").privateKey
+        val signedTx = psbt.sign(privateKey0, 0)
+            .flatMap { it.psbt.sign(privateKey1, 1) }
+            .flatMap {
+                val sig0 = it.psbt.inputs[0].taprootKeySignature!!
+                it.psbt.finalizeWitnessInput(0, ScriptWitness(listOf(sig0)))
+            }
+            .flatMap {
+                val sig1 = it.inputs[1].taprootKeySignature!!
+                it.finalizeWitnessInput(1, ScriptWitness(listOf(sig1)))
+            }
+            .flatMap { it.extract() }.right!!
+
+        val spent = psbt.global.tx.txIn.mapIndexed { i, input -> input.outPoint to psbt.inputs[i].witnessUtxo!! }.toMap()
+        Transaction.correctlySpends(signedTx, spent, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    }
+
+    @Test
+    fun `build and sign a BIP86 psbt`() {
+        val seed = ByteVector.fromHex("0101010101010101010101010101010101010101010101010101010101010101")
+        val master = DeterministicWallet.generate(seed)
+
+        // create a watch-only BIP84 wallet from our key manager xpub
+        val mainPriv = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0")
+        val mainPub = DeterministicWallet.publicKey(mainPriv)
+
+        fun getPrivateKey(index: Long) = DeterministicWallet.derivePrivateKey(mainPriv, index).privateKey
+
+        fun getPublicKey(index: Long) = DeterministicWallet.derivePublicKey(mainPub, index).publicKey.xOnly()
+
+        val utxos = listOf(
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(Satoshi(1_000_000), Script.pay2tr(getPublicKey(0), null as ScriptTree?))), lockTime = 0),
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(Satoshi(1_100_000), Script.pay2tr(getPublicKey(1), null as ScriptTree?))), lockTime = 0),
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(Satoshi(1_200_000), Script.pay2tr(getPublicKey(2), null as ScriptTree?))), lockTime = 0),
+        )
+        val bip32paths = listOf(
+            TaprootBip32DerivationPath(listOf(), 0, KeyPath("m/86'/1'/0'/0/0")),
+            TaprootBip32DerivationPath(listOf(), 0, KeyPath("m/86'/1'/0'/0/1")),
+            TaprootBip32DerivationPath(listOf(), 0, KeyPath("m/86'/1'/0'/0/2")),
+        )
+
+        val tx = Transaction(
+            version = 2,
+            txIn = utxos.map { TxIn(OutPoint(it, 0), TxIn.SEQUENCE_FINAL) },
+            txOut = listOf(TxOut(Satoshi(1000_000), Script.pay2tr(getPublicKey(0)))),
+            lockTime = 0
+        )
+
+        val updated = Psbt(tx)
+            .updateWitnessInput(OutPoint(utxos[0], 0), utxos[0].txOut[0], taprootInternalKey = getPublicKey(0), taprootDerivationPaths = mapOf(getPublicKey(0) to bip32paths[0]))
+            .flatMap { it.updateWitnessInput(OutPoint(utxos[1], 0), utxos[1].txOut[0], taprootInternalKey = getPublicKey(1), taprootDerivationPaths = mapOf(getPublicKey(1) to bip32paths[1])) }
+            .flatMap { it.updateWitnessInput(OutPoint(utxos[2], 0), utxos[2].txOut[0], taprootInternalKey = getPublicKey(2), taprootDerivationPaths = mapOf(getPublicKey(2) to bip32paths[2])) }
+            .flatMap { it.updateWitnessOutput(0, taprootInternalKey = getPublicKey(0), taprootDerivationPaths = mapOf(getPublicKey(0) to bip32paths[0])) }
+        updated.right!!.inputs.forEach {
+            val bip32path = it.taprootDerivationPaths[it.taprootInternalKey!!]!!.keyPath
+            val priv = DeterministicWallet.derivePrivateKey(master, bip32path)
+            assertEquals(priv.publicKey.xOnly(), it.taprootInternalKey!!)
+        }
+        val signed = updated.right!!
+            .sign(getPrivateKey(0), 0)
+            .flatMap { it.psbt.finalizeWitnessInput(0, ScriptWitness(listOf(it.sig))) }
+            .flatMap { it.sign(getPrivateKey(1), 1) }
+            .flatMap { it.psbt.finalizeWitnessInput(1, ScriptWitness(listOf(it.sig))) }
+            .flatMap { it.sign(getPrivateKey(2), 2) }
+            .flatMap { it.psbt.finalizeWitnessInput(2, ScriptWitness(listOf(it.sig))) }
+        val extracted = signed.right!!.extract()
+        Transaction.correctlySpends(extracted.right!!, utxos, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
 
     private fun readValidPsbt(hex: String): Psbt {

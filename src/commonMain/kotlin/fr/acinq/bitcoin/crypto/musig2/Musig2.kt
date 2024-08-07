@@ -228,7 +228,18 @@ public object Musig2 {
         return SecretNonce.generate(sessionId, privateKey, privateKey.publicKey(), message = null, keyAggCache, extraInput = null)
     }
 
-    private fun taprootSession(tx: Transaction, inputIndex: Int, inputs: List<TxOut>, publicKeys: List<PublicKey>, publicNonces: List<IndividualNonce>, scriptTree: ScriptTree?): Either<Throwable, Session> {
+    /**
+     * Create a musig2 session for a given transaction input.
+     *
+     * @param tx transaction
+     * @param inputIndex transaction input index
+     * @param inputs outputs spent by this transaction
+     * @param publicKeys signers' public keys
+     * @param publicNonces signers' public nonces
+     * @param scriptTree tapscript tree of the transaction's input, if it has script paths.
+     */
+    @JvmStatic
+    public fun taprootSession(tx: Transaction, inputIndex: Int, inputs: List<TxOut>, publicKeys: List<PublicKey>, publicNonces: List<IndividualNonce>, scriptTree: ScriptTree?): Either<Throwable, Session> {
         return IndividualNonce.aggregate(publicNonces).flatMap { aggregateNonce ->
             val (aggregatePublicKey, keyAggCache) = KeyAggCache.create(publicKeys)
             val tweak = when (scriptTree) {

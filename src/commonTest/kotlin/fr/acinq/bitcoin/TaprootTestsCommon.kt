@@ -18,6 +18,8 @@ package fr.acinq.bitcoin
 import fr.acinq.bitcoin.Bech32.hrp
 import fr.acinq.bitcoin.Bitcoin.addressToPublicKeyScript
 import fr.acinq.bitcoin.Transaction.Companion.hashForSigningSchnorr
+import fr.acinq.bitcoin.io.ByteArrayInput
+import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.reference.TransactionTestsCommon.Companion.resourcesDir
 import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
@@ -419,5 +421,32 @@ class TaprootTestsCommon {
         // check that we can also serialize this tx and get the same result
         val serializedTx = Transaction.write(tx)
         assertContentEquals(buffer, serializedTx)
+    }
+
+    @Test
+    fun `serialize script trees`() {
+        val random = kotlin.random.Random.Default
+
+        fun randomLeaf(): ScriptTree.Leaf = ScriptTree.Leaf(random.nextInt(), random.nextBytes(random.nextInt(0, 2000)).byteVector(), random.nextInt(255))
+
+        fun randomTree(maxLevel: Int): ScriptTree = when {
+            maxLevel == 0 -> randomLeaf()
+            random.nextBoolean() -> randomLeaf()
+            else -> ScriptTree.Branch(randomTree(maxLevel - 1), randomTree(maxLevel - 1))
+        }
+
+        fun serde(input: ScriptTree): ScriptTree {
+            val output = ByteArrayOutput()
+            input.write(output)
+            return ScriptTree.read(ByteArrayInput(output.toByteArray()))
+        }
+
+        val leaf = randomLeaf()
+        assertEquals(leaf, serde(leaf))
+
+        (0 until 1000).forEach { _ ->
+            val tree = randomTree(10)
+            assertEquals(tree, serde(tree))
+        }
     }
 }

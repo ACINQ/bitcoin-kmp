@@ -389,9 +389,44 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
         }
 
         @JvmField
-        public val TestnetGenesisBlock: Block = LivenetGenesisBlock.copy(
+        public val Testnet3GenesisBlock: Block = LivenetGenesisBlock.copy(
             header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458)
         )
+
+        @JvmField
+        @Deprecated("testnet is the deprecated testnet3 network, use testnet3 explicitly", replaceWith = ReplaceWith("Testnet3GenesisBlock", "fr.acinq.bitcoin.Block"))
+        public val TestnetGenesisBlock: Block = Testnet3GenesisBlock
+
+        @JvmField
+        public val Testnet4GenesisBlock: Block = run {
+            val script = listOf(
+                OP_PUSHDATA(writeUInt32(486604799u)),
+                OP_PUSHDATA(ByteVector("04")),
+                OP_PUSHDATA("03/May/2024 000000000000000000001ebd58c244970b3aa9d783bb001011fbe8ea8e98e00e".encodeToByteArray())
+            )
+            val scriptPubKey = listOf(
+                OP_PUSHDATA(ByteVector("000000000000000000000000000000000000000000000000000000000000000000")),
+                OP_CHECKSIG
+            )
+            Block(
+                BlockHeader(
+                    version = 1,
+                    hashPreviousBlock = BlockHash(ByteVector32.Zeroes),
+                    hashMerkleRoot = ByteVector32("7aa0a7ae1e223414cb807e40cd57e667b718e42aaf9306db9102fe28912b7b4e").reversed(),
+                    time = 1714777860,
+                    bits = 0x1d00ffff,
+                    nonce = 393743547
+                ),
+                listOf(
+                    Transaction(
+                        version = 1,
+                        txIn = listOf(TxIn.coinbase(script)),
+                        txOut = listOf(TxOut(amount = 5000000000.toSatoshi(), publicKeyScript = scriptPubKey)),
+                        lockTime = 0
+                    )
+                )
+            )
+        }
 
         @JvmField
         public val RegtestGenesisBlock: Block = LivenetGenesisBlock.copy(

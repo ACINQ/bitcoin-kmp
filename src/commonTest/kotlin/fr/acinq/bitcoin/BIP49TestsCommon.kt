@@ -41,6 +41,6 @@ class BIP49TestsCommon {
             key.publicKey,
             PublicKey.fromHex("03a1af804ac108a8a51782198c2d034b28bf90c8803f5a53f76276fa69a4eae77f")
         )
-        assertEquals(computeBIP49Address(key.publicKey, Block.TestnetGenesisBlock.hash), "2Mww8dCYPUpKHofjgcXcBCEGmniw9CoaiD2")
+        assertEquals(computeBIP49Address(key.publicKey, Block.Testnet3GenesisBlock.hash), "2Mww8dCYPUpKHofjgcXcBCEGmniw9CoaiD2")
     }
 }

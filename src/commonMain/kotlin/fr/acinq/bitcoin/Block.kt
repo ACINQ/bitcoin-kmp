@@ -76,6 +76,28 @@ public data class BlockHeader(
 
     public fun setNonce(input: Long): BlockHeader = this.copy(nonce = input)
 
+    public fun difficulty(): UInt256 {
+        val (diff, neg, _) = UInt256.decodeCompact(bits)
+        return if (neg) -diff else diff
+    }
+
+    /**
+     *
+     * @return the amount of work represented by this block's difficulty target, as displayed by bitcoin core
+     */
+    public fun blockProof(): UInt256 = blockProof(bits)
+
+    /**
+     * Proof of work: hash(header) <= target difficulty
+     *
+     * @return true if this block header validates its expected proof of work
+     */
+    public fun checkProofOfWork(): Boolean {
+        val (target, _, _) = UInt256.decodeCompact(bits)
+        val hash = UInt256(blockId.value.toByteArray())
+        return hash <= target
+    }
+
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     public companion object : BtcSerializer<BlockHeader>() {
         override fun read(input: Input, protocolVersion: Long): BlockHeader {
@@ -120,10 +142,7 @@ public data class BlockHeader(
         }
 
         @JvmStatic
-        public fun getDifficulty(header: BlockHeader): UInt256 {
-            val (diff, neg, _) = UInt256.decodeCompact(header.bits)
-            return if (neg) -diff else diff
-        }
+        public fun getDifficulty(header: BlockHeader): UInt256 = header.difficulty()
 
         /**
          *
@@ -152,11 +171,7 @@ public data class BlockHeader(
          * @return true if the input block header validates its expected proof of work
          */
         @JvmStatic
-        public fun checkProofOfWork(header: BlockHeader): Boolean {
-            val (target, _, _) = UInt256.decodeCompact(header.bits)
-            val hash = UInt256(header.blockId.value.toByteArray())
-            return hash <= target
-        }
+        public fun checkProofOfWork(header: BlockHeader): Boolean = header.checkProofOfWork()
 
         @JvmStatic
         public fun calculateNextWorkRequired(lastHeader: BlockHeader, lastRetargetTime: Long): Long {
@@ -208,6 +223,13 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
     @JvmField
     val blockId: BlockId = header.blockId
 
+    /**
+     * Proof of work: hash(block) <= target difficulty
+     *
+     * @return true if the input block validates its expected proof of work
+     */
+    public fun checkProofOfWork(): Boolean = BlockHeader.checkProofOfWork(header)
+
     public companion object : BtcSerializer<Block>() {
         override fun write(message: Block, out: Output, protocolVersion: Long) {
             BlockHeader.write(message.header, out)
@@ -250,7 +272,7 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
          * @return true if the input block validates its expected proof of work
          */
         @JvmStatic
-        public fun checkProofOfWork(block: Block): Boolean = BlockHeader.checkProofOfWork(block.header)
+        public fun checkProofOfWork(block: Block): Boolean = block.checkProofOfWork()
 
         /**
          * Verify a tx inclusion proof (a merkle proof that a set of transactions are included in a given block)

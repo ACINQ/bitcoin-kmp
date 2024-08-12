@@ -4,8 +4,8 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "1.9.22"
-    id("org.jetbrains.dokka") version "1.9.10"
+    kotlin("multiplatform") version "1.9.23"
+    id("org.jetbrains.dokka") version "1.9.20"
     `maven-publish`
 }
 
@@ -24,7 +24,6 @@ kotlin {
     explicitApi()
 
     jvm {
-        withJava()
         compilations.all {
             kotlinOptions.jvmTarget = "1.8"
         }
@@ -118,7 +117,9 @@ plugins.withId("org.jetbrains.kotlin.multiplatform") {
         configure(targets) {
             compilations.all {
                 cinterops.all { tasks[interopProcessingTaskName].enabled = false }
-                compileKotlinTask.enabled = false
+                compileTaskProvider.configure {
+                    enabled = false
+                }
                 tasks[processResourcesTaskName].enabled = false
             }
             binaries.all { linkTask.enabled = false }
@@ -132,7 +133,7 @@ plugins.withId("org.jetbrains.kotlin.multiplatform") {
     }
 }
 
-val dokkaOutputDir = buildDir.resolve("dokka")
+val dokkaOutputDir = layout.buildDirectory.dir("dokka")
 
 tasks.dokkaHtml {
     outputDirectory.set(file(dokkaOutputDir))
@@ -144,6 +145,7 @@ tasks.dokkaHtml {
                 Platform.native -> "native"
                 Platform.common -> "common"
                 Platform.wasm -> "wasm"
+                else -> error("unexpected platform ${platform.get()}")
             }
             displayName.set(platformName)
 

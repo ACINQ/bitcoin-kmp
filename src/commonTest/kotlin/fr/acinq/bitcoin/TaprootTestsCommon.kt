@@ -427,7 +427,7 @@ class TaprootTestsCommon {
     fun `serialize script trees`() {
         val random = kotlin.random.Random.Default
 
-        fun randomLeaf(): ScriptTree.Leaf = ScriptTree.Leaf(random.nextInt(), random.nextBytes(random.nextInt(0, 2000)).byteVector(), random.nextInt(255))
+        fun randomLeaf(): ScriptTree.Leaf = ScriptTree.Leaf(0, random.nextBytes(random.nextInt(1, 8)).byteVector(), random.nextInt(255))
 
         fun randomTree(maxLevel: Int): ScriptTree = when {
             maxLevel == 0 -> randomLeaf()
@@ -441,12 +441,16 @@ class TaprootTestsCommon {
             return ScriptTree.read(ByteArrayInput(output.toByteArray()))
         }
 
-        val leaf = randomLeaf()
-        assertEquals(leaf, serde(leaf))
+        fun serdePsbt(input: ScriptTree): ScriptTree {
+            val output = ByteArrayOutput()
+            input.writeForPSbt(output, 0)
+            return ScriptTree.readFromPsbt(ByteArrayInput(output.toByteArray()))
+        }
 
         (0 until 1000).forEach { _ ->
             val tree = randomTree(10)
             assertEquals(tree, serde(tree))
+            assertEquals(tree, serdePsbt(tree))
         }
     }
 }

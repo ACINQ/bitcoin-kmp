@@ -23,11 +23,21 @@ import kotlin.jvm.JvmStatic
 
 /** Simple binary tree structure containing taproot spending scripts. */
 public sealed class ScriptTree {
+    // our own tree-based binary format
     public abstract fun write(output: Output): Output
 
     public fun write(): ByteArray {
         val output = ByteArrayOutput()
         write(output)
+        return output.toByteArray()
+    }
+
+    // BIP373 binary format
+    public abstract fun writeForPSbt(output: Output, level: Int): Output
+
+    public fun writeForPsbt(): ByteArray {
+        val output = ByteArrayOutput()
+        writeForPSbt(output, 0)
         return output.toByteArray()
     }
 
@@ -42,12 +52,21 @@ public sealed class ScriptTree {
     public data class Leaf(val id: Int, val script: ByteVector, val leafVersion: Int) : ScriptTree() {
         public constructor(id: Int, script: List<ScriptElt>) : this(id, script, Script.TAPROOT_LEAF_TAPSCRIPT)
         public constructor(id: Int, script: List<ScriptElt>, leafVersion: Int) : this(id, Script.write(script).byteVector(), leafVersion)
+        public constructor(id: Int, script: String, leafVersion: Int) : this(id, ByteVector.fromHex(script), leafVersion)
 
         public override fun write(output: Output): Output {
             output.write(0)
             BtcSerializer.writeVarint(id, output)
             BtcSerializer.writeScript(script, output)
             output.write(leafVersion)
+            return output
+        }
+
+        override fun writeForPSbt(output: Output, level: Int): Output {
+            // id is not persisted
+            output.write(level)
+            output.write(leafVersion)
+            BtcSerializer.writeScript(script, output)
             return output
         }
     }
@@ -59,6 +78,13 @@ public sealed class ScriptTree {
             right.write(output)
             return output
         }
+
+        override fun writeForPSbt(output: Output, level: Int): Output {
+            left.writeForPSbt(output, level + 1)
+            right.writeForPSbt(output, level + 1)
+            return output
+        }
+
     }
 
     /** Compute the merkle root of the script tree. */
@@ -107,5 +133,45 @@ public sealed class ScriptTree {
 
         @JvmStatic
         public fun read(input: ByteArray): ScriptTree = read(ByteArrayInput(input))
+
+        internal fun readLeaves(input: Input, setIdToZero: Boolean = true): ArrayList<Pair<Int, ScriptTree>> {
+            val leaves = arrayListOf<Pair<Int, ScriptTree>>()
+            var id = 0
+            while (input.availableBytes > 0) {
+                val depth = input.read()
+                val leafVersion = input.read()
+                val script = BtcSerializer.script(input).byteVector()
+                leaves.add(Pair(depth, Leaf(if (setIdToZero) 0 else id++, script, leafVersion)))
+            }
+            return leaves
+        }
+
+        internal fun merge(nodes: ArrayList<Pair<Int, ScriptTree>>): Boolean {
+            if (nodes.size > 1) {
+                var i = 0
+                while (i < nodes.size - 1) {
+                    if (nodes[i].first == nodes[i + 1].first) {
+                        val node = Pair(nodes[i].first - 1, Branch(nodes[i].second, nodes[i + 1].second))
+                        nodes[i] = node
+                        nodes.removeAt(i + 1)
+                        return true
+                    } else i++
+                }
+            }
+            return false
+        }
+
+        @JvmStatic
+        public fun readFromPsbt(input: Input, setIdToZero: Boolean = true): ScriptTree {
+            val leaves = readLeaves(input, setIdToZero)
+            while (merge(leaves)) {
+                // keep on merging
+            }
+            return when (leaves.size) {
+                1 -> leaves[0].second
+                2 -> Branch(leaves[0].second, leaves[1].second)
+                else -> error("cannot merge $leaves")
+            }
+        }
     }
 }

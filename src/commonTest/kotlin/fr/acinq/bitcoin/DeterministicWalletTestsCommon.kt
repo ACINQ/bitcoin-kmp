@@ -37,36 +37,36 @@ class DeterministicWalletTestsCommon {
     fun `generate and derive keys -- test vector no1`() {
         val m = generate(Hex.decode("000102030405060708090a0b0c0d0e0f"))
         assertEquals(
-            encode(m, testnet = false),
+            m.encode(testnet = false),
             "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi"
         )
 
-        val m_pub = publicKey(m)
+        val m_pub = m.extendedPublicKey
         assertEquals(
-            encode(m_pub, testnet = false),
+            m_pub.encode(testnet = false),
             "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8"
         )
-        assertEquals(fingerprint(m), 876747070L)
+        assertEquals(m.fingerprint(), 876747070L)
 
-        val m0h = derivePrivateKey(m, hardened(0))
+        val m0h = m.derivePrivateKey(hardened(0))
         assertEquals(
-            encode(m0h, testnet = false),
+            m0h.encode(testnet = false),
             "xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7"
         )
-        val m0h_pub = publicKey(m0h)
+        val m0h_pub = m0h.extendedPublicKey
         assertEquals(
-            encode(m0h_pub, testnet = false),
+            m0h_pub.encode(testnet = false),
             "xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw"
         )
 
-        val m0h_1 = derivePrivateKey(m0h, 1L)
+        val m0h_1 = m0h.derivePrivateKey(1L)
         assertEquals(
-            encode(m0h_1, testnet = false),
+            m0h_1.encode(testnet = false),
             "xprv9wTYmMFdV23N2TdNG573QoEsfRrWKQgWeibmLntzniatZvR9BmLnvSxqu53Kw1UmYPxLgboyZQaXwTCg8MSY3H2EU4pWcQDnRnrVA1xe8fs"
         )
-        val m0h_1_pub = publicKey(m0h_1)
+        val m0h_1_pub = m0h_1.extendedPublicKey
         assertEquals(
-            encode(m0h_1_pub, testnet = false),
+            m0h_1_pub.encode(testnet = false),
             "xpub6ASuArnXKPbfEwhqN6e3mwBcDTgzisQN1wXN9BJcM47sSikHjJf3UFHKkNAWbWMiGj7Wf5uMash7SyYq527Hqck2AxYysAA7xmALppuCkwQ"
         )
 

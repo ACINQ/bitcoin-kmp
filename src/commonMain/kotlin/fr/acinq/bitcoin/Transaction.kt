@@ -16,6 +16,9 @@
 
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.BtcSerializer.Companion.writeScript
+import fr.acinq.bitcoin.BtcSerializer.Companion.writeUInt32
+import fr.acinq.bitcoin.BtcSerializer.Companion.writeUInt64
 import fr.acinq.bitcoin.Protocol.PROTOCOL_VERSION
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Input
@@ -67,6 +70,8 @@ public data class OutPoint(@JvmField val hash: TxHash, @JvmField val index: Long
     public val txid: TxId = TxId(hash)
 
     public val isCoinbase: Boolean get() = isCoinbase(this)
+
+    public val isNull: Boolean get() = isNull(this)
 
     override fun toString(): String = "$txid:$index"
 
@@ -254,6 +259,8 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
 
     public fun updatePublicKeyScript(input: List<ScriptElt>): TxOut = updatePublicKeyScript(Script.write(input))
 
+    public fun totalSize(): Int = Companion.totalSize(this)
+
     public fun weight(): Int = weight(this)
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
@@ -354,12 +361,46 @@ public data class Transaction(
 
     public fun addOutput(output: TxOut): Transaction = this.copy(txOut = this.txOut + output)
 
-    public fun weight(): Int = weight(this)
+    /**
+     * @return the total size of the transaction without witness data
+     */
+    public fun baseSize(protocolVersion: Long): Int = write(this, protocolVersion or SERIALIZE_TRANSACTION_NO_WITNESS).size
+
+    /**
+     * @return the total size of the transaction without witness data
+     */
+    public fun baseSize(): Int = baseSize(PROTOCOL_VERSION)
+
+    /**
+     * @return the total size of the transaction with witness data, if any
+     */
+    public fun totalSize(protocolVersion: Long): Int = write(this, protocolVersion).size
+
+    /**
+     * @return the total size of the transaction with witness data, if any
+     */
+    public fun totalSize(): Int = totalSize(PROTOCOL_VERSION)
+
+    /**
+     * @return the weight of the transaction (witness data uses 1 weight unit, while non-witness data uses 4 weight units)
+     */
+    public fun weight(protocolVersion: Long): Int {
+        // Witness data uses 1 weight unit, while non-witness data uses 4 weight units.
+        // We thus serialize once with witness data and 3 times without witness data.
+        return totalSize(protocolVersion) + 3 * baseSize(protocolVersion)
+    }
+
+    public fun weight(): Int = weight(PROTOCOL_VERSION)
+
+    /**
+     * @return true if this is coibase transaction
+     */
+    public fun isCoinbase(): Boolean = txIn.count() == 1 && txIn.first().outPoint.isCoinbase
 
     public fun transactionData(inputs: List<TxOut>, sighashType: Int): ByteArray {
         val out = ByteArrayOutput()
-        BtcSerializer.writeUInt32(version.toUInt(), out)
-        BtcSerializer.writeUInt32(lockTime.toUInt(), out)
+        writeUInt32(version.toUInt(), out)
+        writeUInt32(lockTime.toUInt(), out)
         val inputType = sighashType and SigHash.SIGHASH_INPUT_MASK
         if (inputType != SigHash.SIGHASH_ANYONECANPAY) {
             out.write(prevoutsSha256(this))
@@ -372,6 +413,323 @@ public data class Transaction(
             out.write(outputsSha256(this))
         }
         return out.toByteArray()
+    }
+
+    /**
+     * prepare a transaction for signing a specific input
+     *
+     * @param inputIndex           index of the tx input that is being processed
+     * @param previousOutputScript public key script of the output claimed by this tx input
+     * @param sighashType          signature hash type
+     * @return a new transaction with proper inputs and outputs according to SIGHASH_TYPE rules
+     */
+    public fun prepareForSigning(inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int): Transaction {
+        val filteredScript = Script.write(Script.parse(previousOutputScript).filterNot { it == OP_CODESEPARATOR })
+
+        fun removeSignatureScript(txin: TxIn): TxIn = txin.copy(signatureScript = ByteVector.empty)
+
+        fun removeAllSignatureScripts(tx: Transaction): Transaction =
+            tx.copy(txIn = tx.txIn.map { removeSignatureScript(it) })
+
+        fun updateSignatureScript(tx: Transaction, index: Int, script: ByteArray): Transaction =
+            tx.updateSigScript(index, script)
+
+        fun resetSequence(txins: List<TxIn>, inputIndex: Int): List<TxIn> {
+            val result = txins.toMutableList()
+            for (i in 0..result.lastIndex) {
+                if (i != inputIndex) result[i] = result[i].copy(sequence = 0L)
+            }
+            return result.toList()
+        }
+
+        val tx1 = removeAllSignatureScripts(this)
+        val tx2 = updateSignatureScript(tx1, inputIndex, filteredScript)
+        val tx3 = when {
+            SigHash.isHashNone(sighashType) -> {
+                // hash none: remove all outputs
+                val inputs = resetSequence(tx2.txIn, inputIndex)
+                tx2.copy(txIn = inputs, txOut = listOf())
+            }
+
+            SigHash.isHashSingle(sighashType) -> {
+                // hash single: remove all outputs but the one that we are trying to claim
+                val inputs = resetSequence(tx2.txIn, inputIndex)
+                val outputs = mutableListOf<TxOut>()
+                for (i in 0..inputIndex) {
+                    outputs += if (i == inputIndex) tx2.txOut[inputIndex] else TxOut((-1L).toSatoshi(), ByteArray(0))
+                }
+                tx2.copy(txIn = inputs, txOut = outputs.toList())
+            }
+
+            else -> tx2
+        }
+
+        val tx4 = if (SigHash.isAnyoneCanPay(sighashType)) tx3.copy(txIn = listOf(tx3.txIn[inputIndex])) else tx3
+        return tx4
+    }
+
+    /**
+     * hash a tx for signing (pre-segwit)
+     *
+     * @param inputIndex           index of the tx input that is being processed
+     * @param previousOutputScript public key script of the output claimed by this tx input
+     * @param sighashType          signature hash type
+     * @return a hash which can be used to sign the referenced tx input
+     */
+    public fun hashForSigning(inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int): ByteArray {
+        return if (SigHash.isHashSingle(sighashType) && inputIndex >= txOut.count()) {
+            ByteVector32.One.toByteArray()
+        } else {
+            val txCopy = prepareForSigning(inputIndex, previousOutputScript, sighashType)
+            Crypto.hash256(Transaction.write(txCopy, SERIALIZE_TRANSACTION_NO_WITNESS) + writeUInt32(sighashType.toUInt()))
+        }
+    }
+
+    /**
+     * hash a tx for signing
+     *
+     * @param inputIndex           index of the tx input that is being processed
+     * @param previousOutputScript public key script of the output claimed by this tx input
+     * @param sighashType          signature hash type
+     * @param amount               amount of the output claimed by this input
+     * @return a hash which can be used to sign the referenced tx input
+     */
+    public fun hashForSigning(inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteArray {
+        when (signatureVersion) {
+            SigVersion.SIGVERSION_WITNESS_V0 -> {
+                val hashPrevOut = if (!SigHash.isAnyoneCanPay(sighashType)) {
+                    val arrays = txIn.map { it.outPoint }.map { OutPoint.write(it, PROTOCOL_VERSION) }
+                    val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
+                    Crypto.hash256(concatenated)
+                } else ByteArray(32)
+
+                val hashSequence = if (!SigHash.isAnyoneCanPay(sighashType) && !SigHash.isHashSingle(sighashType) && !SigHash.isHashNone(sighashType)) {
+                    val arrays = txIn.map { it.sequence }.map { writeUInt32(it.toUInt()) }
+                    val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
+                    Crypto.hash256(concatenated)
+                } else ByteArray(32)
+
+                val hashOutputs = if (!SigHash.isHashSingle(sighashType) && !SigHash.isHashNone(sighashType)) {
+                    val arrays = txOut.map { TxOut.write(it, PROTOCOL_VERSION) }
+                    val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
+                    Crypto.hash256(concatenated)
+                } else if (SigHash.isHashSingle(sighashType) && inputIndex < txOut.count()) {
+                    Crypto.hash256(TxOut.write(txOut[inputIndex], PROTOCOL_VERSION))
+                } else ByteArray(32)
+
+                val out = ByteArrayOutput()
+                writeUInt32(version.toUInt(), out)
+                out.write(hashPrevOut)
+                out.write(hashSequence)
+                out.write(OutPoint.write(txIn.elementAt(inputIndex).outPoint, PROTOCOL_VERSION))
+                writeScript(previousOutputScript, out)
+                writeUInt64(amount.toULong(), out)
+                writeUInt32(txIn[inputIndex].sequence.toUInt(), out)
+                out.write(hashOutputs)
+                writeUInt32(lockTime.toUInt(), out)
+                writeUInt32(sighashType.toUInt(), out)
+                val preimage = out.toByteArray()
+                return Crypto.hash256(preimage)
+            }
+
+            else -> return hashForSigning(inputIndex, previousOutputScript, sighashType)
+        }
+    }
+
+    /**
+     * hash a tx for signing
+     *
+     * @param inputIndex           index of the tx input that is being processed
+     * @param previousOutputScript public key script of the output claimed by this tx input
+     * @param sighashType          signature hash type
+     * @param amount               amount of the output claimed by this input
+     * @return a hash which can be used to sign the referenced tx input
+     */
+    public fun hashForSigning(inputIndex: Int, previousOutputScript: List<ScriptElt>, sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteArray =
+        hashForSigning(inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion)
+
+    /**
+     * sign a tx input
+     *
+     * @param inputIndex           index of the tx input that is being processed
+     * @param previousOutputScript public key script of the output claimed by this tx input
+     * @param sighashType          signature hash type, which will be appended to the signature
+     * @param amount               amount of the output claimed by this tx input
+     * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
+     * @param privateKey           private key
+     * @return the encoded signature of this tx for this specific tx input
+     */
+    public fun signInput(inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray {
+        val hash = hashForSigning(inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
+        val sig = Crypto.sign(hash, privateKey)
+        return Crypto.compact2der(sig).toByteArray() + (sighashType.toByte())
+    }
+
+    public fun signInput(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray =
+        signInput(inputIndex, previousOutputScript.toByteArray(), sighashType, amount, signatureVersion, privateKey)
+
+    /**
+     * sign a tx input
+     *
+     * @param inputIndex           index of the tx input that is being processed
+     * @param previousOutputScript public key script of the output claimed by this tx input
+     * @param sighashType          signature hash type, which will be appended to the signature
+     * @param amount               amount of the output claimed by this tx input
+     * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
+     * @param privateKey           private key
+     * @return the encoded signature of this tx for this specific tx input
+     */
+    public fun signInput(inputIndex: Int, previousOutputScript: List<ScriptElt>, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray =
+        signInput(inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
+
+    /**
+     *
+     * @param inputIndex           index of the tx input that is being processed
+     * @param previousOutputScript public key script of the output claimed by this tx input
+     * @param sighashType          signature hash type, which will be appended to the signature
+     * @param privateKey           private key
+     * @return the encoded signature of this tx for this specific tx input
+     */
+    public fun signInput(inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, privateKey: PrivateKey): ByteArray =
+        signInput(inputIndex, previousOutputScript, sighashType, Satoshi(0L), SigVersion.SIGVERSION_BASE, privateKey)
+
+    public fun signInput(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, privateKey: PrivateKey): ByteArray =
+        signInput(inputIndex, previousOutputScript.toByteArray(), sighashType, privateKey)
+
+    public fun signInput(inputIndex: Int, previousOutputScript: List<ScriptElt>, sighashType: Int, privateKey: PrivateKey): ByteArray =
+        signInput(inputIndex, Script.write(previousOutputScript), sighashType, privateKey)
+
+    /**
+     * @param inputIndex index of the transaction input being signed
+     * @param inputs UTXOs spent by this transaction
+     * @param sighashType signature hash type
+     * @param sigVersion signature version
+     * @param tapleaf when spending a tapscript, the hash of the corresponding script leaf must be provided
+     * @param annex (optional) taproot annex
+     */
+    public fun hashForSigningSchnorr(
+        inputIndex: Int,
+        inputs: List<TxOut>,
+        sighashType: Int,
+        sigVersion: Int,
+        tapleaf: ByteVector32? = null,
+        annex: ByteVector? = null,
+        codeSeparatorPos: Long? = null,
+    ): ByteVector32 {
+        val out = ByteArrayOutput()
+        out.write(0)
+        require(sighashType <= 0x03 || (sighashType in 0x81..0x83))
+
+        out.write(sighashType)
+        val txData = transactionData(inputs, sighashType)
+        out.write(txData)
+        val (extFlag, keyVersion) = when (sigVersion) {
+            SigVersion.SIGVERSION_TAPSCRIPT -> Pair(1, 0)
+            else -> Pair(0, 0)
+        }
+        val spendType = 2 * extFlag + (if (annex != null) 1 else 0)
+        out.write(spendType)
+        val inputType = sighashType and SigHash.SIGHASH_INPUT_MASK
+        if (inputType == SigHash.SIGHASH_ANYONECANPAY) {
+            OutPoint.write(txIn[inputIndex].outPoint, out)
+            TxOut.write(inputs[inputIndex], out)
+            writeUInt32(txIn[inputIndex].sequence.toUInt(), out)
+        } else {
+            writeUInt32(inputIndex.toUInt(), out)
+        }
+        if (annex != null) {
+            val buffer = ByteArrayOutput()
+            writeScript(annex, buffer)
+            val annexHash = Crypto.sha256(buffer.toByteArray())
+            out.write(annexHash)
+        }
+        val outputType = if (sighashType == SigHash.SIGHASH_DEFAULT) SigHash.SIGHASH_ALL else sighashType and SigHash.SIGHASH_OUTPUT_MASK
+        if (outputType == SigHash.SIGHASH_SINGLE) {
+            out.write(Crypto.sha256(TxOut.write(txOut[inputIndex])))
+        }
+        if (sigVersion == SigVersion.SIGVERSION_TAPSCRIPT) {
+            require(tapleaf != null) { "tapleaf hash is missing" }
+            out.write(tapleaf.toByteArray())
+            out.write(keyVersion)
+            writeUInt32((codeSeparatorPos ?: 0xFFFFFFFFL).toUInt(), out)
+        }
+        val preimage = out.toByteArray()
+        return Crypto.taggedHash(preimage, "TapSighash")
+    }
+
+    /** Use this function when spending a taproot key path. */
+    public fun hashForSigningTaprootKeyPath(inputIndex: Int, inputs: List<TxOut>, sighashType: Int, annex: ByteVector? = null): ByteVector32 {
+        return hashForSigningSchnorr(inputIndex, inputs, sighashType, SigVersion.SIGVERSION_TAPROOT, annex = annex)
+    }
+
+    /** Use this function when spending a taproot script path. */
+    public fun hashForSigningTaprootScriptPath(inputIndex: Int, inputs: List<TxOut>, sighashType: Int, tapleaf: ByteVector32, annex: ByteVector? = null): ByteVector32 {
+        return hashForSigningSchnorr(inputIndex, inputs, sighashType, SigVersion.SIGVERSION_TAPSCRIPT, tapleaf, annex)
+    }
+
+    /**
+     * Sign a taproot tx input, using the internal key path.
+     *
+     * @param privateKey private key.
+     * @param inputIndex index of the tx input that is being signed.
+     * @param inputs list of all UTXOs spent by this transaction.
+     * @param sighashType signature hash type, which will be appended to the signature (if not default).
+     * @param scriptTree tapscript tree of the signed input, if it has script paths.
+     * @return the schnorr signature of this tx for this specific tx input.
+     */
+    public fun signInputTaprootKeyPath(privateKey: PrivateKey, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, scriptTree: ScriptTree?, annex: ByteVector? = null, auxrand32: ByteVector32? = null): ByteVector64 {
+        val data = hashForSigningTaprootKeyPath(inputIndex, inputs, sighashType, annex)
+        val tweak = when (scriptTree) {
+            null -> Crypto.TaprootTweak.NoScriptTweak
+            else -> Crypto.TaprootTweak.ScriptTweak(scriptTree.hash())
+        }
+        return Crypto.signSchnorr(data, privateKey, tweak, auxrand32)
+    }
+
+    /**
+     * Sign a taproot tx input, using one of its script paths.
+     *
+     * @param privateKey private key.
+     * @param inputIndex index of the tx input that is being signed.
+     * @param inputs list of all UTXOs spent by this transaction.
+     * @param sighashType signature hash type, which will be appended to the signature (if not default).
+     * @param tapleaf tapscript leaf hash of the script that is being spent.
+     * @return the schnorr signature of this tx for this specific tx input and the given script leaf.
+     */
+    public fun signInputTaprootScriptPath(
+        privateKey: PrivateKey,
+        inputIndex: Int,
+        inputs: List<TxOut>,
+        sighashType: Int,
+        tapleaf: ByteVector32,
+        annex: ByteVector? = null,
+        auxrand32: ByteVector32? = null
+    ): ByteVector64 {
+        val data = hashForSigningTaprootScriptPath(inputIndex, inputs, sighashType, tapleaf, annex)
+        return Crypto.signSchnorr(data, privateKey, Crypto.SchnorrTweak.NoTweak, auxrand32)
+    }
+
+    public fun correctlySpends(previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int) {
+        val prevouts = txIn.map { previousOutputs[it.outPoint]!! }
+        for (i in 0 until txIn.count()) {
+            if (OutPoint.isCoinbase(txIn.elementAt(i).outPoint)) continue
+            val prevOutput = previousOutputs.getValue(txIn[i].outPoint)
+            val prevOutputScript = prevOutput.publicKeyScript
+            val amount = prevOutput.amount
+            val ctx = Script.Context(this, i, amount, prevouts)
+            val runner = Script.Runner(ctx, scriptFlags)
+            if (!runner.verifyScripts(txIn[i].signatureScript, prevOutputScript, txIn[i].witness)) throw RuntimeException("tx ${txid} does not spend its input #$i")
+        }
+    }
+
+    public fun correctlySpends(inputs: List<Transaction>, scriptFlags: Int) {
+        val map = mutableMapOf<OutPoint, TxOut>()
+        for (outPoint in txIn.map { it.outPoint }) {
+            val prevTx = inputs.find { it.txid == outPoint.txid }
+            val prevOut = prevTx?.txOut!![outPoint.index.toInt()]
+            map[outPoint] = prevOut
+        }
+        correctlySpends(map.toMap(), scriptFlags)
     }
 
     override fun toString(): String {
@@ -471,25 +829,20 @@ public data class Transaction(
 
         /** Total size of the transaction without witness data. */
         @JvmStatic
-        public fun baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int =
-            write(tx, protocolVersion or SERIALIZE_TRANSACTION_NO_WITNESS).size
+        public fun baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = tx.baseSize(protocolVersion)
 
         /** Total size of the transaction with witness data, if any. */
         @JvmStatic
-        public fun totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion).size
+        public fun totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = tx.totalSize(protocolVersion)
 
         @JvmStatic
-        public fun weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int {
-            // Witness data uses 1 weight unit, while non-witness data uses 4 weight units.
-            // We thus serialize once with witness data and 3 times without witness data.
-            return totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
-        }
+        public fun weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = tx.weight(protocolVersion)
 
         @JvmStatic
-        public fun weight(tx: Transaction): Int = weight(tx, PROTOCOL_VERSION)
+        public fun weight(tx: Transaction): Int = tx.weight()
 
         @JvmStatic
-        public fun isCoinbase(input: Transaction): Boolean = input.txIn.count() == 1 && OutPoint.isCoinbase(input.txIn.first().outPoint)
+        public fun isCoinbase(input: Transaction): Boolean = input.isCoinbase()
 
         @JvmStatic
         public fun prevoutsSha256(tx: Transaction): ByteArray {
@@ -536,49 +889,7 @@ public data class Transaction(
          * @return a new transaction with proper inputs and outputs according to SIGHASH_TYPE rules
          */
         @JvmStatic
-        public fun prepareForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int): Transaction {
-            val filteredScript =
-                Script.write(Script.parse(previousOutputScript).filterNot { it == OP_CODESEPARATOR })
-
-            fun removeSignatureScript(txin: TxIn): TxIn = txin.copy(signatureScript = ByteVector.empty)
-
-            fun removeAllSignatureScripts(tx: Transaction): Transaction =
-                tx.copy(txIn = tx.txIn.map { removeSignatureScript(it) })
-
-            fun updateSignatureScript(tx: Transaction, index: Int, script: ByteArray): Transaction =
-                tx.updateSigScript(index, script)
-
-            fun resetSequence(txins: List<TxIn>, inputIndex: Int): List<TxIn> {
-                val result = txins.toMutableList()
-                for (i in 0..result.lastIndex) {
-                    if (i != inputIndex) result[i] = result[i].copy(sequence = 0L)
-                }
-                return result.toList()
-            }
-
-            val tx1 = removeAllSignatureScripts(tx)
-            val tx2 = updateSignatureScript(tx1, inputIndex, filteredScript)
-            val tx3 = when {
-                SigHash.isHashNone(sighashType) -> {
-                    // hash none: remove all outputs
-                    val inputs = resetSequence(tx2.txIn, inputIndex)
-                    tx2.copy(txIn = inputs, txOut = listOf())
-                }
-                SigHash.isHashSingle(sighashType) -> {
-                    // hash single: remove all outputs but the one that we are trying to claim
-                    val inputs = resetSequence(tx2.txIn, inputIndex)
-                    val outputs = mutableListOf<TxOut>()
-                    for (i in 0..inputIndex) {
-                        outputs += if (i == inputIndex) tx2.txOut[inputIndex] else TxOut((-1L).toSatoshi(), ByteArray(0))
-                    }
-                    tx2.copy(txIn = inputs, txOut = outputs.toList())
-                }
-                else -> tx2
-            }
-
-            val tx4 = if (SigHash.isAnyoneCanPay(sighashType)) tx3.copy(txIn = listOf(tx3.txIn[inputIndex])) else tx3
-            return tx4
-        }
+        public fun prepareForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int): Transaction = tx.prepareForSigning(inputIndex, previousOutputScript, sighashType)
 
         /**
          * hash a tx for signing (pre-segwit)
@@ -590,14 +901,7 @@ public data class Transaction(
          * @return a hash which can be used to sign the referenced tx input
          */
         @JvmStatic
-        public fun hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int): ByteArray {
-            return if (SigHash.isHashSingle(sighashType) && inputIndex >= tx.txOut.count()) {
-                ByteVector32.One.toByteArray()
-            } else {
-                val txCopy = prepareForSigning(tx, inputIndex, previousOutputScript, sighashType)
-                Crypto.hash256(Transaction.write(txCopy, SERIALIZE_TRANSACTION_NO_WITNESS) + writeUInt32(sighashType.toUInt()))
-            }
-        }
+        public fun hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int): ByteArray = tx.hashForSigning(inputIndex, previousOutputScript, sighashType)
 
         /**
          * hash a tx for signing
@@ -610,46 +914,8 @@ public data class Transaction(
          * @return a hash which can be used to sign the referenced tx input
          */
         @JvmStatic
-        public fun hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteArray {
-            when (signatureVersion) {
-                SigVersion.SIGVERSION_WITNESS_V0 -> {
-                    val hashPrevOut = if (!SigHash.isAnyoneCanPay(sighashType)) {
-                        val arrays = tx.txIn.map { it.outPoint }.map { OutPoint.write(it, PROTOCOL_VERSION) }
-                        val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
-                        Crypto.hash256(concatenated)
-                    } else ByteArray(32)
-
-                    val hashSequence = if (!SigHash.isAnyoneCanPay(sighashType) && !SigHash.isHashSingle(sighashType) && !SigHash.isHashNone(sighashType)) {
-                        val arrays = tx.txIn.map { it.sequence }.map { writeUInt32(it.toUInt()) }
-                        val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
-                        Crypto.hash256(concatenated)
-                    } else ByteArray(32)
-
-                    val hashOutputs = if (!SigHash.isHashSingle(sighashType) && !SigHash.isHashNone(sighashType)) {
-                        val arrays = tx.txOut.map { TxOut.write(it, PROTOCOL_VERSION) }
-                        val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
-                        Crypto.hash256(concatenated)
-                    } else if (SigHash.isHashSingle(sighashType) && inputIndex < tx.txOut.count()) {
-                        Crypto.hash256(TxOut.write(tx.txOut[inputIndex], PROTOCOL_VERSION))
-                    } else ByteArray(32)
-
-                    val out = ByteArrayOutput()
-                    writeUInt32(tx.version.toUInt(), out)
-                    out.write(hashPrevOut)
-                    out.write(hashSequence)
-                    out.write(OutPoint.write(tx.txIn.elementAt(inputIndex).outPoint, PROTOCOL_VERSION))
-                    writeScript(previousOutputScript, out)
-                    writeUInt64(amount.toULong(), out)
-                    writeUInt32(tx.txIn[inputIndex].sequence.toUInt(), out)
-                    out.write(hashOutputs)
-                    writeUInt32(tx.lockTime.toUInt(), out)
-                    writeUInt32(sighashType.toUInt(), out)
-                    val preimage = out.toByteArray()
-                    return Crypto.hash256(preimage)
-                }
-                else -> return hashForSigning(tx, inputIndex, previousOutputScript, sighashType)
-            }
-        }
+        public fun hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteArray =
+            tx.hashForSigning(inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
 
         /**
          * hash a tx for signing
@@ -678,11 +944,8 @@ public data class Transaction(
          * @return the encoded signature of this tx for this specific tx input
          */
         @JvmStatic
-        public fun signInput(tx: Transaction, inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray {
-            val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
-            val sig = Crypto.sign(hash, privateKey)
-            return Crypto.compact2der(sig).toByteArray() + (sighashType.toByte())
-        }
+        public fun signInput(tx: Transaction, inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray =
+            tx.signInput(inputIndex, previousOutputScript, sighashType, amount, signatureVersion, privateKey)
 
         @JvmStatic
         public fun signInput(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray =
@@ -744,47 +1007,7 @@ public data class Transaction(
             tapleaf: ByteVector32? = null,
             annex: ByteVector? = null,
             codeSeparatorPos: Long? = null,
-        ): ByteVector32 {
-            val out = ByteArrayOutput()
-            out.write(0)
-            require(sighashType <= 0x03 || (sighashType in 0x81..0x83))
-
-            out.write(sighashType)
-            val txData = tx.transactionData(inputs, sighashType)
-            out.write(txData)
-            val (extFlag, keyVersion) = when (sigVersion) {
-                SigVersion.SIGVERSION_TAPSCRIPT -> Pair(1, 0)
-                else -> Pair(0, 0)
-            }
-            val spendType = 2 * extFlag + (if (annex != null) 1 else 0)
-            out.write(spendType)
-            val inputType = sighashType and SigHash.SIGHASH_INPUT_MASK
-            if (inputType == SigHash.SIGHASH_ANYONECANPAY) {
-                OutPoint.write(tx.txIn[inputIndex].outPoint, out)
-                TxOut.write(inputs[inputIndex], out)
-                writeUInt32(tx.txIn[inputIndex].sequence.toUInt(), out)
-            } else {
-                writeUInt32(inputIndex.toUInt(), out)
-            }
-            if (annex != null) {
-                val buffer = ByteArrayOutput()
-                writeScript(annex, buffer)
-                val annexHash = Crypto.sha256(buffer.toByteArray())
-                out.write(annexHash)
-            }
-            val outputType = if (sighashType == SigHash.SIGHASH_DEFAULT) SigHash.SIGHASH_ALL else sighashType and SigHash.SIGHASH_OUTPUT_MASK
-            if (outputType == SigHash.SIGHASH_SINGLE) {
-                out.write(Crypto.sha256(TxOut.write(tx.txOut[inputIndex])))
-            }
-            if (sigVersion == SigVersion.SIGVERSION_TAPSCRIPT) {
-                require(tapleaf != null) { "tapleaf hash is missing" }
-                out.write(tapleaf.toByteArray())
-                out.write(keyVersion)
-                writeUInt32((codeSeparatorPos ?: 0xFFFFFFFFL).toUInt(), out)
-            }
-            val preimage = out.toByteArray()
-            return Crypto.taggedHash(preimage, "TapSighash")
-        }
+        ): ByteVector32 = tx.hashForSigningSchnorr(inputIndex, inputs, sighashType, sigVersion, tapleaf, annex, codeSeparatorPos)
 
         /** Use this function when spending a taproot key path. */
         @JvmStatic
@@ -810,14 +1033,8 @@ public data class Transaction(
          * @return the schnorr signature of this tx for this specific tx input.
          */
         @JvmStatic
-        public fun signInputTaprootKeyPath(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, scriptTree: ScriptTree?, annex: ByteVector? = null, auxrand32: ByteVector32? = null): ByteVector64 {
-            val data = hashForSigningTaprootKeyPath(tx, inputIndex, inputs, sighashType, annex)
-            val tweak = when (scriptTree) {
-                null -> Crypto.TaprootTweak.NoScriptTweak
-                else -> Crypto.TaprootTweak.ScriptTweak(scriptTree.hash())
-            }
-            return Crypto.signSchnorr(data, privateKey, tweak, auxrand32)
-        }
+        public fun signInputTaprootKeyPath(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, scriptTree: ScriptTree?, annex: ByteVector? = null, auxrand32: ByteVector32? = null): ByteVector64 =
+            tx.signInputTaprootKeyPath(privateKey, inputIndex, inputs, sighashType, scriptTree, annex, auxrand32)
 
         /**
          * Sign a taproot tx input, using one of its script paths.
@@ -840,35 +1057,13 @@ public data class Transaction(
             tapleaf: ByteVector32,
             annex: ByteVector? = null,
             auxrand32: ByteVector32? = null
-        ): ByteVector64 {
-            val data = hashForSigningTaprootScriptPath(tx, inputIndex, inputs, sighashType, tapleaf, annex)
-            return Crypto.signSchnorr(data, privateKey, Crypto.SchnorrTweak.NoTweak, auxrand32)
-        }
+        ): ByteVector64 = tx.signInputTaprootScriptPath(privateKey, inputIndex, inputs, sighashType, tapleaf, annex, auxrand32)
 
         @JvmStatic
-        public fun correctlySpends(tx: Transaction, previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int) {
-            val prevouts = tx.txIn.map { previousOutputs[it.outPoint]!! }
-            for (i in 0 until tx.txIn.count()) {
-                if (OutPoint.isCoinbase(tx.txIn.elementAt(i).outPoint)) continue
-                val prevOutput = previousOutputs.getValue(tx.txIn[i].outPoint)
-                val prevOutputScript = prevOutput.publicKeyScript
-                val amount = prevOutput.amount
-                val ctx = Script.Context(tx, i, amount, prevouts)
-                val runner = Script.Runner(ctx, scriptFlags)
-                if (!runner.verifyScripts(tx.txIn[i].signatureScript, prevOutputScript, tx.txIn[i].witness)) throw RuntimeException("tx ${tx.txid} does not spend its input #$i")
-            }
-        }
+        public fun correctlySpends(tx: Transaction, previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int): Unit = tx.correctlySpends(previousOutputs, scriptFlags)
 
         @JvmStatic
-        public fun correctlySpends(tx: Transaction, inputs: List<Transaction>, scriptFlags: Int) {
-            val map = mutableMapOf<OutPoint, TxOut>()
-            for (outPoint in tx.txIn.map { it.outPoint }) {
-                val prevTx = inputs.find { it.txid == outPoint.txid }
-                val prevOut = prevTx?.txOut!![outPoint.index.toInt()]
-                map[outPoint] = prevOut
-            }
-            correctlySpends(tx, map.toMap(), scriptFlags)
-        }
+        public fun correctlySpends(tx: Transaction, inputs: List<Transaction>, scriptFlags: Int): Unit = tx.correctlySpends(inputs, scriptFlags)
 
         @JvmStatic
         public fun correctlySpends(tx: Transaction, parent: Transaction, scriptFlags: Int): Unit = correctlySpends(tx, listOf(parent), scriptFlags)

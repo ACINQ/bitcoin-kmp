@@ -451,9 +451,7 @@ class TaprootTestsCommon {
         }
 
         fun serde(input: ScriptTree): ScriptTree {
-            val output = ByteArrayOutput()
-            input.write(output, 0)
-            return ScriptTree.read(ByteArrayInput(output.toByteArray()))
+            return ScriptTree.read(ByteArrayInput(input.write()))
         }
 
         (0 until 1000).forEach { _ ->

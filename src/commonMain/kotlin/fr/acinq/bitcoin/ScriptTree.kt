@@ -23,7 +23,7 @@ import kotlin.jvm.JvmStatic
 
 /** Simple binary tree structure containing taproot spending scripts. */
 public sealed class ScriptTree {
-    public abstract fun write(output: Output, level: Int): Output
+    public abstract fun write(output: Output, level: Int): Unit
 
     /**
      * @return the tree serialised with the format defined in BIP 371
@@ -46,21 +46,18 @@ public sealed class ScriptTree {
         public constructor(script: List<ScriptElt>, leafVersion: Int) : this(Script.write(script).byteVector(), leafVersion)
         public constructor(script: String, leafVersion: Int) : this(ByteVector.fromHex(script), leafVersion)
 
-        override fun write(output: Output, level: Int): Output {
+        override fun write(output: Output, level: Int): Unit {
             output.write(level)
             output.write(leafVersion)
             BtcSerializer.writeScript(script, output)
-            return output
         }
     }
 
     public data class Branch(val left: ScriptTree, val right: ScriptTree) : ScriptTree() {
-        override fun write(output: Output, level: Int): Output {
+        override fun write(output: Output, level: Int): Unit {
             left.write(output, level + 1)
             right.write(output, level + 1)
-            return output
         }
-
     }
 
     /** Compute the merkle root of the script tree. */

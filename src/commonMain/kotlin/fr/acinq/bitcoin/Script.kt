@@ -1451,7 +1451,7 @@ public object Script {
                         require((control.size() - 33) / 32 in 0..128) { "invalid control block size" }
                         val leafVersion = control[0].toInt() and TAPROOT_LEAF_MASK
                         val internalKey = XonlyPublicKey(control.slice(1, 33).toByteArray().byteVector32())
-                        val tapleafHash = ScriptTree.Leaf(0, script, leafVersion).hash()
+                        val tapleafHash = ScriptTree.Leaf(script, leafVersion).hash()
                         this.context.executionData = this.context.executionData.copy(tapleafHash = tapleafHash)
 
                         // split input buffer into 32 bytes chunks (input buffer size MUST be a multiple of 32 !!)

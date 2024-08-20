@@ -104,8 +104,21 @@ class BIP341TestsCommon {
                     // When control blocks are provided, recompute them for each script tree leaf and check that they match.
                     assertNotNull(scriptTree)
                     val controlBlocks = expected["scriptPathControlBlocks"]!!.jsonArray.map { ByteVector.fromHex(it.jsonPrimitive.content) }
+
+                    fun loop(tree: ScriptTree, acc: ArrayList<ScriptTree.Leaf>) {
+                        when (tree) {
+                            is ScriptTree.Leaf -> acc.add(tree)
+                            is ScriptTree.Branch -> {
+                                loop(tree.left, acc)
+                                loop(tree.right, acc)
+                            }
+                        }
+                    }
+                    // traverse the tree from left to right and top to bottom, this is the order that is used in the reference tests
+                    val leaves = ArrayList<ScriptTree.Leaf>()
+                    loop(scriptTree, leaves)
                     controlBlocks.forEachIndexed { index, expectedControlBlock ->
-                        val scriptLeaf = scriptTree.findScript(index)
+                        val scriptLeaf = leaves[index]
                         assertNotNull(scriptLeaf)
                         val computedControlBlock = Script.ControlBlock.build(internalPubkey, scriptTree, scriptLeaf)
                         assertEquals(expectedControlBlock, computedControlBlock)
@@ -121,14 +134,13 @@ class BIP341TestsCommon {
             else -> ByteVector32(input)
         }
 
-        private fun scriptLeafFromJson(json: JsonElement): ScriptTree.Leaf = ScriptTree.Leaf(
-            id = json.jsonObject["id"]!!.jsonPrimitive.int,
+        private fun scriptLeafFromJson(json: JsonElement): Pair<Int, ScriptTree.Leaf> = json.jsonObject["id"]!!.jsonPrimitive.int to ScriptTree.Leaf(
             script = ByteVector.fromHex(json.jsonObject["script"]!!.jsonPrimitive.content),
             leafVersion = json.jsonObject["leafVersion"]!!.jsonPrimitive.int
         )
 
         fun scriptTreeFromJson(json: JsonElement): ScriptTree = when (json) {
-            is JsonObject -> scriptLeafFromJson(json)
+            is JsonObject -> scriptLeafFromJson(json).second
             is JsonArray -> {
                 require(json.size == 2) { "script tree must contain exactly two branches: $json" }
                 ScriptTree.Branch(scriptTreeFromJson(json[0]), scriptTreeFromJson(json[1]))

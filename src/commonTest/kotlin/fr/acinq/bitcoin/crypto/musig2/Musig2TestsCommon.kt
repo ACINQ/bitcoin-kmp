@@ -324,7 +324,7 @@ class Musig2TestsCommon {
         // The redeem script is just the refund script, generated from this policy: and_v(v:pk(user),older(refundDelay))
         // It does not depend upon the user's or server's key, just the user's refund key and the refund delay.
         val redeemScript = listOf(OP_PUSHDATA(userRefundPrivateKey.xOnlyPublicKey()), OP_CHECKSIGVERIFY, OP_PUSHDATA(Script.encodeNumber(refundDelay)), OP_CHECKSEQUENCEVERIFY)
-        val scriptTree = ScriptTree.Leaf(0, redeemScript)
+        val scriptTree = ScriptTree.Leaf(redeemScript)
 
         // The internal pubkey is the musig2 aggregation of the user's and server's public keys: it does not depend upon the user's refund's key.
         val internalPubKey = Musig2.aggregateKeys(listOf(userPublicKey, serverPublicKey))

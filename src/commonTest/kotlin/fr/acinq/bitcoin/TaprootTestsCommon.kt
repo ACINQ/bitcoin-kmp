@@ -18,6 +18,8 @@ package fr.acinq.bitcoin
 import fr.acinq.bitcoin.Bech32.hrp
 import fr.acinq.bitcoin.Bitcoin.addressToPublicKeyScript
 import fr.acinq.bitcoin.Transaction.Companion.hashForSigningSchnorr
+import fr.acinq.bitcoin.io.ByteArrayInput
+import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.reference.TransactionTestsCommon.Companion.resourcesDir
 import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
@@ -175,7 +177,7 @@ class TaprootTestsCommon {
         )
 
         // simple script tree with a single element
-        val scriptTree = ScriptTree.Leaf(0, script)
+        val scriptTree = ScriptTree.Leaf(script)
         // we choose a pubkey that does not have a corresponding private key: our funding tx can only be spent through the script path, not the key path
         val internalPubkey = PublicKey.fromHex("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0").xOnly()
 
@@ -221,7 +223,7 @@ class TaprootTestsCommon {
             PrivateKey(ByteVector32("0101010101010101010101010101010101010101010101010101010101010103"))
         )
         val scripts = privs.map { listOf(OP_PUSHDATA(it.publicKey().xOnly().value), OP_CHECKSIG) }
-        val leaves = scripts.mapIndexed { idx, script -> ScriptTree.Leaf(idx, script) }
+        val leaves = scripts.map { ScriptTree.Leaf(it) }
         //     root
         //    /   \
         //  /  \   #3
@@ -419,5 +421,42 @@ class TaprootTestsCommon {
         // check that we can also serialize this tx and get the same result
         val serializedTx = Transaction.write(tx)
         assertContentEquals(buffer, serializedTx)
+    }
+
+    @Test
+    fun `serialize script tree -- reference test`() {
+        val tree =
+            ScriptTree.read(ByteArrayInput(Hex.decode("02c02220736e572900fe1252589a2143c8f3c79f71a0412d2353af755e9701c782694a02ac02c02220631c5f3b5832b8fbdebfb19704ceeb323c21f40f7a24f43d68ef0cc26b125969ac01c0222044faa49a0338de488c8dfffecdfb6f329f380bd566ef20c8df6d813eab1c4273ac")))
+        assertEquals(
+            ScriptTree.Branch(
+                ScriptTree.Branch(
+                    ScriptTree.Leaf("20736e572900fe1252589a2143c8f3c79f71a0412d2353af755e9701c782694a02ac", 0xc0),
+                    ScriptTree.Leaf("20631c5f3b5832b8fbdebfb19704ceeb323c21f40f7a24f43d68ef0cc26b125969ac", 0xc0),
+                ),
+                ScriptTree.Leaf("2044faa49a0338de488c8dfffecdfb6f329f380bd566ef20c8df6d813eab1c4273ac", 0xc0)
+            ), tree
+        )
+    }
+
+    @Test
+    fun `serialize script trees`() {
+        val random = kotlin.random.Random.Default
+
+        fun randomLeaf(): ScriptTree.Leaf = ScriptTree.Leaf(random.nextBytes(random.nextInt(1, 8)).byteVector(), random.nextInt(255))
+
+        fun randomTree(maxLevel: Int): ScriptTree = when {
+            maxLevel == 0 -> randomLeaf()
+            random.nextBoolean() -> randomLeaf()
+            else -> ScriptTree.Branch(randomTree(maxLevel - 1), randomTree(maxLevel - 1))
+        }
+
+        fun serde(input: ScriptTree): ScriptTree {
+            return ScriptTree.read(ByteArrayInput(input.write()))
+        }
+
+        (0 until 1000).forEach { _ ->
+            val tree = randomTree(10)
+            assertEquals(tree, serde(tree))
+        }
     }
 }

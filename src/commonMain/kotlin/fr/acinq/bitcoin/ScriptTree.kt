@@ -15,24 +15,50 @@
  */
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.ByteArrayOutput
+import fr.acinq.bitcoin.io.Input
+import fr.acinq.bitcoin.io.Output
+import kotlin.jvm.JvmStatic
 
 /** Simple binary tree structure containing taproot spending scripts. */
 public sealed class ScriptTree {
+    public abstract fun write(output: Output, level: Int): Unit
+
+    /**
+     * @return the tree serialised with the format defined in BIP 371
+     */
+    public fun write(): ByteArray {
+        val output = ByteArrayOutput()
+        write(output, 0)
+        return output.toByteArray()
+    }
+
     /**
      * Multiple spending scripts can be placed in the leaves of a taproot tree. When using one of those scripts to spend
      * funds, we only need to reveal that specific script and a merkle proof that it is a leaf of the tree.
      *
-     * @param id id that isn't used in the hash, but can be used by the caller to reference specific scripts.
      * @param script serialized spending script.
      * @param leafVersion tapscript version.
      */
-    public data class Leaf(val id: Int, val script: ByteVector, val leafVersion: Int) : ScriptTree() {
-        public constructor(id: Int, script: List<ScriptElt>) : this(id, script, Script.TAPROOT_LEAF_TAPSCRIPT)
-        public constructor(id: Int, script: List<ScriptElt>, leafVersion: Int) : this(id, Script.write(script).byteVector(), leafVersion)
+    public data class Leaf(val script: ByteVector, val leafVersion: Int) : ScriptTree() {
+        public constructor(script: List<ScriptElt>) : this(script, Script.TAPROOT_LEAF_TAPSCRIPT)
+        public constructor(script: List<ScriptElt>, leafVersion: Int) : this(Script.write(script).byteVector(), leafVersion)
+        public constructor(script: String, leafVersion: Int) : this(ByteVector.fromHex(script), leafVersion)
+
+        override fun write(output: Output, level: Int): Unit {
+            output.write(level)
+            output.write(leafVersion)
+            BtcSerializer.writeScript(script, output)
+        }
     }
 
-    public data class Branch(val left: ScriptTree, val right: ScriptTree) : ScriptTree()
+    public data class Branch(val left: ScriptTree, val right: ScriptTree) : ScriptTree() {
+        override fun write(output: Output, level: Int): Unit {
+            left.write(output, level + 1)
+            right.write(output, level + 1)
+        }
+    }
 
     /** Compute the merkle root of the script tree. */
     public fun hash(): ByteVector32 = when (this) {
@@ -42,6 +68,7 @@ public sealed class ScriptTree {
             BtcSerializer.writeScript(this.script, buffer)
             Crypto.taggedHash(buffer.toByteArray(), "TapLeaf")
         }
+
         is Branch -> {
             val h1 = this.left.hash()
             val h2 = this.right.hash()
@@ -50,10 +77,10 @@ public sealed class ScriptTree {
         }
     }
 
-    /** Return the first script leaf with the corresponding id, if any. */
-    public fun findScript(id: Int): Leaf? = when (this) {
-        is Leaf -> if (this.id == id) this else null
-        is Branch -> this.left.findScript(id) ?: this.right.findScript(id)
+    /** Return the first leaf with a matching script, if any. */
+    public fun findScript(script: ByteVector): Leaf? = when (this) {
+        is Leaf -> if (this.script == script) this else null
+        is Branch -> this.left.findScript(script) ?: this.right.findScript(script)
     }
 
     /**
@@ -67,5 +94,42 @@ public sealed class ScriptTree {
             is Branch -> loop(tree.left, tree.right.hash().toByteArray() + proof) ?: loop(tree.right, tree.left.hash().toByteArray() + proof)
         }
         return loop(this, ByteArray(0))
+    }
+
+    public companion object {
+        private fun readLeaves(input: Input): ArrayList<Pair<Int, ScriptTree>> {
+            val leaves = arrayListOf<Pair<Int, ScriptTree>>()
+            while (input.availableBytes > 0) {
+                val depth = input.read()
+                val leafVersion = input.read()
+                val script = BtcSerializer.script(input).byteVector()
+                leaves.add(Pair(depth, Leaf(script, leafVersion)))
+            }
+            return leaves
+        }
+
+        private fun merge(nodes: ArrayList<Pair<Int, ScriptTree>>) {
+            if (nodes.size > 1) {
+                var i = 0
+                while (i < nodes.size - 1) {
+                    if (nodes[i].first == nodes[i + 1].first) {
+                        // merge 2 consecutive nodes that are on the same level
+                        val node = Pair(nodes[i].first - 1, Branch(nodes[i].second, nodes[i + 1].second))
+                        nodes[i] = node
+                        nodes.removeAt(i + 1)
+                        // and start again from the beginning (the node at the bottom-left of the tree)
+                        i = 0
+                    } else i++
+                }
+            }
+        }
+
+        @JvmStatic
+        public fun read(input: Input): ScriptTree {
+            val leaves = readLeaves(input)
+            merge(leaves)
+            require(leaves.size == 1) { "invalid serialised script tree" }
+            return leaves[0].second
+        }
     }
 }

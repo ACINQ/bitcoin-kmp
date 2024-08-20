@@ -361,13 +361,41 @@ public data class Transaction(
 
     public fun addOutput(output: TxOut): Transaction = this.copy(txOut = this.txOut + output)
 
-    /** Total size of the transaction without witness data. */
-    public fun baseSize(): Int = baseSize(this)
+    /**
+     * @return the total size of the transaction without witness data
+     */
+    public fun baseSize(protocolVersion: Long): Int = write(this, protocolVersion or SERIALIZE_TRANSACTION_NO_WITNESS).size
 
-    /** Total size of the transaction with witness data, if any. */
-    public fun totalSize(): Int = totalSize(this)
+    /**
+     * @return the total size of the transaction without witness data
+     */
+    public fun baseSize(): Int = baseSize(PROTOCOL_VERSION)
 
-    public fun weight(): Int = weight(this)
+    /**
+     * @return the total size of the transaction with witness data, if any
+     */
+    public fun totalSize(protocolVersion: Long): Int = write(this, protocolVersion).size
+
+    /**
+     * @return the total size of the transaction with witness data, if any
+     */
+    public fun totalSize(): Int = totalSize(PROTOCOL_VERSION)
+
+    /**
+     * @return the weight of the transaction (witness data uses 1 weight unit, while non-witness data uses 4 weight units)
+     */
+    public fun weight(protocolVersion: Long): Int {
+        // Witness data uses 1 weight unit, while non-witness data uses 4 weight units.
+        // We thus serialize once with witness data and 3 times without witness data.
+        return totalSize(protocolVersion) + 3 * baseSize(protocolVersion)
+    }
+
+    public fun weight(): Int = weight(PROTOCOL_VERSION)
+
+    /**
+     * @return true if this is coibase transaction
+     */
+    public fun isCoinbase(): Boolean = txIn.count() == 1 && txIn.first().outPoint.isCoinbase
 
     public fun transactionData(inputs: List<TxOut>, sighashType: Int): ByteArray {
         val out = ByteArrayOutput()
@@ -801,25 +829,20 @@ public data class Transaction(
 
         /** Total size of the transaction without witness data. */
         @JvmStatic
-        public fun baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int =
-            write(tx, protocolVersion or SERIALIZE_TRANSACTION_NO_WITNESS).size
+        public fun baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = tx.baseSize(protocolVersion)
 
         /** Total size of the transaction with witness data, if any. */
         @JvmStatic
-        public fun totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion).size
+        public fun totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = tx.totalSize(protocolVersion)
 
         @JvmStatic
-        public fun weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int {
-            // Witness data uses 1 weight unit, while non-witness data uses 4 weight units.
-            // We thus serialize once with witness data and 3 times without witness data.
-            return totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
-        }
+        public fun weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = tx.weight(protocolVersion)
 
         @JvmStatic
-        public fun weight(tx: Transaction): Int = weight(tx, PROTOCOL_VERSION)
+        public fun weight(tx: Transaction): Int = tx.weight()
 
         @JvmStatic
-        public fun isCoinbase(input: Transaction): Boolean = input.txIn.count() == 1 && OutPoint.isCoinbase(input.txIn.first().outPoint)
+        public fun isCoinbase(input: Transaction): Boolean = input.isCoinbase()
 
         @JvmStatic
         public fun prevoutsSha256(tx: Transaction): ByteArray {

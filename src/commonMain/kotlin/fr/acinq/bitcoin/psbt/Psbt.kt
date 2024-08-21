@@ -48,8 +48,8 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
      */
     public constructor(tx: Transaction) : this(
         Global(Version, tx.copy(txIn = tx.txIn.map { it.copy(signatureScript = ByteVector.empty, witness = ScriptWitness.empty) }), listOf(), listOf()),
-        tx.txIn.map { Input.PartiallySignedInputWithoutUtxo(null, mapOf(), setOf(), setOf(), setOf(), setOf(), listOf()) },
-        tx.txOut.map { Output.UnspecifiedOutput(mapOf(), listOf()) }
+        tx.txIn.map { Input.PartiallySignedInputWithoutUtxo(null, mapOf(), setOf(), setOf(), setOf(), setOf(), null, mapOf(), null, listOf()) },
+        tx.txOut.map { Output.UnspecifiedOutput(mapOf(), null, mapOf(), listOf()) }
     )
 
     /**
@@ -70,7 +70,10 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
         redeemScript: List<ScriptElt>? = null,
         witnessScript: List<ScriptElt>? = null,
         sighashType: Int? = null,
-        derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
+        derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf(),
+        taprootKeySignature: ByteVector? = null,
+        taprootInternalKey: XonlyPublicKey? = null,
+        taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath> = mapOf()
     ): Either<UpdateFailure, Psbt> {
         val inputIndex = global.tx.txIn.indexOfFirst { it.outPoint == outPoint }
         if (inputIndex < 0) return Either.Left(UpdateFailure.InvalidInput("psbt transaction does not spend the provided outpoint"))
@@ -87,6 +90,9 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 input.sha256,
                 input.hash160,
                 input.hash256,
+                taprootKeySignature ?: input.taprootKeySignature,
+                input.taprootDerivationPaths + taprootDerivationPaths,
+                taprootInternalKey ?: input.taprootInternalKey,
                 input.unknown
             )
             is Input.WitnessInput.PartiallySignedWitnessInput -> input.copy(
@@ -94,7 +100,9 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 redeemScript = redeemScript ?: input.redeemScript,
                 witnessScript = witnessScript ?: input.witnessScript,
                 sighashType = sighashType ?: input.sighashType,
-                derivationPaths = input.derivationPaths + derivationPaths
+                derivationPaths = input.derivationPaths + derivationPaths,
+                taprootInternalKey = taprootInternalKey ?: input.taprootInternalKey,
+                taprootDerivationPaths = input.taprootDerivationPaths + taprootDerivationPaths
             )
             is Input.NonWitnessInput.PartiallySignedNonWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update segwit input: it has already been updated with non-segwit data"))
             is Input.FinalizedInputWithoutUtxo -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update segwit input: it has already been finalized"))
@@ -114,6 +122,8 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
      * @param witnessScript witness script if known and applicable (when using p2wsh).
      * @param sighashType sighash type if one should be specified.
      * @param derivationPaths derivation paths for keys used by this utxo.
+     * @param taprootInternalKey internal key used by this utxo.
+     * @param taprootDerivationPaths taproot derivation paths for keys used by this utxo.
      * @return psbt with the matching input updated.
      */
     public fun updateWitnessInputTx(
@@ -122,7 +132,10 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
         redeemScript: List<ScriptElt>? = null,
         witnessScript: List<ScriptElt>? = null,
         sighashType: Int? = null,
-        derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
+        derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf(),
+        taprootKeySignature: ByteVector? = null,
+        taprootInternalKey: XonlyPublicKey? = null,
+        taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath> = mapOf()
     ): Either<UpdateFailure, Psbt> {
         if (outputIndex >= inputTx.txOut.size) return Either.Left(UpdateFailure.InvalidInput("output index must exist in the input tx"))
         val outpoint = OutPoint(inputTx, outputIndex.toLong())
@@ -141,6 +154,9 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 input.sha256,
                 input.hash160,
                 input.hash256,
+                taprootKeySignature ?: input.taprootKeySignature,
+                input.taprootDerivationPaths + taprootDerivationPaths,
+                taprootInternalKey ?: input.taprootInternalKey,
                 input.unknown
             )
             is Input.WitnessInput.PartiallySignedWitnessInput -> input.copy(
@@ -149,7 +165,9 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 redeemScript = redeemScript ?: input.redeemScript,
                 witnessScript = witnessScript ?: input.witnessScript,
                 sighashType = sighashType ?: input.sighashType,
-                derivationPaths = input.derivationPaths + derivationPaths
+                derivationPaths = input.derivationPaths + derivationPaths,
+                taprootInternalKey = taprootInternalKey ?: input.taprootInternalKey,
+                taprootDerivationPaths = input.taprootDerivationPaths + taprootDerivationPaths
             )
             is Input.NonWitnessInput.PartiallySignedNonWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update segwit input: it has already been updated with non-segwit data"))
             is Input.FinalizedInputWithoutUtxo -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update segwit input: it has already been finalized"))
@@ -246,7 +264,9 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
         outputIndex: Int,
         witnessScript: List<ScriptElt>? = null,
         redeemScript: List<ScriptElt>? = null,
-        derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
+        derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf(),
+        taprootInternalKey: XonlyPublicKey? = null,
+        taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath> = mapOf()
     ): Either<UpdateFailure, Psbt> {
         if (outputIndex >= global.tx.txOut.size) return Either.Left(UpdateFailure.InvalidInput("output index must exist in the global tx"))
         val updatedOutput = when (val output = outputs[outputIndex]) {
@@ -254,9 +274,18 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
             is Output.WitnessOutput -> output.copy(
                 witnessScript = witnessScript ?: output.witnessScript,
                 redeemScript = redeemScript ?: output.redeemScript,
-                derivationPaths = output.derivationPaths + derivationPaths
+                derivationPaths = output.derivationPaths + derivationPaths,
+                taprootInternalKey = taprootInternalKey ?: output.taprootInternalKey,
+                taprootDerivationPaths = output.taprootDerivationPaths + taprootDerivationPaths
             )
-            is Output.UnspecifiedOutput -> Output.WitnessOutput(witnessScript, redeemScript, output.derivationPaths + derivationPaths, output.unknown)
+            is Output.UnspecifiedOutput -> Output.WitnessOutput(
+                witnessScript,
+                redeemScript,
+                output.derivationPaths + derivationPaths,
+                taprootInternalKey ?: output.taprootInternalKey,
+                output.taprootDerivationPaths + taprootDerivationPaths,
+                output.unknown
+            )
         }
         return Either.Right(this.copy(outputs = outputs.updated(outputIndex, updatedOutput)))
     }
@@ -370,34 +399,62 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
     }
 
     private fun signWitness(priv: PrivateKey, inputIndex: Int, input: Input.WitnessInput.PartiallySignedWitnessInput, global: Global): Either<UpdateFailure, Pair<Input.WitnessInput.PartiallySignedWitnessInput, ByteVector>> {
-        val redeemScript = when (input.redeemScript) {
-            null -> runCatching {
-                Script.parse(input.txOut.publicKeyScript)
-            }.getOrElse {
-                return Either.Left(UpdateFailure.InvalidWitnessUtxo("failed to parse redeem script"))
-            }
-            else -> {
-                // If a redeem script is provided in the partially signed input, the utxo must be a p2sh for that script (we're using p2sh-embedded segwit).
-                val p2sh = Script.write(Script.pay2sh(input.redeemScript))
-                if (!input.txOut.publicKeyScript.contentEquals(p2sh)) {
-                    return Either.Left(UpdateFailure.InvalidWitnessUtxo("redeem script does not match witness utxo scriptPubKey"))
-                } else {
-                    input.redeemScript
-                }
-            }
+        val pubkeyScript = runCatching {
+            Script.parse(input.txOut.publicKeyScript)
+        }.getOrElse {
+            return Either.Left(UpdateFailure.InvalidWitnessUtxo("failed to parse pubkeyScript"))
         }
-        return when (input.witnessScript) {
-            null -> {
-                val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, redeemScript, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
-                Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
-            }
-            else -> {
-                if (!Script.isPay2wpkh(redeemScript) && redeemScript != Script.pay2wsh(input.witnessScript)) {
-                    Either.Left(UpdateFailure.InvalidWitnessUtxo("witness script does not match redeemScript or scriptPubKey"))
-                } else {
+        return when {
+            Script.isPay2wpkh(pubkeyScript) -> when (input.witnessScript) {
+                null -> Either.Left(UpdateFailure.InvalidWitnessUtxo("missing witness script"))
+                else -> {
                     val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, input.witnessScript, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
                     Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
                 }
+            }
+            Script.isPay2wsh(pubkeyScript) -> when {
+                input.witnessScript == null -> Either.Left(UpdateFailure.InvalidWitnessUtxo("missing witness script"))
+                pubkeyScript != Script.pay2wsh(input.witnessScript) -> Either.Left(UpdateFailure.InvalidWitnessUtxo("witness script does not match redeemScript or scriptPubKey"))
+                else -> {
+                    val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, input.witnessScript, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
+                    Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
+                }
+            }
+            Script.isPay2tr(pubkeyScript) -> when (input.taprootInternalKey) {
+                null -> Either.Left(UpdateFailure.InvalidWitnessUtxo("missing taproot internal key"))
+                else -> {
+                    // When spending taproot inputs, we include *all* of the transaction's inputs in the signed hash.
+                    val spentOutputs = this.inputs.mapIndexedNotNull { idx, txIn -> txIn.witnessUtxo ?: txIn.nonWitnessUtxo?.txOut?.get(this.global.tx.txIn[idx].outPoint.index.toInt()) }
+                    if (spentOutputs.size != this.inputs.size) {
+                        Either.Left(UpdateFailure.InvalidInput("missing txOut for one of our inputs"))
+                    } else {
+                        val sig = Transaction.signInputTaprootKeyPath(priv, global.tx, inputIndex, spentOutputs, input.sighashType ?: SigHash.SIGHASH_DEFAULT, null)
+                        val sigAndSighashType = input.sighashType?.let { sig.concat(it.toByte()) } ?: sig
+                        Either.Right(Pair(input.copy(taprootKeySignature = sigAndSighashType), sigAndSighashType))
+                    }
+                }
+            }
+            Script.isPay2sh(pubkeyScript) -> when {
+                input.redeemScript == null -> Either.Left(UpdateFailure.InvalidWitnessUtxo("missing redeem script"))
+                pubkeyScript != Script.pay2sh(input.redeemScript) -> Either.Left(UpdateFailure.InvalidWitnessUtxo("redeem script does not match witness utxo scriptPubKey"))
+                else -> when {
+                    input.witnessScript == null -> {
+                        val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, input.redeemScript, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
+                        Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
+                    }
+                    !Script.isPay2wpkh(input.redeemScript) && input.redeemScript != Script.pay2wsh(input.witnessScript) -> {
+                        Either.Left(UpdateFailure.InvalidWitnessUtxo("witness script does not match redeemScript or scriptPubKey"))
+                    }
+                    else -> {
+                        val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, input.witnessScript, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
+                        Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
+                    }
+                }
+            }
+            else -> {
+                val script = input.witnessScript ?: input.redeemScript ?: pubkeyScript
+                val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, script, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
+                Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
             }
         }
     }
@@ -499,7 +556,7 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
         return try {
             Transaction.correctlySpends(finalTx, utxos.toMap(), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
             Either.Right(finalTx)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             Either.Left(UpdateFailure.CannotExtractTx("extracted transaction doesn't pass standard script validation"))
         }
     }
@@ -586,6 +643,9 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
             inputs.flatMap { it.sha256 }.toSet(),
             inputs.flatMap { it.hash160 }.toSet(),
             inputs.flatMap { it.hash256 }.toSet(),
+            inputs.firstNotNullOfOrNull { it.taprootKeySignature },
+            inputs.flatMap { it.taprootDerivationPaths.toList() }.toMap(),
+            inputs.firstNotNullOfOrNull { it.taprootInternalKey },
             combineUnknown(inputs.map { it.unknown })
         )
 
@@ -593,6 +653,8 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
             outputs.firstNotNullOfOrNull { it.redeemScript },
             outputs.firstNotNullOfOrNull { it.witnessScript },
             outputs.flatMap { it.derivationPaths.toList() }.toMap(),
+            outputs.firstNotNullOfOrNull { it.taprootInternalKey },
+            outputs.flatMap { it.taprootDerivationPaths.toList() }.toMap(),
             combineUnknown(outputs.map { it.unknown })
         )
 
@@ -683,6 +745,13 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 input.sha256.forEach { writeDataEntry(DataEntry(ByteVector("0b") + Crypto.sha256(it), it), out) }
                 input.hash160.forEach { writeDataEntry(DataEntry(ByteVector("0c") + Crypto.hash160(it), it), out) }
                 input.hash256.forEach { writeDataEntry(DataEntry(ByteVector("0d") + Crypto.hash256(it), it), out) }
+                input.taprootKeySignature?.let { writeDataEntry(DataEntry(ByteVector("13"), it), out) }
+                sortXonlyPublicKeys(input.taprootDerivationPaths).forEach { (publicKey, path) ->
+                    val key = ByteVector("16") + publicKey.value
+                    val value = path.write().byteVector()
+                    writeDataEntry(DataEntry(key, value), out)
+                }
+                input.taprootInternalKey?.let { writeDataEntry(DataEntry(ByteVector("17"), it.value), out) }
                 input.unknown.forEach { writeDataEntry(it, out) }
                 out.write(0x00) // separator
             }
@@ -696,6 +765,12 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                     val value = ByteVector(Pack.writeInt32BE(path.masterKeyFingerprint.toInt())).concat(path.keyPath.path.map { ByteVector(Pack.writeInt32LE(it.toInt())) })
                     writeDataEntry(DataEntry(key, value), out)
                 }
+                output.taprootInternalKey?.let { writeDataEntry(DataEntry(ByteVector("05"), it.value), out) }
+                sortXonlyPublicKeys(output.taprootDerivationPaths).forEach { (publicKey, path) ->
+                    val key = ByteVector("07") + publicKey.value
+                    val value = path.write().byteVector()
+                    writeDataEntry(DataEntry(key, value), out)
+                }
                 output.unknown.forEach { writeDataEntry(it, out) }
                 out.write(0x00) // separator
             }
@@ -703,6 +778,11 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
 
         /** We use lexicographic ordering on the public keys. */
         private fun <T> sortPublicKeys(publicKeys: Map<PublicKey, T>): List<Pair<PublicKey, T>> {
+            return publicKeys.toList().sortedWith { a, b -> LexicographicalOrdering.compare(a.first, b.first) }
+        }
+
+        /** We use lexicographic ordering on the public keys. */
+        private fun <T> sortXonlyPublicKeys(publicKeys: Map<XonlyPublicKey, T>): List<Pair<XonlyPublicKey, T>> {
             return publicKeys.toList().sortedWith { a, b -> LexicographicalOrdering.compare(a.first, b.first) }
         }
 
@@ -798,7 +878,7 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
 
             /********** Inputs **********/
             val inputs = global.tx.txIn.map { txIn ->
-                val keyTypes = setOf<Byte>(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x0a, 0x0b, 0x0c, 0x0d)
+                val keyTypes = setOf<Byte>(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x13, 0x16, 0x17, 0x0a, 0x0b, 0x0c, 0x0d)
                 val entries = readDataMap(input).getOrElse {
                     return when (it) {
                         is ReadEntryFailure.DuplicateKeys -> Either.Left(ParseFailure.DuplicateKeys)
@@ -890,6 +970,30 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                         }
                     }
                 }
+                val taprootKeySignature = known.find { it.key[0] == 0x13.toByte() }?.let {
+                    when {
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("taproot keypath signature key must contain exactly 1 byte"))
+                        it.value.size() != 64 && it.value.size() != 65 -> return Either.Left(ParseFailure.InvalidTxInput("taproot keypath signature must contain 64 or 65 bytes"))
+                        else -> it.value
+                    }
+                }
+                val taprootDerivationPaths = known.filter { it.key[0] == 0x16.toByte() }.map {
+                    when {
+                        it.key.size() != 33 -> return Either.Left(ParseFailure.InvalidTxInput("taproot derivation path key must contain exactly 32 bytes"))
+                        else -> {
+                            val xonlyPublicKey = XonlyPublicKey(it.key.drop(1).toByteArray().byteVector32())
+                            val path = TaprootBip32DerivationPath.read(it.value.toByteArray())
+                            xonlyPublicKey to path
+                        }
+                    }
+                }.toMap()
+                val taprootInternalKey = known.find { it.key[0] == 0x17.toByte() }?.let {
+                    when {
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("taproot internal key entry must have an empty key"))
+                        it.value.size() != 32 -> return Either.Left(ParseFailure.InvalidTxInput("taproot internal key entry must have a 32 bytes value"))
+                        else -> XonlyPublicKey(it.value.toByteArray().byteVector32())
+                    }
+                }
                 val ripemd160Preimages = known.filter { it.key[0] == 0x0a.toByte() }.map {
                     when {
                         it.key.size() != 21 -> return Either.Left(ParseFailure.InvalidTxInput("ripemd160 hash must contain exactly 20 bytes"))
@@ -933,13 +1037,16 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                     sha256Preimages,
                     hash160Preimages,
                     hash256Preimages,
+                    taprootKeySignature,
+                    taprootDerivationPaths,
+                    taprootInternalKey,
                     unknown
                 )
             }
 
             /********** Outputs **********/
             val outputs = global.tx.txOut.map {
-                val keyTypes = setOf<Byte>(0x00, 0x01, 0x02)
+                val keyTypes = setOf<Byte>(0x00, 0x01, 0x02, 0x05, 0x07)
                 val entries = readDataMap(input).getOrElse {
                     return when (it) {
                         is ReadEntryFailure.DuplicateKeys -> Either.Left(ParseFailure.DuplicateKeys)
@@ -972,7 +1079,24 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                         }
                     }
                 }.toMap()
-                createOutput(redeemScript, witnessScript, derivationPaths, unknown)
+                val taprootInternalKey = known.find { it.key[0] == 0x05.toByte() }?.let {
+                    when {
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxOutput("taproot internal key entry must have an empty key"))
+                        it.value.size() != 32 -> return Either.Left(ParseFailure.InvalidTxOutput("taproot internal key entry must have a 32 bytes value"))
+                        else -> XonlyPublicKey(it.value.toByteArray().byteVector32())
+                    }
+                }
+                val taprootDerivationPaths = known.filter { it.key[0] == 0x07.toByte() }.map {
+                    when {
+                        it.key.size() != 33 -> return Either.Left(ParseFailure.InvalidTxOutput("taproot derivation path key must contain exactly 32 bytes"))
+                        else -> {
+                            val xonlyPublicKey = XonlyPublicKey(it.key.drop(1).toByteArray().byteVector32())
+                            val path = TaprootBip32DerivationPath.read(it.value.toByteArray())
+                            xonlyPublicKey to path
+                        }
+                    }
+                }.toMap()
+                createOutput(redeemScript, witnessScript, derivationPaths, taprootInternalKey, taprootDerivationPaths, unknown)
             }
 
             return if (input.availableBytes != 0) {
@@ -997,6 +1121,9 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
             sha256: Set<ByteVector>,
             hash160: Set<ByteVector>,
             hash256: Set<ByteVector>,
+            taprootKeySignature: ByteVector?,
+            taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath>,
+            taprootInternalKey: XonlyPublicKey?,
             unknown: List<DataEntry>
         ): Input {
             val emptied = redeemScript == null && witnessScript == null && partialSigs.isEmpty() && derivationPaths.isEmpty() && sighashType == null
@@ -1006,9 +1133,9 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 witnessUtxo != null && scriptWitness != null && emptied -> Input.WitnessInput.FinalizedWitnessInput(witnessUtxo, nonWitnessUtxo, scriptWitness, scriptSig, ripemd160, sha256, hash160, hash256, unknown)
                 nonWitnessUtxo != null && scriptSig != null && emptied -> Input.NonWitnessInput.FinalizedNonWitnessInput(nonWitnessUtxo, txIn.outPoint.index.toInt(), scriptSig, ripemd160, sha256, hash160, hash256, unknown)
                 (scriptSig != null || scriptWitness != null) && emptied -> Input.FinalizedInputWithoutUtxo(scriptWitness, scriptSig, ripemd160, sha256, hash160, hash256, unknown)
-                witnessUtxo != null -> Input.WitnessInput.PartiallySignedWitnessInput(witnessUtxo, nonWitnessUtxo, sighashType, partialSigs, derivationPaths, redeemScript, witnessScript, ripemd160, sha256, hash160, hash256, unknown)
+                witnessUtxo != null -> Input.WitnessInput.PartiallySignedWitnessInput(witnessUtxo, nonWitnessUtxo, sighashType, partialSigs, derivationPaths, redeemScript, witnessScript, ripemd160, sha256, hash160, hash256, taprootKeySignature, taprootDerivationPaths, taprootInternalKey, unknown)
                 nonWitnessUtxo != null -> Input.NonWitnessInput.PartiallySignedNonWitnessInput(nonWitnessUtxo, txIn.outPoint.index.toInt(), sighashType, partialSigs, derivationPaths, redeemScript, ripemd160, sha256, hash160, hash256, unknown)
-                else -> Input.PartiallySignedInputWithoutUtxo(sighashType, derivationPaths, ripemd160, sha256, hash160, hash256, unknown)
+                else -> Input.PartiallySignedInputWithoutUtxo(sighashType, derivationPaths, ripemd160, sha256, hash160, hash256, taprootKeySignature, taprootDerivationPaths, taprootInternalKey, unknown)
                 // @formatter:on
             }
         }
@@ -1017,11 +1144,13 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
             redeemScript: List<ScriptElt>?,
             witnessScript: List<ScriptElt>?,
             derivationPaths: Map<PublicKey, KeyPathWithMaster>,
+            taprootInternalKey: XonlyPublicKey?,
+            taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath>,
             unknown: List<DataEntry>
         ): Output = when {
-            witnessScript != null -> Output.WitnessOutput(witnessScript, redeemScript, derivationPaths, unknown)
+            witnessScript != null -> Output.WitnessOutput(witnessScript, redeemScript, derivationPaths, taprootInternalKey, taprootDerivationPaths, unknown)
             redeemScript != null -> Output.NonWitnessOutput(redeemScript, derivationPaths, unknown)
-            else -> Output.UnspecifiedOutput(derivationPaths, unknown)
+            else -> Output.UnspecifiedOutput(derivationPaths, taprootInternalKey, taprootDerivationPaths, unknown)
         }
 
         private sealed class ReadEntryFailure {
@@ -1041,6 +1170,7 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                             Either.Right(entries)
                         }
                     }
+
                     is ReadEntryFailure.InvalidData -> Either.Left(ReadEntryFailure.InvalidData)
                     else -> Either.Left(result.value)
                 }
@@ -1075,6 +1205,32 @@ public data class ExtendedPublicKeyWithMaster(@JvmField val prefix: Long, @JvmFi
  * @param keyPath bip 32 derivation path.
  */
 public data class KeyPathWithMaster(@JvmField val masterKeyFingerprint: Long, @JvmField val keyPath: KeyPath)
+
+/**
+ * @param masterKeyFingerprint fingerprint of the master key.
+ * @param keyPath bip 32 derivation path.
+ */
+public data class TaprootBip32DerivationPath(@JvmField val leaves: List<ByteVector32>, @JvmField val masterKeyFingerprint: Long, @JvmField val keyPath: KeyPath) {
+    public fun write(): ByteArray {
+        val out = ByteArrayOutput()
+        BtcSerializer.writeVarint(leaves.size, out)
+        leaves.forEach { BtcSerializer.writeBytes(it, out) }
+        BtcSerializer.writeBytes(ByteVector(Pack.writeInt32BE(masterKeyFingerprint.toInt())).concat(keyPath.path.map { ByteVector(Pack.writeInt32LE(it.toInt())) }), out)
+        return out.toByteArray()
+    }
+
+    public companion object {
+        public fun read(bin: ByteArray): TaprootBip32DerivationPath {
+            val input = ByteArrayInput(bin)
+            val numLeaves = BtcSerializer.varint(input).toInt()
+            val leaves = (0 until numLeaves).map { BtcSerializer.bytes(input, 32).byteVector32() }
+            val masterKeyFingerprint = Pack.int32BE(input).toLong()
+            val childCount = (input.availableBytes / 4)
+            val keyPath = KeyPath((0 until childCount).map { _ -> Pack.int32LE(input).toUInt().toLong() })
+            return TaprootBip32DerivationPath(leaves, masterKeyFingerprint, keyPath)
+        }
+    }
+}
 
 public data class DataEntry(@JvmField val key: ByteVector, @JvmField val value: ByteVector)
 
@@ -1122,6 +1278,12 @@ public sealed class Input {
     public abstract val hash160: Set<ByteVector>
     /** Hash256 preimages (e.g. for miniscript hash challenges). */
     public abstract val hash256: Set<ByteVector>
+    /** taproot keypath signature */
+    public abstract val taprootKeySignature: ByteVector?
+    /** Derivation paths used for taproot signatures, key is the internal key */
+    public abstract val taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath>
+    /** Internal key used for taproot signatures */
+    public abstract val taprootInternalKey: XonlyPublicKey?
     /** (optional) Unknown global entries. */
     public abstract val unknown: List<DataEntry>
     // @formatter:on
@@ -1137,7 +1299,10 @@ public sealed class Input {
         override val sha256: Set<ByteVector>,
         override val hash160: Set<ByteVector>,
         override val hash256: Set<ByteVector>,
-        override val unknown: List<DataEntry>
+        override val taprootKeySignature: ByteVector?,
+        override val taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath>,
+        override val taprootInternalKey: XonlyPublicKey?,
+        override val unknown: List<DataEntry>,
     ) : Input() {
         override val nonWitnessUtxo: Transaction? = null
         override val witnessUtxo: TxOut? = null
@@ -1167,6 +1332,9 @@ public sealed class Input {
         override val sighashType: Int? = null
         override val partialSigs: Map<PublicKey, ByteVector> = mapOf()
         override val derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
+        override val taprootKeySignature: ByteVector? = null
+        override val taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath> = mapOf()
+        override val taprootInternalKey: XonlyPublicKey? = null
         override val redeemScript: List<ScriptElt>? = null
         override val witnessScript: List<ScriptElt>? = null
     }
@@ -1190,6 +1358,9 @@ public sealed class Input {
             override val sha256: Set<ByteVector>,
             override val hash160: Set<ByteVector>,
             override val hash256: Set<ByteVector>,
+            override val taprootKeySignature: ByteVector?,
+            override val taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath>,
+            override val taprootInternalKey: XonlyPublicKey?,
             override val unknown: List<DataEntry>
         ) : WitnessInput() {
             override val scriptSig: List<ScriptElt>? = null
@@ -1211,6 +1382,9 @@ public sealed class Input {
             override val sighashType: Int? = null
             override val partialSigs: Map<PublicKey, ByteVector> = mapOf()
             override val derivationPaths: Map<PublicKey, KeyPathWithMaster> = mapOf()
+            override val taprootKeySignature: ByteVector? = null
+            override val taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath> = mapOf()
+            override val taprootInternalKey: XonlyPublicKey? = null
             override val redeemScript: List<ScriptElt>? = null
             override val witnessScript: List<ScriptElt>? = null
         }
@@ -1226,6 +1400,9 @@ public sealed class Input {
         // The following fields should only be present for inputs which spend segwit outputs (including P2SH embedded ones).
         override val witnessUtxo: TxOut? = null
         override val witnessScript: List<ScriptElt>? = null
+        override val taprootKeySignature: ByteVector? = null
+        override val taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath> = mapOf()
+        override val taprootInternalKey: XonlyPublicKey? = null
 
         /** A partially signed non-segwit input. More signatures may need to be added before it can be finalized. */
         public data class PartiallySignedNonWitnessInput(
@@ -1275,6 +1452,10 @@ public sealed class Output {
     public abstract val witnessScript: List<ScriptElt>?
     /** Derivation paths used to produce the public keys associated to this output. */
     public abstract val derivationPaths: Map<PublicKey, KeyPathWithMaster>
+    /** Internal key used to produce the public key associated to this output. */
+    public abstract val taprootInternalKey: XonlyPublicKey?
+    /** Taproot Derivation paths used to produce the public keys associated to this output. */
+    public abstract val taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath>
     /** (optional) Unknown global entries. */
     public abstract val unknown: List<DataEntry>
     // @formatter:on
@@ -1286,6 +1467,8 @@ public sealed class Output {
         override val unknown: List<DataEntry>
     ) : Output() {
         override val witnessScript: List<ScriptElt>? = null
+        override val taprootInternalKey: XonlyPublicKey? = null
+        override val taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath> = mapOf()
     }
 
     /** A segwit output. */
@@ -1293,12 +1476,16 @@ public sealed class Output {
         override val witnessScript: List<ScriptElt>?,
         override val redeemScript: List<ScriptElt>?,
         override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
+        override val taprootInternalKey: XonlyPublicKey?,
+        override val taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath>,
         override val unknown: List<DataEntry>
     ) : Output()
 
     /** An output for which usage of segwit is currently unknown. */
     public data class UnspecifiedOutput(
         override val derivationPaths: Map<PublicKey, KeyPathWithMaster>,
+        override val taprootInternalKey: XonlyPublicKey?,
+        override val taprootDerivationPaths: Map<XonlyPublicKey, TaprootBip32DerivationPath>,
         override val unknown: List<DataEntry>
     ) : Output() {
         override val redeemScript: List<ScriptElt>? = null

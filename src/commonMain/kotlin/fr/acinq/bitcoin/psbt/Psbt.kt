@@ -17,7 +17,6 @@
 package fr.acinq.bitcoin.psbt
 
 import fr.acinq.bitcoin.*
-import fr.acinq.bitcoin.Transaction.Companion.hashForSigningSchnorr
 import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.ByteArrayOutput
@@ -96,7 +95,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 taprootInternalKey ?: input.taprootInternalKey,
                 input.unknown
             )
-
             is Input.WitnessInput.PartiallySignedWitnessInput -> input.copy(
                 txOut = txOut,
                 redeemScript = redeemScript ?: input.redeemScript,
@@ -106,7 +104,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 taprootInternalKey = taprootInternalKey ?: input.taprootInternalKey,
                 taprootDerivationPaths = input.taprootDerivationPaths + taprootDerivationPaths
             )
-
             is Input.NonWitnessInput.PartiallySignedNonWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update segwit input: it has already been updated with non-segwit data"))
             is Input.FinalizedInputWithoutUtxo -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update segwit input: it has already been finalized"))
             is Input.WitnessInput.FinalizedWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update segwit input: it has already been finalized"))
@@ -162,7 +159,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 taprootInternalKey ?: input.taprootInternalKey,
                 input.unknown
             )
-
             is Input.WitnessInput.PartiallySignedWitnessInput -> input.copy(
                 txOut = inputTx.txOut[outputIndex],
                 nonWitnessUtxo = inputTx,
@@ -173,7 +169,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 taprootInternalKey = taprootInternalKey ?: input.taprootInternalKey,
                 taprootDerivationPaths = input.taprootDerivationPaths + taprootDerivationPaths
             )
-
             is Input.NonWitnessInput.PartiallySignedNonWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update segwit input: it has already been updated with non-segwit data"))
             is Input.FinalizedInputWithoutUtxo -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update segwit input: it has already been finalized"))
             is Input.WitnessInput.FinalizedWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update segwit input: it has already been finalized"))
@@ -217,7 +212,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 input.hash256,
                 input.unknown
             )
-
             is Input.NonWitnessInput.PartiallySignedNonWitnessInput -> input.copy(
                 inputTx = inputTx,
                 outputIndex = outputIndex,
@@ -225,14 +219,12 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 sighashType = sighashType ?: input.sighashType,
                 derivationPaths = input.derivationPaths + derivationPaths
             )
-
             is Input.WitnessInput.PartiallySignedWitnessInput -> input.copy(
                 nonWitnessUtxo = inputTx,
                 redeemScript = redeemScript ?: input.redeemScript,
                 sighashType = sighashType ?: input.sighashType,
                 derivationPaths = input.derivationPaths + derivationPaths
             )
-
             is Input.FinalizedInputWithoutUtxo -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update non-segwit input: it has already been finalized"))
             is Input.WitnessInput.FinalizedWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update non-segwit input: it has already been finalized"))
             is Input.NonWitnessInput.FinalizedNonWitnessInput -> return Either.Left(UpdateFailure.CannotUpdateInput(inputIndex, "cannot update non-segwit input: it has already been finalized"))
@@ -286,7 +278,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 taprootInternalKey = taprootInternalKey ?: output.taprootInternalKey,
                 taprootDerivationPaths = output.taprootDerivationPaths + taprootDerivationPaths
             )
-
             is Output.UnspecifiedOutput -> Output.WitnessOutput(
                 witnessScript,
                 redeemScript,
@@ -318,7 +309,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 redeemScript = redeemScript ?: output.redeemScript,
                 derivationPaths = output.derivationPaths + derivationPaths
             )
-
             is Output.WitnessOutput -> return Either.Left(UpdateFailure.CannotUpdateOutput(outputIndex, "cannot update non-segwit output: it has already been updated with segwit data"))
             is Output.UnspecifiedOutput -> Output.NonWitnessOutput(redeemScript, output.derivationPaths + derivationPaths, output.unknown)
         }
@@ -370,7 +360,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                     signWitness(priv, inputIndex, input, global)
                 }
             }
-
             is Input.NonWitnessInput.PartiallySignedNonWitnessInput -> {
                 if (input.inputTx.txid != txIn.outPoint.txid) {
                     Either.Left(UpdateFailure.InvalidNonWitnessUtxo("non-witness utxo does not match unsigned tx input"))
@@ -380,7 +369,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                     signNonWitness(priv, inputIndex, input, global)
                 }
             }
-
             is Input.FinalizedInputWithoutUtxo -> Either.Left(UpdateFailure.CannotSignInput(inputIndex, "cannot sign: input has already been finalized"))
             is Input.WitnessInput.FinalizedWitnessInput -> Either.Left(UpdateFailure.CannotSignInput(inputIndex, "cannot sign: input has already been finalized"))
             is Input.NonWitnessInput.FinalizedNonWitnessInput -> Either.Left(UpdateFailure.CannotSignInput(inputIndex, "cannot sign: input has already been finalized"))
@@ -396,7 +384,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
             }.getOrElse {
                 return Either.Left(UpdateFailure.InvalidNonWitnessUtxo("failed to parse redeem script"))
             }
-
             else -> {
                 // If a redeem script is provided in the partially signed input, the utxo must be a p2sh for that script.
                 val p2sh = Script.write(Script.pay2sh(input.redeemScript))
@@ -412,87 +399,66 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
     }
 
     private fun signWitness(priv: PrivateKey, inputIndex: Int, input: Input.WitnessInput.PartiallySignedWitnessInput, global: Global): Either<UpdateFailure, Pair<Input.WitnessInput.PartiallySignedWitnessInput, ByteVector>> {
-        val spentOutputs = this.inputs.mapNotNull { it.witnessUtxo ?: it.nonWitnessUtxo?.txOut?.get(this.global.tx.txIn[inputIndex].outPoint.index.toInt()) }
-        val pubkeyScript = Script.parse(input.txOut.publicKeyScript)
-
+        val pubkeyScript = runCatching {
+            Script.parse(input.txOut.publicKeyScript)
+        }.getOrElse {
+            return Either.Left(UpdateFailure.InvalidWitnessUtxo("failed to parse pubkeyScript"))
+        }
         return when {
             Script.isPay2wpkh(pubkeyScript) -> when (input.witnessScript) {
-                null -> {
-                    Either.Left(UpdateFailure.InvalidWitnessUtxo("missing witness script"))
-                }
-
+                null -> Either.Left(UpdateFailure.InvalidWitnessUtxo("missing witness script"))
                 else -> {
-                    val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, Script.write(input.witnessScript), input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
+                    val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, input.witnessScript, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
                     Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
                 }
             }
-
             Script.isPay2wsh(pubkeyScript) -> when {
-                input.witnessScript == null -> {
-                    Either.Left(UpdateFailure.InvalidWitnessUtxo("missing witness script"))
-                }
-
+                input.witnessScript == null -> Either.Left(UpdateFailure.InvalidWitnessUtxo("missing witness script"))
                 pubkeyScript != Script.pay2wsh(input.witnessScript) -> Either.Left(UpdateFailure.InvalidWitnessUtxo("witness script does not match redeemScript or scriptPubKey"))
                 else -> {
                     val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, input.witnessScript, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
                     Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
                 }
             }
-
-            Script.isPay2tr(pubkeyScript) -> when {
-                input.taprootInternalKey == null -> {
-                    Either.Left(UpdateFailure.InvalidWitnessUtxo("missing taproot internal key"))
-                }
-
+            Script.isPay2tr(pubkeyScript) -> when (input.taprootInternalKey) {
+                null -> Either.Left(UpdateFailure.InvalidWitnessUtxo("missing taproot internal key"))
                 else -> {
-                    val sig = Transaction.signInputTaprootKeyPath(priv, global.tx, inputIndex, spentOutputs, input.sighashType ?: SigHash.SIGHASH_DEFAULT, null)
-                    val sigAndSighashType = input.sighashType?.let { sig.concat(it.toByte()) } ?: sig
-                    Either.Right(Pair(input.copy(taprootKeySignature = sigAndSighashType), sigAndSighashType))
+                    // When spending taproot inputs, we include *all* of the transaction's inputs in the signed hash.
+                    val spentOutputs = this.inputs.mapIndexedNotNull { idx, txIn -> txIn.witnessUtxo ?: txIn.nonWitnessUtxo?.txOut?.get(this.global.tx.txIn[idx].outPoint.index.toInt()) }
+                    if (spentOutputs.size != this.inputs.size) {
+                        Either.Left(UpdateFailure.InvalidInput("missing txOut for one of our inputs"))
+                    } else {
+                        val sig = Transaction.signInputTaprootKeyPath(priv, global.tx, inputIndex, spentOutputs, input.sighashType ?: SigHash.SIGHASH_DEFAULT, null)
+                        val sigAndSighashType = input.sighashType?.let { sig.concat(it.toByte()) } ?: sig
+                        Either.Right(Pair(input.copy(taprootKeySignature = sigAndSighashType), sigAndSighashType))
+                    }
                 }
             }
-
             Script.isPay2sh(pubkeyScript) -> when {
-                input.redeemScript == null -> {
-                    Either.Left(UpdateFailure.InvalidWitnessUtxo("missing redeem script"))
-                }
-
-                pubkeyScript != Script.pay2sh(input.redeemScript) -> {
-                    Either.Left(UpdateFailure.InvalidWitnessUtxo("redeem script does not match witness utxo scriptPubKey"))
-                }
-
+                input.redeemScript == null -> Either.Left(UpdateFailure.InvalidWitnessUtxo("missing redeem script"))
+                pubkeyScript != Script.pay2sh(input.redeemScript) -> Either.Left(UpdateFailure.InvalidWitnessUtxo("redeem script does not match witness utxo scriptPubKey"))
                 else -> when {
                     input.witnessScript == null -> {
                         val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, input.redeemScript, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
                         Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
                     }
-
                     !Script.isPay2wpkh(input.redeemScript) && input.redeemScript != Script.pay2wsh(input.witnessScript) -> {
                         Either.Left(UpdateFailure.InvalidWitnessUtxo("witness script does not match redeemScript or scriptPubKey"))
                     }
-
                     else -> {
                         val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, input.witnessScript, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
                         Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
                     }
                 }
             }
-
             else -> {
-                val script = input.witnessScript ?: input.redeemScript ?: kotlin.runCatching { Script.parse(input.txOut.publicKeyScript) }.getOrNull()
-                when (script) {
-                    null -> {
-                        Either.Left(UpdateFailure.InvalidWitnessUtxo("failed to parse redeem script"))
-                    }
-
-                    else -> {
-                        val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, script, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
-                        Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
-                    }
-                }
+                val script = input.witnessScript ?: input.redeemScript ?: pubkeyScript
+                val sig = ByteVector(Transaction.signInput(global.tx, inputIndex, script, input.sighashType ?: SigHash.SIGHASH_ALL, input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv))
+                Either.Right(Pair(input.copy(partialSigs = input.partialSigs + (priv.publicKey() to sig)), sig))
             }
         }
     }
-    
+
     /**
      * Implements the PSBT finalizer role: finalizes a given segwit input.
      * This will clear all fields from the input except the utxo, scriptSig, scriptWitness and unknown entries.
@@ -525,7 +491,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 val finalizedInput = Input.WitnessInput.FinalizedWitnessInput(input.txOut, input.nonWitnessUtxo, scriptWitness, scriptSig, input.ripemd160, input.sha256, input.hash160, input.hash256, input.unknown)
                 Either.Right(this.copy(inputs = this.inputs.updated(inputIndex, finalizedInput)))
             }
-
             else -> Either.Left(UpdateFailure.CannotFinalizeInput(inputIndex, ("cannot finalize: input has already been finalized")))
         }
     }
@@ -561,7 +526,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 val finalizedInput = Input.NonWitnessInput.FinalizedNonWitnessInput(input.inputTx, input.outputIndex, scriptSig, input.ripemd160, input.sha256, input.hash160, input.hash256, input.unknown)
                 Either.Right(this.copy(inputs = this.inputs.updated(inputIndex, finalizedInput)))
             }
-
             else -> Either.Left(UpdateFailure.CannotFinalizeInput(inputIndex, ("cannot finalize: input has already been finalized")))
         }
     }
@@ -583,7 +547,6 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                     if (input.inputTx.txOut.size <= txIn.outPoint.index) return Either.Left(UpdateFailure.CannotExtractTx("non-witness utxo index out of bounds"))
                     input.inputTx.txOut[txIn.outPoint.index.toInt()]
                 }
-
                 is Input.WitnessInput.FinalizedWitnessInput -> input.txOut
                 else -> return Either.Left(UpdateFailure.CannotExtractTx("some utxos are missing"))
             }
@@ -785,11 +748,8 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 input.taprootKeySignature?.let { writeDataEntry(DataEntry(ByteVector("13"), it), out) }
                 sortXonlyPublicKeys(input.taprootDerivationPaths).forEach { (publicKey, path) ->
                     val key = ByteVector("16") + publicKey.value
-                    val bao = ByteArrayOutput()
-                    BtcSerializer.writeVarint(path.leaves.size, bao)
-                    path.leaves.forEach { BtcSerializer.writeBytes(it, bao) }
-                    BtcSerializer.writeBytes(ByteVector(Pack.writeInt32BE(path.masterKeyFingerprint.toInt())).concat(path.keyPath.path.map { ByteVector(Pack.writeInt32LE(it.toInt())) }), bao)
-                    writeDataEntry(DataEntry(key, bao.toByteArray().byteVector()), out)
+                    val value = path.write().byteVector()
+                    writeDataEntry(DataEntry(key, value), out)
                 }
                 input.taprootInternalKey?.let { writeDataEntry(DataEntry(ByteVector("17"), it.value), out) }
                 input.unknown.forEach { writeDataEntry(it, out) }
@@ -808,11 +768,8 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 output.taprootInternalKey?.let { writeDataEntry(DataEntry(ByteVector("05"), it.value), out) }
                 sortXonlyPublicKeys(output.taprootDerivationPaths).forEach { (publicKey, path) ->
                     val key = ByteVector("07") + publicKey.value
-                    val bao = ByteArrayOutput()
-                    BtcSerializer.writeVarint(path.leaves.size, bao)
-                    path.leaves.forEach { BtcSerializer.writeBytes(it, bao) }
-                    BtcSerializer.writeBytes(ByteVector(Pack.writeInt32BE(path.masterKeyFingerprint.toInt())).concat(path.keyPath.path.map { ByteVector(Pack.writeInt32LE(it.toInt())) }), bao)
-                    writeDataEntry(DataEntry(key, bao.toByteArray().byteVector()), out)
+                    val value = path.write().byteVector()
+                    writeDataEntry(DataEntry(key, value), out)
                 }
                 output.unknown.forEach { writeDataEntry(it, out) }
                 out.write(0x00) // separator
@@ -1025,13 +982,8 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                         it.key.size() != 33 -> return Either.Left(ParseFailure.InvalidTxInput("taproot derivation path key must contain exactly 32 bytes"))
                         else -> {
                             val xonlyPublicKey = XonlyPublicKey(it.key.drop(1).toByteArray().byteVector32())
-                            val valueInput = ByteArrayInput(it.value.toByteArray())
-                            val numLeaves = BtcSerializer.varint(valueInput).toInt()
-                            val leaves = (0 until numLeaves).map { BtcSerializer.bytes(valueInput, 32).byteVector32() }
-                            val masterKeyFingerprint = Pack.int32BE(valueInput).toLong()
-                            val childCount = (valueInput.availableBytes / 4)
-                            val paths = KeyPath((0 until childCount).map { _ -> BtcSerializer.uint32(valueInput).toLong() })
-                            xonlyPublicKey to TaprootBip32DerivationPath(leaves, masterKeyFingerprint, paths)
+                            val path = TaprootBip32DerivationPath.read(it.value.toByteArray())
+                            xonlyPublicKey to path
                         }
                     }
                 }.toMap()
@@ -1129,23 +1081,18 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 }.toMap()
                 val taprootInternalKey = known.find { it.key[0] == 0x05.toByte() }?.let {
                     when {
-                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxInput("taproot internal key entry must have an empty key"))
-                        it.value.size() != 32 -> return Either.Left(ParseFailure.InvalidTxInput("taproot internal key entry must have a 32 bytes value"))
+                        it.key.size() != 1 -> return Either.Left(ParseFailure.InvalidTxOutput("taproot internal key entry must have an empty key"))
+                        it.value.size() != 32 -> return Either.Left(ParseFailure.InvalidTxOutput("taproot internal key entry must have a 32 bytes value"))
                         else -> XonlyPublicKey(it.value.toByteArray().byteVector32())
                     }
                 }
                 val taprootDerivationPaths = known.filter { it.key[0] == 0x07.toByte() }.map {
                     when {
-                        it.key.size() != 33 -> return Either.Left(ParseFailure.InvalidTxInput("taproot derivation path key must contain exactly 32 bytes"))
+                        it.key.size() != 33 -> return Either.Left(ParseFailure.InvalidTxOutput("taproot derivation path key must contain exactly 32 bytes"))
                         else -> {
                             val xonlyPublicKey = XonlyPublicKey(it.key.drop(1).toByteArray().byteVector32())
-                            val valueInput = ByteArrayInput(it.value.toByteArray())
-                            val numLeaves = BtcSerializer.varint(valueInput).toInt()
-                            val leaves = (0 until numLeaves).map { BtcSerializer.bytes(valueInput, 32).byteVector32() }
-                            val masterKeyFingerprint = Pack.int32BE(valueInput).toLong()
-                            val childCount = (valueInput.availableBytes / 4)
-                            val paths = KeyPath((0 until childCount).map { _ -> BtcSerializer.uint32(valueInput).toLong() })
-                            xonlyPublicKey to TaprootBip32DerivationPath(leaves, masterKeyFingerprint, paths)
+                            val path = TaprootBip32DerivationPath.read(it.value.toByteArray())
+                            xonlyPublicKey to path
                         }
                     }
                 }.toMap()
@@ -1259,12 +1206,31 @@ public data class ExtendedPublicKeyWithMaster(@JvmField val prefix: Long, @JvmFi
  */
 public data class KeyPathWithMaster(@JvmField val masterKeyFingerprint: Long, @JvmField val keyPath: KeyPath)
 
-
 /**
  * @param masterKeyFingerprint fingerprint of the master key.
  * @param keyPath bip 32 derivation path.
  */
-public data class TaprootBip32DerivationPath(@JvmField val leaves: List<ByteVector32>, @JvmField val masterKeyFingerprint: Long, @JvmField val keyPath: KeyPath)
+public data class TaprootBip32DerivationPath(@JvmField val leaves: List<ByteVector32>, @JvmField val masterKeyFingerprint: Long, @JvmField val keyPath: KeyPath) {
+    public fun write(): ByteArray {
+        val out = ByteArrayOutput()
+        BtcSerializer.writeVarint(leaves.size, out)
+        leaves.forEach { BtcSerializer.writeBytes(it, out) }
+        BtcSerializer.writeBytes(ByteVector(Pack.writeInt32BE(masterKeyFingerprint.toInt())).concat(keyPath.path.map { ByteVector(Pack.writeInt32LE(it.toInt())) }), out)
+        return out.toByteArray()
+    }
+
+    public companion object {
+        public fun read(bin: ByteArray): TaprootBip32DerivationPath {
+            val input = ByteArrayInput(bin)
+            val numLeaves = BtcSerializer.varint(input).toInt()
+            val leaves = (0 until numLeaves).map { BtcSerializer.bytes(input, 32).byteVector32() }
+            val masterKeyFingerprint = Pack.int32BE(input).toLong()
+            val childCount = (input.availableBytes / 4)
+            val keyPath = KeyPath((0 until childCount).map { _ -> Pack.int32LE(input).toUInt().toLong() })
+            return TaprootBip32DerivationPath(leaves, masterKeyFingerprint, keyPath)
+        }
+    }
+}
 
 public data class DataEntry(@JvmField val key: ByteVector, @JvmField val value: ByteVector)
 

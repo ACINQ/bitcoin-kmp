@@ -24,8 +24,6 @@ import fr.acinq.bitcoin.SigHash.SIGHASH_SINGLE
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.flatMap
 import fr.acinq.secp256k1.Hex
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
 
 class PsbtTestsCommon {
@@ -158,6 +156,36 @@ class PsbtTestsCommon {
                     "70736274ff01007802000000000101268171371edff285e937adeea4b37b78000c0566cbb3ad64641713ca42171bf60000000000feffffff02d3dff505000000001976a914d0c59903c5bac2868760e90fd521a4665aa7652088ac00e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc78700b32e1300000100fda5010100000000010289a3c71eab4d20e0371bbba4cc698fa295c9463afa2e397f8533ccb62f9567e50100000017160014be18d152a9b012039daf3da7de4f53349eecb985ffffffff86f8aa43a71dff1448893a530a7237ef6b4608bbb2dd2d0171e63aec6a4890b40100000017160014fe3e9ef1a745e974d902c4355943abcb34bd5353ffffffff0200c2eb0b000000001976a91485cff1097fd9e008bb34af709c62197b38978a4888ac72fef84e2c00000017a914339725ba21efd62ac753a9bcd067d6c7a6a39d05870247304402202712be22e0270f394f568311dc7ca9a68970b8025fdd3b240229f07f8a5f3a240220018b38d7dcd314e734c9276bd6fb40f673325bc4baa144c800d2f2f02db2765c012103d2e15674941bad4a996372cb87e1856d3652606d98562fe39c5e9e7e413f210502483045022100d12b852d85dcd961d2f5f4ab660654df6eedcc794c0c33ce5cc309ffb5fce58d022067338a8e0e1725c197fb1a88af59f51e44e4255b20167c8684031c05d1f2592a01210223b72beef0965d10be0778efecd61fcac6f79a4ea169393380734464f84f2ab300000000000000"
                 )
             )
+        )
+        // PSBT with invalid taproot internal key (incorrectly serialized as compressed DER)
+        assertEquals(
+            Either.Left(ParseFailure.InvalidTxInput("taproot internal key entry must have a 32 bytes value")),
+            Psbt.read(ByteVector("70736274ff010071020000000127744ababf3027fe0d6cf23a96eee2efb188ef52301954585883e69b6624b2420000000000ffffffff02787c01000000000016001483a7e34bd99ff03a4962ef8a1a101bb295461ece606b042a010000001600147ac369df1b20e033d6116623957b0ac49f3c52e8000000000001012b00f2052a010000002251205a2c2cf5b52cf31f83ad2e8da63ff03183ecd8f609c7510ae8a48e03910a075701172102fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa232000000")),
+        )
+        // PSBT with invalid taproot key path signature that is too short
+        assertEquals(
+            Either.Left(ParseFailure.InvalidTxInput("taproot keypath signature must contain 64 or 65 bytes")),
+            Psbt.read(ByteVector("70736274ff010071020000000127744ababf3027fe0d6cf23a96eee2efb188ef52301954585883e69b6624b2420000000000ffffffff02787c01000000000016001483a7e34bd99ff03a4962ef8a1a101bb295461ece606b042a010000001600147ac369df1b20e033d6116623957b0ac49f3c52e8000000000001012b00f2052a010000002251205a2c2cf5b52cf31f83ad2e8da63ff03183ecd8f609c7510ae8a48e03910a075701133f173bb3d36c074afb716fec6307a069a2e450b995f3c82785945ab8df0e24260dcd703b0cbf34de399184a9481ac2b3586db6601f026a77f7e4938481bc3475000000")),
+        )
+        // PSBT with invalid taproot key path signature that is too long
+        assertEquals(
+            Either.Left(ParseFailure.InvalidTxInput("taproot keypath signature must contain 64 or 65 bytes")),
+            Psbt.read(ByteVector("70736274ff010071020000000127744ababf3027fe0d6cf23a96eee2efb188ef52301954585883e69b6624b2420000000000ffffffff02787c01000000000016001483a7e34bd99ff03a4962ef8a1a101bb295461ece606b042a010000001600147ac369df1b20e033d6116623957b0ac49f3c52e8000000000001012b00f2052a010000002251205a2c2cf5b52cf31f83ad2e8da63ff03183ecd8f609c7510ae8a48e03910a0757011342173bb3d36c074afb716fec6307a069a2e450b995f3c82785945ab8df0e24260dcd703b0cbf34de399184a9481ac2b3586db6601f026a77f7e4938481bc34751701aa000000")),
+        )
+        // PSBT with invalid BIP 32 taproot derivation path key that is too long (incorrectly serialized as compressed DER)
+        assertEquals(
+            Either.Left(ParseFailure.InvalidTxInput("taproot derivation path key must contain exactly 32 bytes")),
+            Psbt.read(ByteVector("70736274ff010071020000000127744ababf3027fe0d6cf23a96eee2efb188ef52301954585883e69b6624b2420000000000ffffffff02787c01000000000016001483a7e34bd99ff03a4962ef8a1a101bb295461ece606b042a010000001600147ac369df1b20e033d6116623957b0ac49f3c52e8000000000001012b00f2052a010000002251205a2c2cf5b52cf31f83ad2e8da63ff03183ecd8f609c7510ae8a48e03910a0757221602fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa2321900772b2da75600008001000080000000800100000000000000000000")),
+        )
+        // PSBT with invalid taproot internal key that is too long (incorrectly serialized as compressed DER)
+        assertEquals(
+            Either.Left(ParseFailure.InvalidTxOutput("taproot internal key entry must have a 32 bytes value")),
+            Psbt.read(ByteVector("70736274ff01007d020000000127744ababf3027fe0d6cf23a96eee2efb188ef52301954585883e69b6624b2420000000000ffffffff02887b0100000000001600142382871c7e8421a00093f754d91281e675874b9f606b042a010000002251205a2c2cf5b52cf31f83ad2e8da63ff03183ecd8f609c7510ae8a48e03910a0757000000000001012b00f2052a010000002251205a2c2cf5b52cf31f83ad2e8da63ff03183ecd8f609c7510ae8a48e03910a0757000001052102fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa23200")),
+        )
+        // PSBT with invalid BIP 32 taproot derivation path key that is too long (incorrectly serialized as compressed DER)
+        assertEquals(
+            Either.Left(ParseFailure.InvalidTxOutput("taproot derivation path key must contain exactly 32 bytes")),
+            Psbt.read(ByteVector("70736274ff01007d020000000127744ababf3027fe0d6cf23a96eee2efb188ef52301954585883e69b6624b2420000000000ffffffff02887b0100000000001600142382871c7e8421a00093f754d91281e675874b9f606b042a010000002251205a2c2cf5b52cf31f83ad2e8da63ff03183ecd8f609c7510ae8a48e03910a0757000000000001012b00f2052a010000002251205a2c2cf5b52cf31f83ad2e8da63ff03183ecd8f609c7510ae8a48e03910a07570000220702fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa2321900772b2da7560000800100008000000080010000000000000000")),
         )
         /** ADDITIONAL TEST VECTORS */
         // PSBT missing inputs
@@ -424,6 +452,60 @@ class PsbtTestsCommon {
             assertTrue(psbt.inputs.isEmpty())
             assertEquals(psbt.outputs.size, 2)
             psbt.outputs.forEach { verifyEmptyOutput(it) }
+            assertEquals(Psbt.write(psbt), bin)
+        }
+        run {
+            // PSBT with one P2TR key only input with internal key and its derivation path
+            val bin = ByteVector(
+                "70736274ff010052020000000127744ababf3027fe0d6cf23a96eee2efb188ef52301954585883e69b6624b2420000000000ffffffff0148e6052a01000000160014768e1eeb4cf420866033f80aceff0f9720744969000000000001012b00f2052a010000002251205a2c2cf5b52cf31f83ad2e8da63ff03183ecd8f609c7510ae8a48e03910a07572116fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa2321900772b2da75600008001000080000000800100000000000000011720fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa232002202036b772a6db74d8753c98a827958de6c78ab3312109f37d3e0304484242ece73d818772b2da7540000800100008000000080000000000000000000"
+            )
+            val result = Psbt.read(bin)
+            assertTrue(result.isRight)
+            val psbt = result.right!!
+            verifyNoUnknown(psbt)
+            assertEquals(psbt.inputs.size, 1)
+            val internalKey = XonlyPublicKey(ByteVector32("fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa232"))
+            assertEquals(psbt.inputs.first().taprootInternalKey, internalKey)
+            assertEquals(psbt.inputs.first().taprootDerivationPaths[internalKey], TaprootBip32DerivationPath(listOf(), 1999318439L, KeyPath("m/86'/1'/0'/1/0")))
+            assertNull(psbt.inputs.first().taprootKeySignature)
+            assertEquals(psbt.outputs.size, 1)
+            assertEquals(Psbt.write(psbt), bin)
+        }
+        run {
+            // PSBT with one P2TR key only input with internal key, its derivation path, and signature
+            val bin = ByteVector(
+                "70736274ff010052020000000127744ababf3027fe0d6cf23a96eee2efb188ef52301954585883e69b6624b2420000000000ffffffff0148e6052a01000000160014768e1eeb4cf420866033f80aceff0f9720744969000000000001012b00f2052a010000002251205a2c2cf5b52cf31f83ad2e8da63ff03183ecd8f609c7510ae8a48e03910a0757011340bb53ec917bad9d906af1ba87181c48b86ace5aae2b53605a725ca74625631476fc6f5baedaf4f2ee0f477f36f58f3970d5b8273b7e497b97af2e3f125c97af342116fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa2321900772b2da75600008001000080000000800100000000000000011720fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa232002202036b772a6db74d8753c98a827958de6c78ab3312109f37d3e0304484242ece73d818772b2da7540000800100008000000080000000000000000000"
+            )
+            val result = Psbt.read(bin)
+            assertTrue(result.isRight)
+            val psbt = result.right!!
+            verifyNoUnknown(psbt)
+            assertEquals(psbt.inputs.size, 1)
+            val internalKey = XonlyPublicKey(ByteVector32("fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa232"))
+            assertEquals(psbt.inputs.first().taprootInternalKey, internalKey)
+            assertEquals(psbt.inputs.first().taprootDerivationPaths[internalKey], TaprootBip32DerivationPath(listOf(), 1999318439L, KeyPath("m/86'/1'/0'/1/0")))
+            assertEquals(psbt.inputs.first().taprootKeySignature, ByteVector("bb53ec917bad9d906af1ba87181c48b86ace5aae2b53605a725ca74625631476fc6f5baedaf4f2ee0f477f36f58f3970d5b8273b7e497b97af2e3f125c97af34"))
+            assertEquals(psbt.outputs.size, 1)
+            assertEquals(Psbt.write(psbt), bin)
+        }
+        run {
+            // PSBT with one P2TR key only output with internal key and its derivation path
+            val bin = ByteVector(
+                "70736274ff01005e020000000127744ababf3027fe0d6cf23a96eee2efb188ef52301954585883e69b6624b2420000000000ffffffff0148e6052a0100000022512083698e458c6664e1595d75da2597de1e22ee97d798e706c4c0a4b5a9823cd743000000000001012b00f2052a010000002251205a2c2cf5b52cf31f83ad2e8da63ff03183ecd8f609c7510ae8a48e03910a07572116fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa2321900772b2da75600008001000080000000800100000000000000011720fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa232000105201124da7aec92ccd06c954562647f437b138b95721a84be2bf2276bbddab3e67121071124da7aec92ccd06c954562647f437b138b95721a84be2bf2276bbddab3e6711900772b2da7560000800100008000000080000000000500000000"
+            )
+            val result = Psbt.read(bin)
+            assertTrue(result.isRight)
+            val psbt = result.right!!
+            verifyNoUnknown(psbt)
+            assertEquals(psbt.inputs.size, 1)
+            val inputInternalKey = XonlyPublicKey(ByteVector32("fe349064c98d6e2a853fa3c9b12bd8b304a19c195c60efa7ee2393046d3fa232"))
+            assertEquals(psbt.inputs.first().taprootInternalKey, inputInternalKey)
+            assertEquals(psbt.inputs.first().taprootDerivationPaths[inputInternalKey], TaprootBip32DerivationPath(listOf(), 1999318439L, KeyPath("m/86'/1'/0'/1/0")))
+            assertNull(psbt.inputs.first().taprootKeySignature)
+            assertEquals(psbt.outputs.size, 1)
+            val outputInternalKey = XonlyPublicKey(ByteVector32("1124da7aec92ccd06c954562647f437b138b95721a84be2bf2276bbddab3e671"))
+            assertEquals(psbt.outputs.first().taprootInternalKey, outputInternalKey)
+            assertEquals(psbt.outputs.first().taprootDerivationPaths[outputInternalKey], TaprootBip32DerivationPath(listOf(), 1999318439L, KeyPath("m/86'/1'/0'/0/5")))
             assertEquals(Psbt.write(psbt), bin)
         }
     }
@@ -1220,15 +1302,12 @@ class PsbtTestsCommon {
         assertEquals(updated.outputs[1].derivationPaths, mapOf(priv2.publicKey() to KeyPathWithMaster(0, KeyPath("m/7'"))))
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
-    private fun readPsbt(base64: String): Psbt = Psbt.read(Base64.decode(StringBuilder(base64))).right!!
-
     @Test
     fun `update and sign BIP84 transactions`() {
         val (_, xprv) = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPcxF57E46D8PbHjCT52N8k3MMv866bLMSb8JE5WyQfmTwZysBpCM2GxPjnHaj2rknNASmQXzACfXv6WSGCYTgHrVqjFFFLkZ")
         val unsigned =
-            "cHNidP8BAJoCAAAAAk9/vNA/BH6KortUyvRY2vwTyXJIj7gk0H9IqLUrgzfBAAAAAAD9////gToNNEw2bL6QvOs2jkyKddHoJirxi4rCXrMTE1v+ReYAAAAAAP3///8CADtMAAAAAAAWABRAQtq+BJH+5C8o6/TnlJLJqQeBgUB4fQEAAAAAFgAUIc3AXNCi5djPdVHJa/mgkpEI04wAAAAAAAEAcQIAAAABdSEVHlJ9Ew9DAOcKbHiwjChVe+5PcPNThXdhk3mdD2YBAAAAAP3///8CAC0xAQAAAAAWABReCUIlAdwsMi1K4Fo1h48jv+au+GAXPCgBAAAAFgAU9DPe48u3pTRG0fdURX+4iPVjATiGAAAAAQEfAC0xAQAAAAAWABReCUIlAdwsMi1K4Fo1h48jv+au+CIGAoTn1edGP2J/n+wBG1X+7wLkW2QvytthcpL18w6nfZUeGBptno9UAACAAQAAgAAAAIAAAAAABAAAAAABAHECAAAAAWVylKM/oSuybxSZTFuCDpaQQtQbn6ryUoHlnCixBHVOAQAAAAD9////AoCWmAAAAAAAFgAUJIPtpCTZrH7xfUzaGOCPu833FutgFzwoAQAAABYAFLQYho7ZH1c4eTEi5Weist4VYeGrmQAAAAEBH4CWmAAAAAAAFgAUJIPtpCTZrH7xfUzaGOCPu833FusiBgOQNU/Ja9jwChLrkTcpjgDflY/HJ3PiBLLFbelWHiR/ghgabZ6PVAAAgAEAAIAAAACAAAAAAAMAAAAAIgIDUWh+lhIj3q3i7d5FQ0bo6rKFCCmun7KvXithtO/vjAwYGm2ej1QAAIABAACAAAAAgAEAAAAEAAAAACICAqZl0TkJI9ELk6ENXE4AB/Ks4D3Q/fZUFDrE9R6lwBTeGBptno9UAACAAQAAgAAAAIABAAAAAwAAAAA="
-        val psbt = readPsbt(unsigned)
+            "70736274ff01009a02000000024f7fbcd03f047e8aa2bb54caf458dafc13c972488fb824d07f48a8b52b8337c10000000000fdffffff813a0d344c366cbe90bceb368e4c8a75d1e8262af18b8ac25eb313135bfe45e60000000000fdffffff02003b4c00000000001600144042dabe0491fee42f28ebf4e79492c9a907818140787d010000000016001421cdc05cd0a2e5d8cf7551c96bf9a0929108d38c000000000001007102000000017521151e527d130f4300e70a6c78b08c28557bee4f70f35385776193799d0f660100000000fdffffff02002d3101000000001600145e09422501dc2c322d4ae05a35878f23bfe6aef860173c2801000000160014f433dee3cbb7a53446d1f754457fb888f56301388600000001011f002d3101000000001600145e09422501dc2c322d4ae05a35878f23bfe6aef822060284e7d5e7463f627f9fec011b55feef02e45b642fcadb617292f5f30ea77d951e181a6d9e8f5400008001000080000000800000000004000000000100710200000001657294a33fa12bb26f14994c5b820e969042d41b9faaf25281e59c28b104754e0100000000fdffffff0280969800000000001600142483eda424d9ac7ef17d4cda18e08fbbcdf716eb60173c2801000000160014b418868ed91f5738793122e567a2b2de1561e1ab9900000001011f80969800000000001600142483eda424d9ac7ef17d4cda18e08fbbcdf716eb22060390354fc96bd8f00a12eb9137298e00df958fc72773e204b2c56de9561e247f82181a6d9e8f54000080010000800000008000000000030000000022020351687e961223deade2edde454346e8eab2850829ae9fb2af5e2b61b4efef8c0c181a6d9e8f540000800100008000000080010000000400000000220202a665d1390923d10b93a10d5c4e0007f2ace03dd0fdf654143ac4f51ea5c014de181a6d9e8f540000800100008000000080010000000300000000"
+        val psbt = readValidPsbt(unsigned)
         // all inputs our ours
         psbt.inputs.forEach { input ->
             val spentAddress = Bitcoin.addressFromPublicKeyScript(Block.RegtestGenesisBlock.hash, input.witnessUtxo!!.publicKeyScript.toByteArray()).right!!
@@ -1241,7 +1320,7 @@ class PsbtTestsCommon {
         }
         // output #0 is ours
         run {
-            val output = psbt.outputs.get(0)
+            val output = psbt.outputs[0]
             assertEquals(1, output.derivationPaths.size)
             val pub = output.derivationPaths.keys.first()
             val path = output.derivationPaths.values.first().keyPath
@@ -1250,8 +1329,8 @@ class PsbtTestsCommon {
         }
         val privateKey0 = DeterministicWallet.derivePrivateKey(xprv, "m/84'/1'/0'/0/4").privateKey
         val privateKey1 = DeterministicWallet.derivePrivateKey(xprv, "m/84'/1'/0'/0/3").privateKey
-        val signedTx = psbt.updateWitnessInput(psbt.global.tx.txIn.get(0).outPoint, psbt.inputs[0].witnessUtxo!!, witnessScript = Script.pay2pkh(privateKey0.publicKey()))
-            .flatMap { it.updateWitnessInput(psbt.global.tx.txIn.get(1).outPoint, psbt.inputs[1].witnessUtxo!!, witnessScript = Script.pay2pkh(privateKey1.publicKey())) }
+        val signedTx = psbt.updateWitnessInput(psbt.global.tx.txIn[0].outPoint, psbt.inputs[0].witnessUtxo!!, witnessScript = Script.pay2pkh(privateKey0.publicKey()))
+            .flatMap { it.updateWitnessInput(psbt.global.tx.txIn[1].outPoint, psbt.inputs[1].witnessUtxo!!, witnessScript = Script.pay2pkh(privateKey1.publicKey())) }
             .flatMap { it.sign(privateKey0, 0) }
             .flatMap { it.psbt.sign(privateKey1, 1) }
             .flatMap {
@@ -1272,8 +1351,8 @@ class PsbtTestsCommon {
     fun `update and sign BIP86 transactions`() {
         val (_, xprv) = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPcxF57E46D8PbHjCT52N8k3MMv866bLMSb8JE5WyQfmTwZysBpCM2GxPjnHaj2rknNASmQXzACfXv6WSGCYTgHrVqjFFFLkZ")
         val unsigned =
-            "cHNidP8BALICAAAAAnUhFR5SfRMPQwDnCmx4sIwoVXvuT3DzU4V3YZN5nQ9mAAAAAAD9////ZXKUoz+hK7JvFJlMW4IOlpBC1BufqvJSgeWcKLEEdU4AAAAAAP3///8CQHh9AQAAAAAiUSAch/yYu5X/xhIE0dJBpxXmcoO7apfuWe9h5r8TUgarmrA6TAAAAAAAIlEgumvX915DsXN95wy9i1NwNIHRD5FvsZS0MhYJSc6scEMAAAAAAAEBK4CWmAAAAAAAIlEgA5k6sLVM+T6e9de+9yNooBVxOTk7z66oI/d6zSK2KD4hFsLRgzgW8EenrwQnN/PEbArhJKNuS9ReeGO20zZ+Wg42GQAabZ6PVgAAgAEAAIAAAACAAAAAAAAAAAABFyDC0YM4FvBHp68EJzfzxGwK4SSjbkvUXnhjttM2floONgABASsALTEBAAAAACJRIJ2xWJk+z3wCH+bPz6YWMzwpL64NCTbnGfGEj43RURvwIRZ5NDy7Cbeva2F/gQNs7M+iMbpZS2Hzi+KLLTwnE7ozJhkAGm2ej1YAAIABAACAAAAAgAAAAAABAAAAARcgeTQ8uwm3r2thf4EDbOzPojG6WUth84viiy08JxO6MyYAAQUgeLISjnykqyiWLXYOkmgNeyCwi4+YZ6hfz9qPzarjrsIhB3iyEo58pKsoli12DpJoDXsgsIuPmGeoX8/aj82q467CGQAabZ6PVgAAgAEAAIAAAACAAQAAAAAAAAAAAQUg+5RjG+KiYu+L/qzi6MhAxq+zbB0bLXmgMBK4bF2xxcwhB/uUYxviomLvi/6s4ujIQMavs2wdGy15oDASuGxdscXMGQAabZ6PVgAAgAEAAIAAAACAAQAAAAEAAAAA"
-        val psbt = readPsbt(unsigned)
+            "70736274ff0100b202000000027521151e527d130f4300e70a6c78b08c28557bee4f70f35385776193799d0f660000000000fdffffff657294a33fa12bb26f14994c5b820e969042d41b9faaf25281e59c28b104754e0000000000fdffffff0240787d01000000002251201c87fc98bb95ffc61204d1d241a715e67283bb6a97ee59ef61e6bf135206ab9ab03a4c0000000000225120ba6bd7f75e43b1737de70cbd8b53703481d10f916fb194b432160949ceac7043000000000001012b809698000000000022512003993ab0b54cf93e9ef5d7bef72368a0157139393bcfaea823f77acd22b6283e2116c2d1833816f047a7af042737f3c46c0ae124a36e4bd45e7863b6d3367e5a0e3619001a6d9e8f5600008001000080000000800000000000000000011720c2d1833816f047a7af042737f3c46c0ae124a36e4bd45e7863b6d3367e5a0e360001012b002d3101000000002251209db158993ecf7c021fe6cfcfa616333c292fae0d0936e719f1848f8dd1511bf0211679343cbb09b7af6b617f81036ceccfa231ba594b61f38be28b2d3c2713ba332619001a6d9e8f560000800100008000000080000000000100000001172079343cbb09b7af6b617f81036ceccfa231ba594b61f38be28b2d3c2713ba33260001052078b2128e7ca4ab28962d760e92680d7b20b08b8f9867a85fcfda8fcdaae3aec2210778b2128e7ca4ab28962d760e92680d7b20b08b8f9867a85fcfda8fcdaae3aec219001a6d9e8f560000800100008000000080010000000000000000010520fb94631be2a262ef8bfeace2e8c840c6afb36c1d1b2d79a03012b86c5db1c5cc2107fb94631be2a262ef8bfeace2e8c840c6afb36c1d1b2d79a03012b86c5db1c5cc19001a6d9e8f560000800100008000000080010000000100000000"
+        val psbt = readValidPsbt(unsigned)
         // all inputs our ours
         psbt.inputs.forEach { input ->
             val spentAddress = Bitcoin.addressFromPublicKeyScript(Block.RegtestGenesisBlock.hash, input.witnessUtxo!!.publicKeyScript.toByteArray()).right!!
@@ -1286,7 +1365,7 @@ class PsbtTestsCommon {
         }
         // output #0 is ours
         run {
-            val output = psbt.outputs.get(0)
+            val output = psbt.outputs[0]
             val path = output.taprootDerivationPaths[output.taprootInternalKey!!]!!
             val privateKey = DeterministicWallet.derivePrivateKey(xprv, path.keyPath)
             assertEquals(output.taprootInternalKey!!, privateKey.publicKey.xOnly())
@@ -1313,19 +1392,24 @@ class PsbtTestsCommon {
     fun `build and sign a BIP86 psbt`() {
         val seed = ByteVector.fromHex("0101010101010101010101010101010101010101010101010101010101010101")
         val master = DeterministicWallet.generate(seed)
-
-        // create a watch-only BIP84 wallet from our key manager xpub
+        // Create a BIP86 wallet from our key manager xpub.
         val mainPriv = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0")
-        val mainPub = DeterministicWallet.publicKey(mainPriv)
 
         fun getPrivateKey(index: Long) = DeterministicWallet.derivePrivateKey(mainPriv, index).privateKey
 
-        fun getPublicKey(index: Long) = DeterministicWallet.derivePublicKey(mainPub, index).publicKey.xOnly()
+        fun getPublicKey(index: Long) = DeterministicWallet.derivePublicKey(mainPriv.extendedPublicKey, index).publicKey.xOnly()
 
+        // We also include a non-segwit input in our transaction.
+        val p2pkhPriv = DeterministicWallet.derivePrivateKey(master, "84'/1'/0'/0/0").privateKey
+
+        // We make sure our utxos come from transactions with multiple outputs and are at different indices.
         val utxos = listOf(
-            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(Satoshi(1_000_000), Script.pay2tr(getPublicKey(0), null as ScriptTree?))), lockTime = 0),
-            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(Satoshi(1_100_000), Script.pay2tr(getPublicKey(1), null as ScriptTree?))), lockTime = 0),
-            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(Satoshi(1_200_000), Script.pay2tr(getPublicKey(2), null as ScriptTree?))), lockTime = 0),
+            // @formatter:off
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(100_000.sat(), Script.pay2tr(getPublicKey(0), scripts = null))), lockTime = 0),
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(110_000.sat(), Script.pay2tr(getPublicKey(1), scripts = null)), TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef")))), lockTime = 0),
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(200_000.sat(), Script.pay2tr(getPublicKey(2), scripts = null))), lockTime = 0),
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(50_000.sat(), Script.pay2pkh(p2pkhPriv.publicKey()))), lockTime = 0),
+            // @formatter:on
         )
         val bip32paths = listOf(
             TaprootBip32DerivationPath(listOf(), 0, KeyPath("m/86'/1'/0'/0/0")),
@@ -1333,19 +1417,26 @@ class PsbtTestsCommon {
             TaprootBip32DerivationPath(listOf(), 0, KeyPath("m/86'/1'/0'/0/2")),
         )
 
-        val tx = Transaction(
-            version = 2,
-            txIn = utxos.map { TxIn(OutPoint(it, 0), TxIn.SEQUENCE_FINAL) },
-            txOut = listOf(TxOut(Satoshi(1000_000), Script.pay2tr(getPublicKey(0)))),
-            lockTime = 0
+        val psbt = Psbt(
+            tx = Transaction(
+                version = 2,
+                txIn = listOf(
+                    TxIn(OutPoint(utxos[0], 1), TxIn.SEQUENCE_FINAL),
+                    TxIn(OutPoint(utxos[1], 0), TxIn.SEQUENCE_FINAL),
+                    TxIn(OutPoint(utxos[2], 3), TxIn.SEQUENCE_FINAL),
+                    TxIn(OutPoint(utxos[3], 1), TxIn.SEQUENCE_FINAL),
+                ),
+                txOut = listOf(TxOut(450_000.sat(), Script.pay2tr(getPublicKey(0)))),
+                lockTime = 0
+            )
         )
-
-        val updated = Psbt(tx)
-            .updateWitnessInput(OutPoint(utxos[0], 0), utxos[0].txOut[0], taprootInternalKey = getPublicKey(0), taprootDerivationPaths = mapOf(getPublicKey(0) to bip32paths[0]))
+        val updated = psbt
+            .updateWitnessInput(OutPoint(utxos[0], 1), utxos[0].txOut[1], taprootInternalKey = getPublicKey(0), taprootDerivationPaths = mapOf(getPublicKey(0) to bip32paths[0]))
             .flatMap { it.updateWitnessInput(OutPoint(utxos[1], 0), utxos[1].txOut[0], taprootInternalKey = getPublicKey(1), taprootDerivationPaths = mapOf(getPublicKey(1) to bip32paths[1])) }
-            .flatMap { it.updateWitnessInput(OutPoint(utxos[2], 0), utxos[2].txOut[0], taprootInternalKey = getPublicKey(2), taprootDerivationPaths = mapOf(getPublicKey(2) to bip32paths[2])) }
+            .flatMap { it.updateWitnessInput(OutPoint(utxos[2], 3), utxos[2].txOut[3], taprootInternalKey = getPublicKey(2), taprootDerivationPaths = mapOf(getPublicKey(2) to bip32paths[2])) }
+            .flatMap { it.updateNonWitnessInput(utxos[3], 1) }
             .flatMap { it.updateWitnessOutput(0, taprootInternalKey = getPublicKey(0), taprootDerivationPaths = mapOf(getPublicKey(0) to bip32paths[0])) }
-        updated.right!!.inputs.forEach {
+        updated.right!!.inputs.take(3).forEach {
             val bip32path = it.taprootDerivationPaths[it.taprootInternalKey!!]!!.keyPath
             val priv = DeterministicWallet.derivePrivateKey(master, bip32path)
             assertEquals(priv.publicKey.xOnly(), it.taprootInternalKey!!)
@@ -1357,6 +1448,8 @@ class PsbtTestsCommon {
             .flatMap { it.psbt.finalizeWitnessInput(1, ScriptWitness(listOf(it.sig))) }
             .flatMap { it.sign(getPrivateKey(2), 2) }
             .flatMap { it.psbt.finalizeWitnessInput(2, ScriptWitness(listOf(it.sig))) }
+            .flatMap { it.sign(p2pkhPriv, 3) }
+            .flatMap { it.psbt.finalizeNonWitnessInput(3, listOf(OP_PUSHDATA(it.sig), OP_PUSHDATA(p2pkhPriv.publicKey()))) }
         val extracted = signed.right!!.extract()
         Transaction.correctlySpends(extracted.right!!, utxos, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }

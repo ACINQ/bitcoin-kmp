@@ -67,7 +67,7 @@ public object Descriptor {
     }
 
     private fun getBIP84KeyPath(chainHash: BlockHash): Pair<String, Int> = when (chainHash) {
-        Block.RegtestGenesisBlock.hash, Block.TestnetGenesisBlock.hash -> "84'/1'/0'/0" to DeterministicWallet.tpub
+        Block.Testnet4GenesisBlock.hash, Block.Testnet3GenesisBlock.hash, Block.RegtestGenesisBlock.hash -> "84'/1'/0'/0" to DeterministicWallet.tpub
         Block.LivenetGenesisBlock.hash -> "84'/0'/0'/0" to DeterministicWallet.xpub
         else -> error("invalid chain hash $chainHash")
     }

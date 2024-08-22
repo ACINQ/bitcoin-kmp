@@ -116,7 +116,7 @@ public object Bitcoin {
                 Script.isPay2pkh(pubkeyScript) -> {
                     val prefix = when (chainHash) {
                         Block.LivenetGenesisBlock.hash -> Base58.Prefix.PubkeyAddress
-                        Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> Base58.Prefix.PubkeyAddressTestnet
+                        Block.Testnet4GenesisBlock.hash, Block.Testnet3GenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> Base58.Prefix.PubkeyAddressTestnet
                         else -> return Either.Left(BitcoinError.InvalidChainHash)
                     }
                     Either.Right(Base58Check.encode(prefix, (pubkeyScript[2] as OP_PUSHDATA).data))
@@ -125,7 +125,7 @@ public object Bitcoin {
                 Script.isPay2sh(pubkeyScript) -> {
                     val prefix = when (chainHash) {
                         Block.LivenetGenesisBlock.hash -> Base58.Prefix.ScriptAddress
-                        Block.TestnetGenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> Base58.Prefix.ScriptAddressTestnet
+                        Block.Testnet4GenesisBlock.hash, Block.Testnet3GenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> Base58.Prefix.ScriptAddressTestnet
                         else -> return Either.Left(BitcoinError.InvalidChainHash)
                     }
                     Either.Right(Base58Check.encode(prefix, (pubkeyScript[1] as OP_PUSHDATA).data))
@@ -204,13 +204,13 @@ public object Bitcoin {
         return runCatching { Base58Check.decode(address) }.fold(
             onSuccess = {
                 when {
-                    it.first == Base58.Prefix.PubkeyAddressTestnet && (chainHash == Block.TestnetGenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash || chainHash == Block.SignetGenesisBlock.hash) ->
+                    it.first == Base58.Prefix.PubkeyAddressTestnet && (chainHash == Block.Testnet4GenesisBlock.hash || chainHash == Block.Testnet3GenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash || chainHash == Block.SignetGenesisBlock.hash) ->
                         Either.Right(Script.pay2pkh(it.second))
 
                     it.first == Base58.Prefix.PubkeyAddress && chainHash == Block.LivenetGenesisBlock.hash ->
                         Either.Right(Script.pay2pkh(it.second))
 
-                    it.first == Base58.Prefix.ScriptAddressTestnet && (chainHash == Block.TestnetGenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash || chainHash == Block.SignetGenesisBlock.hash) ->
+                    it.first == Base58.Prefix.ScriptAddressTestnet && (chainHash == Block.Testnet4GenesisBlock.hash || chainHash == Block.Testnet3GenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash || chainHash == Block.SignetGenesisBlock.hash) ->
                         Either.Right(listOf(OP_HASH160, OP_PUSHDATA(it.second), OP_EQUAL))
 
                     it.first == Base58.Prefix.ScriptAddress && chainHash == Block.LivenetGenesisBlock.hash ->
@@ -227,7 +227,8 @@ public object Bitcoin {
                             witnessVersion == null -> Either.Left(BitcoinError.InvalidWitnessVersion(it.second.toInt()))
                             it.third.size != 20 && it.third.size != 32 -> Either.Left(BitcoinError.InvalidBech32Address)
                             it.first == "bc" && chainHash == Block.LivenetGenesisBlock.hash -> Either.Right(listOf(witnessVersion, OP_PUSHDATA(it.third)))
-                            it.first == "tb" && chainHash == Block.TestnetGenesisBlock.hash -> Either.Right(listOf(witnessVersion, OP_PUSHDATA(it.third)))
+                            it.first == "tb" && chainHash == Block.Testnet4GenesisBlock.hash -> Either.Right(listOf(witnessVersion, OP_PUSHDATA(it.third)))
+                            it.first == "tb" && chainHash == Block.Testnet3GenesisBlock.hash -> Either.Right(listOf(witnessVersion, OP_PUSHDATA(it.third)))
                             it.first == "tb" && chainHash == Block.SignetGenesisBlock.hash -> Either.Right(listOf(witnessVersion, OP_PUSHDATA(it.third)))
                             it.first == "bcrt" && chainHash == Block.RegtestGenesisBlock.hash -> Either.Right(listOf(witnessVersion, OP_PUSHDATA(it.third)))
                             else -> Either.Left(BitcoinError.ChainHashMismatch)
@@ -244,12 +245,14 @@ public object Bitcoin {
 
 public sealed class Chain(public val name: String, private val genesis: Block) {
     public object Regtest : Chain("Regtest", Block.RegtestGenesisBlock)
-    public object Testnet : Chain("Testnet", Block.TestnetGenesisBlock)
+    public object Testnet3 : Chain("Testnet3", Block.Testnet3GenesisBlock)
+    public object Testnet4 : Chain("Testnet4", Block.Testnet4GenesisBlock)
     public object Signet : Chain("Signet", Block.SignetGenesisBlock)
     public object Mainnet : Chain("Mainnet", Block.LivenetGenesisBlock)
 
     public fun isMainnet(): Boolean = this is Mainnet
-    public fun isTestnet(): Boolean = this is Testnet
+    public fun isTestnet3(): Boolean = this is Testnet3
+    public fun isTestnet4(): Boolean = this is Testnet4
 
     public val chainHash: BlockHash get() = genesis.hash
 

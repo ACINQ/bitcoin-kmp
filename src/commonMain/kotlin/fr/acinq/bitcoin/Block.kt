@@ -394,10 +394,6 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
         )
 
         @JvmField
-        @Deprecated("testnet is the deprecated testnet3 network, use testnet3 explicitly", replaceWith = ReplaceWith("Block.Testnet3GenesisBlock", "fr.acinq.bitcoin.Block"))
-        public val TestnetGenesisBlock: Block = Testnet3GenesisBlock
-
-        @JvmField
         public val Testnet4GenesisBlock: Block = run {
             val script = listOf(
                 OP_PUSHDATA(writeUInt32(486604799u)),

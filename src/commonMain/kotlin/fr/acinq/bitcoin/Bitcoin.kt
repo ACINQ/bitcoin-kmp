@@ -245,13 +245,13 @@ public object Bitcoin {
 
 public sealed class Chain(public val name: String, private val genesis: Block) {
     public object Regtest : Chain("Regtest", Block.RegtestGenesisBlock)
-    public object Testnet : Chain("Testnet", Block.Testnet3GenesisBlock)
+    public object Testnet3 : Chain("Testnet3", Block.Testnet3GenesisBlock)
     public object Testnet4 : Chain("Testnet4", Block.Testnet4GenesisBlock)
     public object Signet : Chain("Signet", Block.SignetGenesisBlock)
     public object Mainnet : Chain("Mainnet", Block.LivenetGenesisBlock)
 
     public fun isMainnet(): Boolean = this is Mainnet
-    public fun isTestnet(): Boolean = this is Testnet || this is Testnet4
+    public fun isTestnet3(): Boolean = this is Testnet3
     public fun isTestnet4(): Boolean = this is Testnet4
 
     public val chainHash: BlockHash get() = genesis.hash

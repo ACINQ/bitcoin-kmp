@@ -1,10 +1,12 @@
 import org.jetbrains.dokka.Platform
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "1.9.23"
+    kotlin("multiplatform") version "2.0.20"
     id("org.jetbrains.dokka") version "1.9.20"
     `maven-publish`
 }
@@ -24,15 +26,16 @@ kotlin {
     explicitApi()
 
     jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_1_8)
         }
     }
 
     linuxX64()
 
     macosX64()
-    
+
     macosArm64()
 
     iosX64 {
@@ -48,7 +51,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.15.0"
+        val secp256k1KmpVersion = "0.16.0-SNAPSHOT"
 
         val commonMain by getting {
             dependencies {
@@ -60,7 +63,7 @@ kotlin {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
                 implementation("org.kodein.memory:klio-files:0.12.0")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.0")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
             }
         }
 
@@ -83,15 +86,12 @@ kotlin {
     }
 
     // Configure all compilations of all targets:
-    targets.all {
-        compilations.all {
-            kotlinOptions {
-                allWarningsAsErrors = true
-                // We use expect/actual for classes (see Chacha20Poly1305CipherFunctions). This feature is in beta and raises a warning.
-                // See https://youtrack.jetbrains.com/issue/KT-61573
-                kotlinOptions.freeCompilerArgs += "-Xexpect-actual-classes"
-            }
-        }
+    @OptIn(ExperimentalKotlinGradlePluginApi::class)
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+        // We use expect/actual for classes (see Chacha20Poly1305CipherFunctions). This feature is in beta and raises a warning.
+        // See https://youtrack.jetbrains.com/issue/KT-61573
+        freeCompilerArgs.add("-Xexpect-actual-classes")
     }
 }
 

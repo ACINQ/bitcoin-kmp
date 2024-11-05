@@ -16,13 +16,12 @@
 
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.reference.TransactionTestsCommon
 import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
-import org.kodein.memory.file.openReadableFile
-import org.kodein.memory.file.resolve
-import org.kodein.memory.text.readLine
-import org.kodein.memory.use
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readLine
 import kotlin.random.Random
 import kotlin.test.*
 
@@ -207,7 +206,6 @@ class CryptoTestsCommon {
         val publicKey = privateKey.publicKey()
         val shared = Crypto.ecdh(privateKey, publicKey)
         assertEquals("56bc84cffc7db1ca04046fc04ec8f84232c340be789bc4779d221fe8b978af06", Hex.encode(shared))
-
         val random = Random
         val privateKey1 = PrivateKey(random.nextBytes(32))
         val privateKey2 = PrivateKey(random.nextBytes(32))
@@ -257,29 +255,28 @@ class CryptoTestsCommon {
         var pub: PublicKey? = null
         var sig: ByteVector? = null
         var recid: Int
-        val file = TransactionTestsCommon.resourcesDir().resolve("recid.txt")
-        file.openReadableFile().use {
-            while (true) {
-                val line = it.readLine() ?: return
-                val values = line.split(" = ")
-                val lhs = values[0]
-                val rhs = values[1]
-                when (lhs) {
-                    "privkey" -> priv = PrivateKey(ByteVector(rhs).toByteArray())
-                    "message" -> message = ByteVector(rhs)
-                    "pubkey" -> pub = PublicKey(ByteVector(rhs))
-                    "sig" -> sig = run {
-                        val reversed = ByteVector(rhs).take(64)
-                        ByteVector((reversed.take(32).reversed() + reversed.takeRight(32).reversed()).toByteArray())
-                    }
-                    "recid" -> {
-                        recid = rhs.toInt()
-                        assertEquals(priv!!.publicKey(), pub)
-                        val sig1 = Crypto.sign(message!!.toByteArray(), priv!!)
-                        assertEquals(sig1, sig)
-                        val pub1 = Crypto.recoverPublicKey(sig1, message!!.toByteArray(), recid)
-                        assertEquals(pub1, pub)
-                    }
+        val source = SystemFileSystem.source(Path(TestHelpers.resourcesPath, "recid.txt")).buffered()
+        while (true) {
+            val line = source.readLine() ?: return
+            val values = line.split(" = ")
+            val lhs = values[0]
+            val rhs = values[1]
+            when (lhs) {
+                "privkey" -> priv = PrivateKey(ByteVector(rhs).toByteArray())
+                "message" -> message = ByteVector(rhs)
+                "pubkey" -> pub = PublicKey(ByteVector(rhs))
+                "sig" -> sig = run {
+                    val reversed = ByteVector(rhs).take(64)
+                    ByteVector((reversed.take(32).reversed() + reversed.takeRight(32).reversed()).toByteArray())
+                }
+
+                "recid" -> {
+                    recid = rhs.toInt()
+                    assertEquals(priv!!.publicKey(), pub)
+                    val sig1 = Crypto.sign(message!!.toByteArray(), priv)
+                    assertEquals(sig1, sig)
+                    val pub1 = Crypto.recoverPublicKey(sig1, message.toByteArray(), recid)
+                    assertEquals(pub1, pub)
                 }
             }
         }

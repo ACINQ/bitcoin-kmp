@@ -2,10 +2,11 @@ package fr.acinq.bitcoin.reference
 
 import fr.acinq.bitcoin.*
 import fr.acinq.secp256k1.Hex
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readString
 import kotlinx.serialization.json.*
-import org.kodein.memory.file.*
-import org.kodein.memory.text.readString
-import org.kodein.memory.use
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -21,10 +22,11 @@ class TapscriptCoreTestsCommon {
     @Test
     fun `tapscript tests`() {
         var count = 0
-        TransactionTestsCommon.resourcesDir().resolve("data").resolve("taproot-functional-tests").listDir().forEach { dir ->
-            dir.listDir().forEach {
-                val json = readJson(it)
-                run(json, it.name)
+        val root = Path(TestHelpers.resourcesPath, "data", "taproot-functional-tests")
+        SystemFileSystem.list(root).forEach { dir ->
+            SystemFileSystem.list(dir).forEach { file ->
+                val json = readJson(file)
+                run(json, file.name)
                 count++
             }
         }
@@ -33,7 +35,7 @@ class TapscriptCoreTestsCommon {
 
     private fun readJson(path: Path): JsonObject {
         val format = Json { ignoreUnknownKeys = true }
-        var raw = path.openReadableFile().use { it.readString() }.filterNot { c -> c == '\n' }
+        var raw = SystemFileSystem.source(path).buffered().readString().filterNot { c -> c == '\n' }
         if (raw.last() == ',') {
             raw = raw.dropLast(1)
         }
@@ -43,7 +45,7 @@ class TapscriptCoreTestsCommon {
 
     @Test
     fun `single test`() {
-        val file = TransactionTestsCommon.resourcesDir().resolve("data").resolve("taproot-functional-tests").resolve("3").resolve("3c16caf4303dc387d0e90aa1266d0e4e1bf92ffc")
+        val file = Path(TestHelpers.resourcesPath, "data", "taproot-functional-tests", "3", "3c16caf4303dc387d0e90aa1266d0e4e1bf92ffc")
         val json = readJson(file)
         run(json, file.name)
     }

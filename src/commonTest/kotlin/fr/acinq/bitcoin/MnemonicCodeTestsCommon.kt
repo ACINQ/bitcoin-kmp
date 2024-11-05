@@ -18,7 +18,6 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.MnemonicCode.toMnemonics
 import fr.acinq.bitcoin.MnemonicCode.toSeed
-import fr.acinq.bitcoin.reference.TransactionTestsCommon
 import fr.acinq.secp256k1.Hex
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -42,7 +41,7 @@ class MnemonicCodeTestsCommon {
 
     @Test
     fun `reference tests`() {
-        val tests = TransactionTestsCommon.readData("bip39_vectors.json")
+        val tests = TestHelpers.readResourceAsJson("bip39_vectors.json")
 
         tests.jsonObject["english"]!!.jsonArray.map {
             val raw = it.jsonArray[0].jsonPrimitive.content

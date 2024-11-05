@@ -16,16 +16,12 @@
 
 package fr.acinq.bitcoin.reference
 
+import fr.acinq.bitcoin.TestHelpers
 import fr.acinq.bitcoin.Transaction
 import fr.acinq.secp256k1.Hex
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import org.kodein.memory.file.openReadableFile
-import org.kodein.memory.file.resolve
-import org.kodein.memory.text.readString
-import org.kodein.memory.use
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -33,10 +29,7 @@ class SigHashTestsCommon {
 
     @Test
     fun `reference client sighash test`() {
-        val file = TransactionTestsCommon.resourcesDir().resolve("data/sighash.json")
-        val raw = file.openReadableFile().use { it.readString() }
-        val format = Json { ignoreUnknownKeys = true }
-        val json = format.parseToJsonElement(raw)
+        val json = TestHelpers.readResourceAsJson("data/sighash.json")
         // 	["raw_transaction, script, input_index, hashType, signature_hash (result)"],
         json.jsonArray.filter { it.jsonArray.size == 5 }.map { it.jsonArray }.forEach {
             val rawTx = it[0].jsonPrimitive.content

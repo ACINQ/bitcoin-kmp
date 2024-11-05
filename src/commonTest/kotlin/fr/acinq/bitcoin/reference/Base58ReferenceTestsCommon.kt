@@ -18,6 +18,7 @@ package fr.acinq.bitcoin.reference
 
 import fr.acinq.bitcoin.Base58
 import fr.acinq.bitcoin.Base58Check
+import fr.acinq.bitcoin.TestHelpers
 import fr.acinq.secp256k1.Hex
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
@@ -29,7 +30,7 @@ import kotlin.test.assertEquals
 class Base58ReferenceTestsCommon {
     @Test
     fun `reference encode-decode test`() {
-        val tests = TransactionTestsCommon.readData("data/base58_encode_decode.json")
+        val tests = TestHelpers.readResourceAsJson("data/base58_encode_decode.json")
         tests.jsonArray.filter { it.jsonArray.size == 2 }.map { it.jsonArray }.forEach {
             val hex = it[0].jsonPrimitive.content
             val expected = it[1].jsonPrimitive.content
@@ -41,7 +42,7 @@ class Base58ReferenceTestsCommon {
 
     @Test
     fun `reference valid keys test`() {
-        val tests = TransactionTestsCommon.readData("data/base58_keys_valid.json")
+        val tests = TestHelpers.readResourceAsJson("data/base58_keys_valid.json")
         tests.jsonArray.forEach {
             val base58: String = it.jsonArray[0].jsonPrimitive.content
             val (version, data) = Base58Check.decode(base58)

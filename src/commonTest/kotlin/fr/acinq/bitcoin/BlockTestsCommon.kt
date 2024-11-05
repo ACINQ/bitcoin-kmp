@@ -16,24 +16,11 @@
 
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.reference.TransactionTestsCommon
 import fr.acinq.secp256k1.Hex
-import org.kodein.memory.file.openReadableFile
-import org.kodein.memory.file.resolve
-import org.kodein.memory.use
 import kotlin.test.*
 
 class BlockTestsCommon {
-    private val blockData = run {
-        val file = TransactionTestsCommon.resourcesDir().resolve("block1.dat")
-        file.openReadableFile().use {
-            val len = it.size
-            // workaround for a bug in kotlin memory file where dstOffset cannot be 0 but is still ignored...
-            val buffer = ByteArray(len)
-            it.readBytes(buffer, 0, buffer.size)
-            buffer
-        }
-    }
+    private val blockData = TestHelpers.readResourceAsByteArray("block1.dat")
 
     @Test
     fun `read blocks`() {

@@ -18,30 +18,12 @@ package fr.acinq.bitcoin.reference
 
 import fr.acinq.bitcoin.*
 import kotlinx.serialization.json.*
-import org.kodein.memory.file.FileSystem
-import org.kodein.memory.file.Path
-import org.kodein.memory.file.openReadableFile
-import org.kodein.memory.file.resolve
-import org.kodein.memory.system.Environment
-import org.kodein.memory.text.readString
-import org.kodein.memory.use
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
 class TransactionTestsCommon {
     companion object {
-        fun resourcesDir() =
-            Environment.findVariable("TEST_RESOURCES_PATH")?.let { Path(it) }
-                ?: FileSystem.workingDir().resolve("src/commonTest/resources")
-
-        fun readData(filename: String): JsonElement {
-            val file = resourcesDir().resolve(filename)
-            val raw = file.openReadableFile().use { it.readString() }
-            val format = Json { ignoreUnknownKeys = true }
-            return format.parseToJsonElement(raw)
-        }
-
         fun process(tests: JsonArray, valid: Boolean): Int {
             var count = 0
             var comment = ""
@@ -123,14 +105,14 @@ class TransactionTestsCommon {
 
     @Test
     fun `reference valid tx tests`() {
-        val tests = readData("data/tx_valid.json")
+        val tests = TestHelpers.readResourceAsJson("data/tx_valid.json")
         val count = process(tests.jsonArray, true)
         assertEquals(119, count)
     }
 
     @Test
     fun `reference invalid tx tests`() {
-        val tests = readData("data/tx_invalid.json")
+        val tests = TestHelpers.readResourceAsJson("data/tx_invalid.json")
         val count = process(tests.jsonArray, false)
         assertEquals(93, count)
     }

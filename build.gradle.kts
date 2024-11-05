@@ -59,8 +59,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.kodein.memory:klio-files:0.12.0")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.5.4")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
             }
         }
 

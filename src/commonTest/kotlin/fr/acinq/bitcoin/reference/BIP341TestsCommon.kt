@@ -25,7 +25,7 @@ import kotlin.test.assertNotNull
 class BIP341TestsCommon {
     @Test
     fun `BIP341 reference tests -- key path spending`() {
-        val tests = TransactionTestsCommon.readData("data/bip341_wallet_vectors.json").jsonObject["keyPathSpending"]!!
+        val tests = TestHelpers.readResourceAsJson("data/bip341_wallet_vectors.json").jsonObject["keyPathSpending"]!!
         tests.jsonArray.forEach { it ->
             val fullySignedTx = Transaction.read(it.jsonObject["auxiliary"]!!.jsonObject["fullySignedTx"]!!.jsonPrimitive.content)
             val rawUnsignedTx = Transaction.read(it.jsonObject["given"]!!.jsonObject["rawUnsignedTx"]!!.jsonPrimitive.content)
@@ -78,7 +78,7 @@ class BIP341TestsCommon {
 
     @Test
     fun `BIP341 reference tests -- script path spending`() {
-        val tests = TransactionTestsCommon.readData("data/bip341_wallet_vectors.json").jsonObject["scriptPubKey"]!!
+        val tests = TestHelpers.readResourceAsJson("data/bip341_wallet_vectors.json").jsonObject["scriptPubKey"]!!
         tests.jsonArray.forEach { it ->
             val given = it.jsonObject["given"]!!.jsonObject
             val internalPubkey = XonlyPublicKey(ByteVector32.fromValidHex(given["internalPubkey"]!!.jsonPrimitive.content))

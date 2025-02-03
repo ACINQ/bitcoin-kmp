@@ -12,12 +12,11 @@ plugins {
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.21.0"
+version = "0.22.0-SNAPSHOT"
 
 repositories {
     google()
     mavenCentral()
-    maven(url="https://oss.sonatype.org/content/repositories/snapshots/")
 }
 
 kotlin {

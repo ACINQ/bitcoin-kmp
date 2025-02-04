@@ -46,6 +46,17 @@ Our runtime targets are:
 * [X] Passing core reference segwit tests
 * [X] Passing core reference psbt v0 tests
 
+## Building
+
+Build and dependencies are managed with `gradle`. To build, use:
+```sh
+./gradlew build
+```
+Dependencies are verified against a list of trusted checksums. To update this list, use:
+```sh
+./gradlew --write-verification-metadata sha512 build
+```
+
 ## Install
 
 `bitcoin-kmp` is available on [maven central](https://search.maven.org/search?q=g:fr.acinq.bitcoin%20a:bitcoin-kmp*)

@@ -46,6 +46,19 @@ Our runtime targets are:
 * [X] Passing core reference segwit tests
 * [X] Passing core reference psbt v0 tests
 
+## Building
+
+Build and dependencies are managed with `gradle`. To build, use:
+```sh
+./gradlew build
+```
+Dependencies are verified against a list of trusted checksums. To update this list, use:
+```sh
+$ rm -rf ~/.konan
+$ ./gradlew --write-verification-metadata sha256 clean build
+```
+Please note that this has to be done on linux, macos x64 and macos arm64 hosts (or you could download konan packages for all build machines and compute checksums manually).
+
 ## Install
 
 `bitcoin-kmp` is available on [maven central](https://search.maven.org/search?q=g:fr.acinq.bitcoin%20a:bitcoin-kmp*)

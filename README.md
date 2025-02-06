@@ -54,8 +54,10 @@ Build and dependencies are managed with `gradle`. To build, use:
 ```
 Dependencies are verified against a list of trusted checksums. To update this list, use:
 ```sh
-./gradlew --write-verification-metadata sha512 build
+$ rm -rf ~/.konan
+$ ./gradlew --write-verification-metadata sha256 clean build
 ```
+Please note that this has to be done on linux, macos x64 and macos arm64 hosts (or you could download konan packages for all build machines and compute checksums manually).
 
 ## Install
 

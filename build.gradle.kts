@@ -26,7 +26,7 @@ kotlin {
 
     jvm {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_18)
+            jvmTarget.set(JvmTarget.JVM_1_8)
         }
     }
 

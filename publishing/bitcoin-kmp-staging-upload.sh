@@ -22,6 +22,7 @@ for i in 	bitcoin-kmp \
 		bitcoin-kmp-iosx64 \
 		bitcoin-kmp-jvm \
 		bitcoin-kmp-linuxx64 \
+		bitcoin-kmp-linuxarm64 \
 		bitcoin-kmp-macosarm64 \
 		bitcoin-kmp-macosx64
 do

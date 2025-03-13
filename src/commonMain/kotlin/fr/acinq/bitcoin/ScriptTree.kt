@@ -15,7 +15,6 @@
  */
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
@@ -23,10 +22,10 @@ import kotlin.jvm.JvmStatic
 
 /** Simple binary tree structure containing taproot spending scripts. */
 public sealed class ScriptTree {
-    public abstract fun write(output: Output, level: Int): Unit
+    public abstract fun write(output: Output, level: Int)
 
     /**
-     * @return the tree serialised with the format defined in BIP 371
+     * @return the tree serialized with the format defined in BIP 371
      */
     public fun write(): ByteArray {
         val output = ByteArrayOutput()
@@ -46,7 +45,7 @@ public sealed class ScriptTree {
         public constructor(script: List<ScriptElt>, leafVersion: Int) : this(Script.write(script).byteVector(), leafVersion)
         public constructor(script: String, leafVersion: Int) : this(ByteVector.fromHex(script), leafVersion)
 
-        override fun write(output: Output, level: Int): Unit {
+        override fun write(output: Output, level: Int) {
             output.write(level)
             output.write(leafVersion)
             BtcSerializer.writeScript(script, output)
@@ -54,7 +53,7 @@ public sealed class ScriptTree {
     }
 
     public data class Branch(val left: ScriptTree, val right: ScriptTree) : ScriptTree() {
-        override fun write(output: Output, level: Int): Unit {
+        override fun write(output: Output, level: Int) {
             left.write(output, level + 1)
             right.write(output, level + 1)
         }
@@ -68,7 +67,6 @@ public sealed class ScriptTree {
             BtcSerializer.writeScript(this.script, buffer)
             Crypto.taggedHash(buffer.toByteArray(), "TapLeaf")
         }
-
         is Branch -> {
             val h1 = this.left.hash()
             val h2 = this.right.hash()
@@ -81,6 +79,12 @@ public sealed class ScriptTree {
     public fun findScript(script: ByteVector): Leaf? = when (this) {
         is Leaf -> if (this.script == script) this else null
         is Branch -> this.left.findScript(script) ?: this.right.findScript(script)
+    }
+
+    /** Return the first leaf with a matching leaf hash, if any. */
+    public fun findScript(leafHash: ByteVector32): Leaf? = when (this) {
+        is Leaf -> if (this.hash() == leafHash) this else null
+        is Branch -> this.left.findScript(leafHash) ?: this.right.findScript(leafHash)
     }
 
     /**
@@ -128,7 +132,7 @@ public sealed class ScriptTree {
         public fun read(input: Input): ScriptTree {
             val leaves = readLeaves(input)
             merge(leaves)
-            require(leaves.size == 1) { "invalid serialised script tree" }
+            require(leaves.size == 1) { "invalid serialized script tree" }
             return leaves[0].second
         }
     }

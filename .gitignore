@@ -3,6 +3,7 @@ build/
 
 # Idea
 .idea
+.kotlin
 *.iml
 
 # Gradle

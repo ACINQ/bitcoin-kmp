@@ -415,17 +415,28 @@ class TaprootTestsCommon {
 
     @Test
     fun `serialize script tree -- reference test`() {
-        val tree =
-            ScriptTree.read(ByteArrayInput(Hex.decode("02c02220736e572900fe1252589a2143c8f3c79f71a0412d2353af755e9701c782694a02ac02c02220631c5f3b5832b8fbdebfb19704ceeb323c21f40f7a24f43d68ef0cc26b125969ac01c0222044faa49a0338de488c8dfffecdfb6f329f380bd566ef20c8df6d813eab1c4273ac")))
+        val encoded = "02c02220736e572900fe1252589a2143c8f3c79f71a0412d2353af755e9701c782694a02ac02c02220631c5f3b5832b8fbdebfb19704ceeb323c21f40f7a24f43d68ef0cc26b125969ac01c0222044faa49a0338de488c8dfffecdfb6f329f380bd566ef20c8df6d813eab1c4273ac"
+        val tree = ScriptTree.read(ByteArrayInput(Hex.decode(encoded)))
+        val leaves = listOf(
+            ScriptTree.Leaf("20736e572900fe1252589a2143c8f3c79f71a0412d2353af755e9701c782694a02ac", 0xc0),
+            ScriptTree.Leaf("20631c5f3b5832b8fbdebfb19704ceeb323c21f40f7a24f43d68ef0cc26b125969ac", 0xc0),
+            ScriptTree.Leaf("2044faa49a0338de488c8dfffecdfb6f329f380bd566ef20c8df6d813eab1c4273ac", 0xc0),
+        )
         assertEquals(
             ScriptTree.Branch(
                 ScriptTree.Branch(
-                    ScriptTree.Leaf("20736e572900fe1252589a2143c8f3c79f71a0412d2353af755e9701c782694a02ac", 0xc0),
-                    ScriptTree.Leaf("20631c5f3b5832b8fbdebfb19704ceeb323c21f40f7a24f43d68ef0cc26b125969ac", 0xc0),
+                    leaves[0],
+                    leaves[1],
                 ),
-                ScriptTree.Leaf("2044faa49a0338de488c8dfffecdfb6f329f380bd566ef20c8df6d813eab1c4273ac", 0xc0)
+                leaves[2]
             ), tree
         )
+        // We're able to find leaves in that script tree.
+        leaves.forEach { l ->
+            assertEquals(l, tree.findScript(l.script))
+            assertEquals(l, tree.findScript(l.hash()))
+        }
+        assertNull(tree.findScript(ByteVector.fromHex("deadbeef")))
     }
 
     @Test

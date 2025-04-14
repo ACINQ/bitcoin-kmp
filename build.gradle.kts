@@ -13,7 +13,7 @@ plugins {
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.22.1"
+version = "0.22.2-SNAPSHOT"
 
 repositories {
     google()
@@ -32,6 +32,8 @@ kotlin {
 
     linuxX64()
 
+    linuxArm64()
+
     macosX64()
     
     macosArm64()
@@ -49,7 +51,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.17.1"
+        val secp256k1KmpVersion = "0.17.3"
 
         val commonMain by getting {
             dependencies {

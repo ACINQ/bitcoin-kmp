@@ -298,10 +298,14 @@ class Musig2TestsCommon {
 
         // Once they have each other's public nonce, they can produce partial signatures.
         val publicNonces = listOf(aliceNonce.second, bobNonce.second)
+
         val aliceSig = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null).right
         assertNotNull(aliceSig)
+        assertTrue(Musig2.verifyTaprootSignature(aliceSig, aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
+
         val bobSig = Musig2.signTaprootInput(bobPrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), bobNonce.first, publicNonces, scriptTree = null).right
         assertNotNull(bobSig)
+        assertTrue(Musig2.verifyTaprootSignature(bobSig, bobNonce.second, bobPubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
 
         // Once they have each other's partial signature, they can aggregate them into a valid signature.
         val aggregateSig = Musig2.aggregateTaprootSignatures(listOf(aliceSig, bobSig), spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null).right
@@ -355,8 +359,11 @@ class Musig2TestsCommon {
             val publicNonces = listOf(userNonce.second, serverNonce.second)
             val userSig = Musig2.signTaprootInput(userPrivateKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), userNonce.first, publicNonces, scriptTree).right
             assertNotNull(userSig)
+            assertTrue(Musig2.verifyTaprootSignature(userSig, userNonce.second, userPublicKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree))
+
             val serverSig = Musig2.signTaprootInput(serverPrivateKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), serverNonce.first, publicNonces, scriptTree).right
             assertNotNull(serverSig)
+            assertTrue(Musig2.verifyTaprootSignature(serverSig, serverNonce.second, serverPublicKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree))
 
             // Once they have each other's partial signature, they can aggregate them into a valid signature.
             val aggregateSig = Musig2.aggregateTaprootSignatures(listOf(userSig, serverSig), tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree).right

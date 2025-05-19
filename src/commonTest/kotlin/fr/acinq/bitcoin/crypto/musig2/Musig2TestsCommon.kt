@@ -1,7 +1,6 @@
 package fr.acinq.bitcoin.crypto.musig2
 
 import fr.acinq.bitcoin.*
-import fr.acinq.bitcoin.reference.TransactionTestsCommon
 import fr.acinq.secp256k1.Hex
 import kotlinx.serialization.json.*
 import kotlin.random.Random
@@ -81,6 +80,13 @@ class Musig2TestsCommon {
                 assertEquals(expectedSecnonce, secnonce)
             }
         }
+    }
+
+    @Test
+    fun `generate secret nonce from counter`() {
+        val privateKey = PrivateKey.fromHex("EEC1CB7D1B7254C5CAB0D9C61AB02E643D464A59FE6C96A7EFE871F07C5AEF54")
+        val nonce = SecretNonce.generateWithCounter(0UL, privateKey, null, null, null)
+        assertEquals(ByteVector.fromHex("03A5B9B6907942EACDDA49A366016EC2E62404A1BF4AB6D4DB82067BC3ADF086D7033205DB9EB34D5C7CE02848CAC68A83ED73E3883477F563F23CE9A11A7721EC64"), nonce.second.data)
     }
 
     @Test
@@ -301,11 +307,11 @@ class Musig2TestsCommon {
 
         val aliceSig = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null).right
         assertNotNull(aliceSig)
-        assertTrue(Musig2.verifyTaprootSignature(aliceSig, aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
+        assertTrue(Musig2.verify(aliceSig, aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
 
         val bobSig = Musig2.signTaprootInput(bobPrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), bobNonce.first, publicNonces, scriptTree = null).right
         assertNotNull(bobSig)
-        assertTrue(Musig2.verifyTaprootSignature(bobSig, bobNonce.second, bobPubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
+        assertTrue(Musig2.verify(bobSig, bobNonce.second, bobPubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
 
         // Once they have each other's partial signature, they can aggregate them into a valid signature.
         val aggregateSig = Musig2.aggregateTaprootSignatures(listOf(aliceSig, bobSig), spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null).right
@@ -359,11 +365,11 @@ class Musig2TestsCommon {
             val publicNonces = listOf(userNonce.second, serverNonce.second)
             val userSig = Musig2.signTaprootInput(userPrivateKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), userNonce.first, publicNonces, scriptTree).right
             assertNotNull(userSig)
-            assertTrue(Musig2.verifyTaprootSignature(userSig, userNonce.second, userPublicKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree))
+            assertTrue(Musig2.verify(userSig, userNonce.second, userPublicKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree))
 
             val serverSig = Musig2.signTaprootInput(serverPrivateKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), serverNonce.first, publicNonces, scriptTree).right
             assertNotNull(serverSig)
-            assertTrue(Musig2.verifyTaprootSignature(serverSig, serverNonce.second, serverPublicKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree))
+            assertTrue(Musig2.verify(serverSig, serverNonce.second, serverPublicKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree))
 
             // Once they have each other's partial signature, they can aggregate them into a valid signature.
             val aggregateSig = Musig2.aggregateTaprootSignatures(listOf(userSig, serverSig), tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree).right

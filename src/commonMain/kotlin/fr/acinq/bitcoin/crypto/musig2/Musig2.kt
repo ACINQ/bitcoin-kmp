@@ -3,9 +3,9 @@ package fr.acinq.bitcoin.crypto.musig2
 import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.flatMap
+import fr.acinq.bitcoin.utils.getOrElse
 import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
-import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
 /**
@@ -151,6 +151,26 @@ public data class SecretNonce(internal val data: ByteVector) {
             val publicNonce = IndividualNonce(nonce.copyOfRange(Secp256k1.MUSIG2_SECRET_NONCE_SIZE, Secp256k1.MUSIG2_SECRET_NONCE_SIZE + Secp256k1.MUSIG2_PUBLIC_NONCE_SIZE))
             return Pair(secretNonce, publicNonce)
         }
+
+        /**
+         * Alternative counter-based method for generating nonce.
+         * This nonce must never be persisted or reused across signing sessions.
+         * All optional arguments exist to enrich the quality of the randomness used, which is critical for security.
+         *
+         * @param nonRepeatingCounter non-repeating counter that must never be reused with the same private key.
+         * @param privateKey signer's private key.
+         * @param message (optional) message that will be signed, if already known.
+         * @param keyAggCache (optional) key aggregation cache data from the signing session.
+         * @param extraInput (optional) additional random data.
+         * @return secret nonce and the corresponding public nonce.
+         */
+        @JvmStatic
+        public fun generateWithCounter(nonRepeatingCounter: ULong, privateKey: PrivateKey, message: ByteVector32?, keyAggCache: KeyAggCache?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
+            val nonce = Secp256k1.musigNonceGenCounter(nonRepeatingCounter, privateKey.value.toByteArray(), message?.toByteArray(), keyAggCache?.toByteArray(), extraInput?.toByteArray())
+            val secretNonce = SecretNonce(nonce.copyOfRange(0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE))
+            val publicNonce = IndividualNonce(nonce.copyOfRange(Secp256k1.MUSIG2_SECRET_NONCE_SIZE, Secp256k1.MUSIG2_SECRET_NONCE_SIZE + Secp256k1.MUSIG2_PUBLIC_NONCE_SIZE))
+            return Pair(secretNonce, publicNonce)
+        }
     }
 }
 
@@ -277,6 +297,36 @@ public object Musig2 {
         scriptTree: ScriptTree?
     ): Either<Throwable, ByteVector32> {
         return taprootSession(tx, inputIndex, inputs, publicKeys, publicNonces, scriptTree).map { it.sign(secretNonce, privateKey) }
+    }
+
+    /**
+     * Verify a partial musig2 signature.
+
+     * @param partialSig partial musig2 signature.
+     * @param nonce public nonce matching the secret nonce used to generate the signature.
+     * @param publicKey public key for the private key used to generate the signature.
+     * @param tx transaction spending the target taproot input.
+     * @param inputIndex index of the taproot input to spend.
+     * @param inputs all inputs of the spending transaction.
+     * @param publicKeys public keys of all participants of the musig2 session: callers must verify that all public keys are valid.
+     * @param publicNonces public nonces of all participants of the musig2 session.
+     * @param scriptTree tapscript tree of the taproot input, if it has script paths.
+     * @return true if the partial signature is valid.
+     */
+    @JvmStatic
+    public fun verify(
+        partialSig: ByteVector32,
+        nonce: IndividualNonce,
+        publicKey: PublicKey,
+        tx: Transaction,
+        inputIndex: Int,
+        inputs: List<TxOut>,
+        publicKeys: List<PublicKey>,
+        publicNonces: List<IndividualNonce>,
+        scriptTree: ScriptTree?
+    ): Boolean {
+        val session = taprootSession(tx, inputIndex, inputs, publicKeys, publicNonces, scriptTree)
+        return session.map { it.verify(partialSig, nonce, publicKey) }.getOrElse { false }
     }
 
     /**

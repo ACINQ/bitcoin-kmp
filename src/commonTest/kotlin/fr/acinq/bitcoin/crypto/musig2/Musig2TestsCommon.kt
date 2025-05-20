@@ -1,7 +1,6 @@
 package fr.acinq.bitcoin.crypto.musig2
 
 import fr.acinq.bitcoin.*
-import fr.acinq.bitcoin.reference.TransactionTestsCommon
 import fr.acinq.secp256k1.Hex
 import kotlinx.serialization.json.*
 import kotlin.random.Random
@@ -32,6 +31,7 @@ class Musig2TestsCommon {
                         KeyAggCache.create(keyIndices.map { pubkeys[it] })
                     }
                 }
+
                 else -> {
                     // The tweak cannot be applied, it would result in an invalid public key.
                     val (_, cache) = KeyAggCache.create(keyIndices.map { pubkeys[it] })
@@ -80,6 +80,29 @@ class Musig2TestsCommon {
                 assertEquals(expectedPubnonce, pubnonce)
                 assertEquals(expectedSecnonce, secnonce)
             }
+        }
+    }
+
+    @Test
+    fun `generate secret nonce from counter`() {
+        val privateKey = PrivateKey.fromHex("EEC1CB7D1B7254C5CAB0D9C61AB02E643D464A59FE6C96A7EFE871F07C5AEF54")
+        run {
+            val nonce = SecretNonce.generateWithCounter(0UL, privateKey, null, null, null)
+            assertEquals(ByteVector.fromHex("03A5B9B6907942EACDDA49A366016EC2E62404A1BF4AB6D4DB82067BC3ADF086D7033205DB9EB34D5C7CE02848CAC68A83ED73E3883477F563F23CE9A11A7721EC64"), nonce.second.data)
+
+            val nonce1 = SecretNonce.generateWithCounter(0UL, privateKey, null, null, null)
+            assertEquals(nonce, nonce1)
+
+            val nonce2 = SecretNonce.generateWithCounter(0UL, PrivateKey.fromHex("EEC1CB7D1B7254C5CAB0D9C61AB02E643D464A59FE6C96A7EFE871F07C5AEF55"), null, null, null)
+            assertNotEquals(nonce, nonce2)
+        }
+        run {
+            val nonce = SecretNonce.generateWithCounter(0UL, privateKey, ByteVector32.fromValidHex("380CD17A198FC3DAD3B7DA7492941F46976F2702FF7C66F24F472036AF1DA3F9"), null, null)
+            assertEquals(ByteVector.fromHex("0390B0553BA461A5BAC3F72BB86338D5FE8BB833ED7A21D3E21498C068D9A6E802020D641B37264FD22AC5E2F9FB868BAB49EB02FCB81AEC247FFD057DE37E1CB173"), nonce.second.data)
+        }
+        run {
+            val nonce = SecretNonce.generateWithCounter(1UL, privateKey, null, null, null)
+            assertEquals(ByteVector.fromHex("0340A08273BBC9ED0A2BFBDBDAFCCB43073865643593988841F67E665864767047037844A24EC0B763CE73F8252445DDDDFB7CD10498D796AD7217B841882A3A9961"), nonce.second.data)
         }
     }
 
@@ -298,10 +321,15 @@ class Musig2TestsCommon {
 
         // Once they have each other's public nonce, they can produce partial signatures.
         val publicNonces = listOf(aliceNonce.second, bobNonce.second)
+
         val aliceSig = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null).right
         assertNotNull(aliceSig)
+        assertTrue(Musig2.verify(aliceSig, aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
+
+
         val bobSig = Musig2.signTaprootInput(bobPrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), bobNonce.first, publicNonces, scriptTree = null).right
         assertNotNull(bobSig)
+        assertTrue(Musig2.verify(bobSig, bobNonce.second, bobPubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
 
         // Once they have each other's partial signature, they can aggregate them into a valid signature.
         val aggregateSig = Musig2.aggregateTaprootSignatures(listOf(aliceSig, bobSig), spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null).right
@@ -310,6 +338,41 @@ class Musig2TestsCommon {
         // This tx looks like any other tx that spends a p2tr output, with a single signature.
         val signedSpendingTx = spendingTx.updateWitness(0, Script.witnessKeyPathPay2tr(aggregateSig))
         Transaction.correctlySpends(signedSpendingTx, tx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    }
+
+    @Test
+    fun `verify musig2 signatures`() {
+        val alicePrivKey = PrivateKey(ByteArray(32) { 1 })
+        val alicePubKey = alicePrivKey.publicKey()
+        val bobPrivKey = PrivateKey(ByteArray(32) { 2 })
+        val bobPubKey = bobPrivKey.publicKey()
+
+        // Alice and Bob exchange public keys and agree on a common aggregated key.
+        val internalPubKey = Musig2.aggregateKeys(listOf(alicePubKey, bobPubKey))
+        val commonPubKey = internalPubKey.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
+
+        val tx = Transaction(2, listOf(), listOf(TxOut(10_000.sat(), Script.pay2tr(commonPubKey))), 0)
+        val spendingTx = Transaction(2, listOf(TxIn(OutPoint(tx, 0), sequence = 0)), listOf(TxOut(10_000.sat(), Script.pay2wpkh(alicePubKey))), 0)
+
+        val aliceNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), alicePrivKey, listOf(alicePubKey, bobPubKey))
+        val bobNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), bobPrivKey, listOf(alicePubKey, bobPubKey))
+        val publicNonces = listOf(aliceNonce.second, bobNonce.second)
+
+        val aliceSig = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null).right
+        require(aliceSig != null)
+        assertTrue(Musig2.verify(aliceSig, aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
+
+        // wrong signature
+        assertFalse(Musig2.verify(aliceSig.reversed(), aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
+
+        // wrong public key
+        assertFalse(Musig2.verify(aliceSig, aliceNonce.second, bobPubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
+
+        // wrong nonce
+        assertFalse(Musig2.verify(aliceSig, aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), listOf(aliceNonce.second, aliceNonce.second), scriptTree = null))
+
+        // wrong inputs
+        assertFalse(Musig2.verify(aliceSig, aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0], tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
     }
 
     @Test
@@ -355,8 +418,11 @@ class Musig2TestsCommon {
             val publicNonces = listOf(userNonce.second, serverNonce.second)
             val userSig = Musig2.signTaprootInput(userPrivateKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), userNonce.first, publicNonces, scriptTree).right
             assertNotNull(userSig)
+            assertTrue(Musig2.verify(userSig, userNonce.second, userPublicKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree))
+
             val serverSig = Musig2.signTaprootInput(serverPrivateKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), serverNonce.first, publicNonces, scriptTree).right
             assertNotNull(serverSig)
+            assertTrue(Musig2.verify(serverSig, serverNonce.second, serverPublicKey, tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree))
 
             // Once they have each other's partial signature, they can aggregate them into a valid signature.
             val aggregateSig = Musig2.aggregateTaprootSignatures(listOf(userSig, serverSig), tx, 0, swapInTx.txOut, listOf(userPublicKey, serverPublicKey), publicNonces, scriptTree).right

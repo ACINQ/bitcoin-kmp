@@ -31,6 +31,7 @@ class Musig2TestsCommon {
                         KeyAggCache.create(keyIndices.map { pubkeys[it] })
                     }
                 }
+
                 else -> {
                     // The tweak cannot be applied, it would result in an invalid public key.
                     val (_, cache) = KeyAggCache.create(keyIndices.map { pubkeys[it] })
@@ -98,10 +99,6 @@ class Musig2TestsCommon {
         run {
             val nonce = SecretNonce.generateWithCounter(0UL, privateKey, ByteVector32.fromValidHex("380CD17A198FC3DAD3B7DA7492941F46976F2702FF7C66F24F472036AF1DA3F9"), null, null)
             assertEquals(ByteVector.fromHex("0390B0553BA461A5BAC3F72BB86338D5FE8BB833ED7A21D3E21498C068D9A6E802020D641B37264FD22AC5E2F9FB868BAB49EB02FCB81AEC247FFD057DE37E1CB173"), nonce.second.data)
-        }
-        run {
-            val nonce = SecretNonce.generateWithCounter(1UL, privateKey, null, null, null)
-            assertEquals(ByteVector.fromHex("0340A08273BBC9ED0A2BFBDBDAFCCB43073865643593988841F67E665864767047037844A24EC0B763CE73F8252445DDDDFB7CD10498D796AD7217B841882A3A9961"), nonce.second.data)
         }
         run {
             val nonce = SecretNonce.generateWithCounter(1UL, privateKey, null, null, null)
@@ -375,7 +372,7 @@ class Musig2TestsCommon {
         assertFalse(Musig2.verify(aliceSig, aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), listOf(aliceNonce.second, aliceNonce.second), scriptTree = null))
 
         // wrong inputs
-        assertFalse(Musig2.verify(aliceSig, aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0], tx.txOut[0]), listOf(alicePubKey, bobPubKey), listOf(aliceNonce.second, aliceNonce.second), scriptTree = null))
+        assertFalse(Musig2.verify(aliceSig, aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0], tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
     }
 
     @Test

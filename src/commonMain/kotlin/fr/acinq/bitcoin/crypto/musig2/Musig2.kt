@@ -236,18 +236,7 @@ public object Musig2 {
      */
     @JvmStatic
     public fun aggregateKeys(publicKeys: List<PublicKey>): XonlyPublicKey = KeyAggCache.create(publicKeys).first
-
-    /**
-     * @param sessionId a random, unique session ID.
-     * @param privateKey signer's private key.
-     * @param publicKeys public keys of all participants: callers must verify that all public keys are valid.
-     */
-    @Deprecated("use alternate generateNonce() method instead")
-    @JvmStatic
-    public fun generateNonce(sessionId: ByteVector32, privateKey: PrivateKey, publicKeys: List<PublicKey>): Pair<SecretNonce, IndividualNonce> {
-        return generateNonce(sessionId, privateKey, privateKey.publicKey(), publicKeys, null, null)
-    }
-
+    
     /**
      * @param sessionId a random, unique session ID.
      * @param privateKey signer's private key

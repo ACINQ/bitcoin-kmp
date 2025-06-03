@@ -87,21 +87,21 @@ class Musig2TestsCommon {
     fun `generate secret nonce from counter`() {
         val privateKey = PrivateKey.fromHex("EEC1CB7D1B7254C5CAB0D9C61AB02E643D464A59FE6C96A7EFE871F07C5AEF54")
         run {
-            val nonce = SecretNonce.generateWithCounter(0UL, privateKey, null, null, null)
+            val nonce = SecretNonce.generateWithCounter(0L, privateKey, null, null, null)
             assertEquals(ByteVector.fromHex("03A5B9B6907942EACDDA49A366016EC2E62404A1BF4AB6D4DB82067BC3ADF086D7033205DB9EB34D5C7CE02848CAC68A83ED73E3883477F563F23CE9A11A7721EC64"), nonce.second.data)
 
-            val nonce1 = SecretNonce.generateWithCounter(0UL, privateKey, null, null, null)
+            val nonce1 = SecretNonce.generateWithCounter(0L, privateKey, null, null, null)
             assertEquals(nonce, nonce1)
 
-            val nonce2 = SecretNonce.generateWithCounter(0UL, PrivateKey.fromHex("EEC1CB7D1B7254C5CAB0D9C61AB02E643D464A59FE6C96A7EFE871F07C5AEF55"), null, null, null)
+            val nonce2 = SecretNonce.generateWithCounter(0L, PrivateKey.fromHex("EEC1CB7D1B7254C5CAB0D9C61AB02E643D464A59FE6C96A7EFE871F07C5AEF55"), null, null, null)
             assertNotEquals(nonce, nonce2)
         }
         run {
-            val nonce = SecretNonce.generateWithCounter(0UL, privateKey, ByteVector32.fromValidHex("380CD17A198FC3DAD3B7DA7492941F46976F2702FF7C66F24F472036AF1DA3F9"), null, null)
+            val nonce = SecretNonce.generateWithCounter(0L, privateKey, ByteVector32.fromValidHex("380CD17A198FC3DAD3B7DA7492941F46976F2702FF7C66F24F472036AF1DA3F9"), null, null)
             assertEquals(ByteVector.fromHex("0390B0553BA461A5BAC3F72BB86338D5FE8BB833ED7A21D3E21498C068D9A6E802020D641B37264FD22AC5E2F9FB868BAB49EB02FCB81AEC247FFD057DE37E1CB173"), nonce.second.data)
         }
         run {
-            val nonce = SecretNonce.generateWithCounter(1UL, privateKey, null, null, null)
+            val nonce = SecretNonce.generateWithCounter(1L, privateKey, null, null, null)
             assertEquals(ByteVector.fromHex("0340A08273BBC9ED0A2BFBDBDAFCCB43073865643593988841F67E665864767047037844A24EC0B763CE73F8252445DDDDFB7CD10498D796AD7217B841882A3A9961"), nonce.second.data)
         }
     }
@@ -316,8 +316,8 @@ class Musig2TestsCommon {
 
         // The first step of a musig2 signing session is to exchange nonces.
         // If participants are disconnected before the end of the signing session, they must start again with fresh nonces.
-        val aliceNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), alicePrivKey, listOf(alicePubKey, bobPubKey))
-        val bobNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), bobPrivKey, listOf(alicePubKey, bobPubKey))
+        val aliceNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), alicePrivKey, alicePrivKey.publicKey(), listOf(alicePubKey, bobPubKey), null, null)
+        val bobNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), bobPrivKey, bobPrivKey.publicKey(), listOf(alicePubKey, bobPubKey), null, null)
 
         // Once they have each other's public nonce, they can produce partial signatures.
         val publicNonces = listOf(aliceNonce.second, bobNonce.second)
@@ -354,8 +354,8 @@ class Musig2TestsCommon {
         val tx = Transaction(2, listOf(), listOf(TxOut(10_000.sat(), Script.pay2tr(commonPubKey))), 0)
         val spendingTx = Transaction(2, listOf(TxIn(OutPoint(tx, 0), sequence = 0)), listOf(TxOut(10_000.sat(), Script.pay2wpkh(alicePubKey))), 0)
 
-        val aliceNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), alicePrivKey, listOf(alicePubKey, bobPubKey))
-        val bobNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), bobPrivKey, listOf(alicePubKey, bobPubKey))
+        val aliceNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), alicePrivKey, alicePrivKey.publicKey(),listOf(alicePubKey, bobPubKey), null, null)
+        val bobNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), bobPrivKey, bobPrivKey.publicKey(), listOf(alicePubKey, bobPubKey), null, null)
         val publicNonces = listOf(aliceNonce.second, bobNonce.second)
 
         val aliceSig = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null).right
@@ -411,8 +411,8 @@ class Musig2TestsCommon {
             )
             // The first step of a musig2 signing session is to exchange nonces.
             // If participants are disconnected before the end of the signing session, they must start again with fresh nonces.
-            val userNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), userPrivateKey, listOf(userPublicKey, serverPublicKey))
-            val serverNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), serverPrivateKey, listOf(userPublicKey, serverPublicKey))
+            val userNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), userPrivateKey, userPrivateKey.publicKey(), listOf(userPublicKey, serverPublicKey), null, null)
+            val serverNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), serverPrivateKey, serverPrivateKey.publicKey(), listOf(userPublicKey, serverPublicKey), null, null)
 
             // Once they have each other's public nonce, they can produce partial signatures.
             val publicNonces = listOf(userNonce.second, serverNonce.second)

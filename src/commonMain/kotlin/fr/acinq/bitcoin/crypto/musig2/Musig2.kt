@@ -165,8 +165,8 @@ public data class SecretNonce(internal val data: ByteVector) {
          * @return secret nonce and the corresponding public nonce.
          */
         @JvmStatic
-        public fun generateWithCounter(nonRepeatingCounter: ULong, privateKey: PrivateKey, message: ByteVector32?, keyAggCache: KeyAggCache?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
-            val nonce = Secp256k1.musigNonceGenCounter(nonRepeatingCounter, privateKey.value.toByteArray(), message?.toByteArray(), keyAggCache?.toByteArray(), extraInput?.toByteArray())
+        public fun generateWithCounter(nonRepeatingCounter: Long, privateKey: PrivateKey, message: ByteVector32?, keyAggCache: KeyAggCache?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
+            val nonce = Secp256k1.musigNonceGenCounter(nonRepeatingCounter.toULong(), privateKey.value.toByteArray(), message?.toByteArray(), keyAggCache?.toByteArray(), extraInput?.toByteArray())
             val secretNonce = SecretNonce(nonce.copyOfRange(0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE))
             val publicNonce = IndividualNonce(nonce.copyOfRange(Secp256k1.MUSIG2_SECRET_NONCE_SIZE, Secp256k1.MUSIG2_SECRET_NONCE_SIZE + Secp256k1.MUSIG2_PUBLIC_NONCE_SIZE))
             return Pair(secretNonce, publicNonce)
@@ -236,16 +236,32 @@ public object Musig2 {
      */
     @JvmStatic
     public fun aggregateKeys(publicKeys: List<PublicKey>): XonlyPublicKey = KeyAggCache.create(publicKeys).first
-
+    
     /**
      * @param sessionId a random, unique session ID.
-     * @param privateKey signer's private key.
+     * @param privateKey signer's private key
+     * @param publicKey signer's public key
      * @param publicKeys public keys of all participants: callers must verify that all public keys are valid.
+     * @param message (optional) message that will be signed, if already known.
+     * @param extraInput (optional) additional random data.
      */
     @JvmStatic
-    public fun generateNonce(sessionId: ByteVector32, privateKey: PrivateKey, publicKeys: List<PublicKey>): Pair<SecretNonce, IndividualNonce> {
+    public fun generateNonce(sessionId: ByteVector32, privateKey: PrivateKey?, publicKey: PublicKey, publicKeys: List<PublicKey>, message: ByteVector32?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
         val (_, keyAggCache) = KeyAggCache.create(publicKeys)
-        return SecretNonce.generate(sessionId, privateKey, privateKey.publicKey(), message = null, keyAggCache, extraInput = null)
+        return SecretNonce.generate(sessionId, privateKey, publicKey, message, keyAggCache, extraInput)
+    }
+
+    /**
+     * @param nonRepeatingCounter non-repeating counter that must never be reused with the same private key.
+     * @param privateKey signer's private key.
+     * @param publicKeys public keys of all participants: callers must verify that all public keys are valid.
+     * @param message (optional) message that will be signed, if already known.
+     * @param extraInput (optional) additional random data.
+     */
+    @JvmStatic
+    public fun generateNonceWithCounter(nonRepeatingCounter: Long, privateKey: PrivateKey, publicKeys: List<PublicKey>, message: ByteVector32?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
+        val (_, keyAggCache) = KeyAggCache.create(publicKeys)
+        return SecretNonce.generateWithCounter(nonRepeatingCounter, privateKey, message, keyAggCache, extraInput)
     }
 
     /**

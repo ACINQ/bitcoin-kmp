@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "2.1.10"
+    kotlin("multiplatform") version "2.1.21"
     id("org.jetbrains.dokka") version "1.9.20"
     `maven-publish`
 }
@@ -13,7 +13,7 @@ plugins {
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.24.0"
+version = "0.25.0"
 
 repositories {
     google()
@@ -28,6 +28,11 @@ kotlin {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_1_8)
         }
+    }
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 
     linuxX64()
@@ -51,7 +56,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.17.3"
+        val secp256k1KmpVersion = "0.18.0"
 
         val commonMain by getting {
             dependencies {

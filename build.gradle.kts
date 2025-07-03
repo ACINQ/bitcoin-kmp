@@ -13,12 +13,11 @@ plugins {
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.25.0"
+version = "0.25.1-SNAPSHOT"
 
 repositories {
     google()
     mavenCentral()
-    maven(url="https://oss.sonatype.org/content/repositories/snapshots/")
 }
 
 kotlin {
@@ -27,6 +26,8 @@ kotlin {
     jvm {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_1_8)
+            // See https://jakewharton.com/kotlins-jdk-release-compatibility-flag/ and https://youtrack.jetbrains.com/issue/KT-49746/
+            freeCompilerArgs.add("-Xjdk-release=1.8")
         }
     }
 

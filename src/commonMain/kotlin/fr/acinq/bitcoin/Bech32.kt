@@ -72,14 +72,14 @@ public object Bech32 {
         values.forEach { v ->
             val b = chk shr 25
             chk = ((chk and 0x1ffffff) shl 5) xor v.toInt()
-            for (i in 0..5) {
+            for (i in GEN.indices) {
                 if (((b shr i) and 1) != 0) chk = chk xor GEN[i]
             }
         }
         values1.forEach { v ->
             val b = chk shr 25
             chk = ((chk and 0x1ffffff) shl 5) xor v.toInt()
-            for (i in 0..5) {
+            for (i in GEN.indices) {
                 if (((b shr i) and 1) != 0) chk = chk xor GEN[i]
             }
         }
@@ -121,11 +121,12 @@ public object Bech32 {
     @JvmStatic
     public fun decode(bech32: String, noChecksum: Boolean = false): Triple<String, Array<Int5>, Encoding> {
         require(bech32.lowercase() == bech32 || bech32.uppercase() == bech32) { "mixed case strings are not valid bech32" }
-        bech32.forEach { require(it.code in 33..126) { "invalid character " } }
         val input = bech32.lowercase()
         val pos = input.lastIndexOf('1')
         val hrp = input.take(pos)
+        hrp.forEach { require(it.code in 33..126) { "invalid character in hrp" } }
         require(hrp.length in 1..83) { "hrp must contain 1 to 83 characters" }
+        input.drop(pos + 1).forEach { require(alphabet.contains(it)) { "invalid character" } }
         val data = Array<Int5>(input.length - pos - 1) { 0 }
         for (i in 0..data.lastIndex) data[i] = map[input[pos + 1 + i].code]
         return if (noChecksum) {

@@ -160,6 +160,16 @@ class Bech32TestsCommon {
     }
 
     @Test
+    fun `reject invalid character`() {
+        // '(' is not a valid bech32 character
+        val encoded = "lno1zcss88lll8vlpqqqqqqclllllllvwvcqpq8qllllgqrqqgqq8s(q8888"
+        val error = assertFails {
+            Bech32.decode(encoded)
+        }
+        assertEquals("invalid character", error.message)
+    }
+
+    @Test
     fun `encode and decode arbitrary data`() {
         val bin = listOf(
             Hex.decode("00"),

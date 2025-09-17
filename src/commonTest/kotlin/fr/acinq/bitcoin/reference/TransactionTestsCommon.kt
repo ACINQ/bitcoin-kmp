@@ -107,7 +107,7 @@ class TransactionTestsCommon {
     fun `reference valid tx tests`() {
         val tests = TestHelpers.readResourceAsJson("data/tx_valid.json")
         val count = process(tests.jsonArray, true)
-        assertEquals(119, count)
+        assertEquals(120, count)
     }
 
     @Test

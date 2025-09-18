@@ -52,7 +52,7 @@ class ScriptTestsCommon {
             runTest(it.jsonArray)
             count += 1
         }
-        assertEquals(1207, count)
+        assertEquals(1212, count)
     }
 
 
@@ -176,8 +176,27 @@ class ScriptTestsCommon {
             comments: String?,
             expectedText: String
         ) {
-            val witness = ScriptWitness(witnessText.map { ByteVector(it) })
-            val scriptPubKey = parseFromText(scriptPubKeyText)
+            val witnessStack = mutableListOf<ByteVector>()
+            val priv = PrivateKey(ByteVector32.One)
+            var leaf: ScriptTree.Leaf? = null
+
+            witnessText.map {
+                when {
+                    it.startsWith("#SCRIPT#") -> witnessStack.add(parseFromText(it.removePrefix("#SCRIPT#")).byteVector())
+                    it.startsWith("#CONTROLBLOCK#") -> {
+                        leaf = ScriptTree.Leaf(witnessStack.last(), Script.TAPROOT_LEAF_TAPSCRIPT)
+                        val controlBlock = Script.ControlBlock.build(priv.xOnlyPublicKey(), leaf, leaf)
+                        witnessStack.add(controlBlock)
+                    }
+                    else -> witnessStack.add(ByteVector(it))
+                }
+            }
+            val witness = ScriptWitness(witnessStack)
+            val scriptPubKey = if (scriptPubKeyText == "0x51 0x20 #TAPROOTOUTPUT#") {
+                Script.write(Script.pay2tr(priv.xOnlyPublicKey(), leaf))
+            } else {
+                parseFromText(scriptPubKeyText)
+            }
             val scriptSig = parseFromText(scriptSigText)
             val tx = spendingTx(scriptSig, creditTx(scriptPubKey, amount)).updateWitness(0, witness)
             val ctx = Script.Context(tx, 0, amount, listOf())

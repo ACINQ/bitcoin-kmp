@@ -79,7 +79,7 @@ class KeyEncodingTestsCommon {
                         }
                         val prefix = when (chain) {
                             "main" -> "bc"
-                            "test", "signet" -> "tb"
+                            "test", "signet", "testnet4" -> "tb"
                             "regtest" -> "bcrt"
                             else -> throw IllegalArgumentException("invalid chain $chain")
                         }

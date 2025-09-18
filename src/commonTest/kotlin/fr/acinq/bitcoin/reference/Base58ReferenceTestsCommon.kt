@@ -36,7 +36,7 @@ class Base58ReferenceTestsCommon {
             val expected = it[1].jsonPrimitive.content
             assertEquals(Base58.encode(Hex.decode(hex)), expected)
             val decoded = Base58.decode(expected)
-            assertEquals(Hex.encode(decoded), hex)
+            assertEquals(Hex.encode(decoded).lowercase(), hex.lowercase())
         }
     }
 

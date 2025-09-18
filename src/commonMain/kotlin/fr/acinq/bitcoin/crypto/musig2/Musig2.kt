@@ -136,6 +136,30 @@ public data class SecretNonce(internal val data: ByteVector) {
          * All optional arguments exist to enrich the quality of the randomness used, which is critical for security.
          *
          * @param sessionId unique session ID.
+         * @param signingKey signer's private key or public key.
+         * @param message (optional) message that will be signed, if already known.
+         * @param keyAggCache (optional) key aggregation cache data from the signing session.
+         * @param extraInput (optional) additional random data.
+         * @return secret nonce and the corresponding public nonce.
+         */
+        @JvmStatic
+        public fun generate(sessionId: ByteVector32, signingKey: Either<PrivateKey, PublicKey>, message: ByteVector32?, keyAggCache: KeyAggCache?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
+            val (privateKey, publicKey) = when (signingKey) {
+                is Either.Left -> Pair(signingKey.value, signingKey.value.publicKey())
+                is Either.Right -> Pair(null, signingKey.value)
+            }
+            val nonce = Secp256k1.musigNonceGen(sessionId.toByteArray(), privateKey?.value?.toByteArray(), publicKey.value.toByteArray(), message?.toByteArray(), keyAggCache?.toByteArray(), extraInput?.toByteArray())
+            val secretNonce = SecretNonce(nonce.copyOfRange(0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE))
+            val publicNonce = IndividualNonce(nonce.copyOfRange(Secp256k1.MUSIG2_SECRET_NONCE_SIZE, Secp256k1.MUSIG2_SECRET_NONCE_SIZE + Secp256k1.MUSIG2_PUBLIC_NONCE_SIZE))
+            return Pair(secretNonce, publicNonce)
+        }
+
+        /**
+         * Generate a secret nonce to be used in a musig2 signing session.
+         * This nonce must never be persisted or reused across signing sessions.
+         * All optional arguments exist to enrich the quality of the randomness used, which is critical for security.
+         *
+         * @param sessionId unique session ID.
          * @param privateKey (optional) signer's private key.
          * @param publicKey signer's public key.
          * @param message (optional) message that will be signed, if already known.
@@ -143,13 +167,12 @@ public data class SecretNonce(internal val data: ByteVector) {
          * @param extraInput (optional) additional random data.
          * @return secret nonce and the corresponding public nonce.
          */
+        @Deprecated("Use generate() with an Either<PrivateKey, PublicKey> instead", ReplaceWith("generate()"), DeprecationLevel.WARNING)
         @JvmStatic
         public fun generate(sessionId: ByteVector32, privateKey: PrivateKey?, publicKey: PublicKey, message: ByteVector32?, keyAggCache: KeyAggCache?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
             privateKey?.let { require(it.publicKey() == publicKey) { "if the private key is provided, it must match the public key" } }
-            val nonce = Secp256k1.musigNonceGen(sessionId.toByteArray(), privateKey?.value?.toByteArray(), publicKey.value.toByteArray(), message?.toByteArray(), keyAggCache?.toByteArray(), extraInput?.toByteArray())
-            val secretNonce = SecretNonce(nonce.copyOfRange(0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE))
-            val publicNonce = IndividualNonce(nonce.copyOfRange(Secp256k1.MUSIG2_SECRET_NONCE_SIZE, Secp256k1.MUSIG2_SECRET_NONCE_SIZE + Secp256k1.MUSIG2_PUBLIC_NONCE_SIZE))
-            return Pair(secretNonce, publicNonce)
+            val signingKey = privateKey?.let { Either.Left(it) } ?: Either.Right(publicKey)
+            return generate(sessionId, signingKey, message, keyAggCache, extraInput)
         }
 
         /**
@@ -236,7 +259,20 @@ public object Musig2 {
      */
     @JvmStatic
     public fun aggregateKeys(publicKeys: List<PublicKey>): XonlyPublicKey = KeyAggCache.create(publicKeys).first
-    
+
+    /**
+     * @param sessionId a random, unique session ID.
+     * @param signingKey signer's private key or public key
+     * @param publicKeys public keys of all participants: callers must verify that all public keys are valid.
+     * @param message (optional) message that will be signed, if already known.
+     * @param extraInput (optional) additional random data.
+     */
+    @JvmStatic
+    public fun generateNonce(sessionId: ByteVector32, signingKey: Either<PrivateKey, PublicKey>, publicKeys: List<PublicKey>, message: ByteVector32?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
+        val (_, keyAggCache) = KeyAggCache.create(publicKeys)
+        return SecretNonce.generate(sessionId, signingKey, message, keyAggCache, extraInput)
+    }
+
     /**
      * @param sessionId a random, unique session ID.
      * @param privateKey signer's private key
@@ -245,10 +281,12 @@ public object Musig2 {
      * @param message (optional) message that will be signed, if already known.
      * @param extraInput (optional) additional random data.
      */
+    @Deprecated("Use generateNonce() with an Either<PrivateKey, PublicKey> instead", ReplaceWith("generateNonce()"), DeprecationLevel.WARNING)
     @JvmStatic
     public fun generateNonce(sessionId: ByteVector32, privateKey: PrivateKey?, publicKey: PublicKey, publicKeys: List<PublicKey>, message: ByteVector32?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
-        val (_, keyAggCache) = KeyAggCache.create(publicKeys)
-        return SecretNonce.generate(sessionId, privateKey, publicKey, message, keyAggCache, extraInput)
+        privateKey?.let { require(it.publicKey() == publicKey) { "if the private key is provided, it must match the public key" } }
+        val signingKey = privateKey?.let { Either.Left(it) } ?: Either.Right(publicKey)
+        return generateNonce(sessionId, signingKey, publicKeys, message,  extraInput)
     }
 
     /**

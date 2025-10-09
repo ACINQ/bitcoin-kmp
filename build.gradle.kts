@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "2.1.21"
+    kotlin("multiplatform") version "2.2.0"
     id("org.jetbrains.dokka") version "1.9.20"
     `maven-publish`
 }
@@ -13,7 +13,7 @@ plugins {
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.26.0"
+version = "0.27.0"
 
 repositories {
     google()
@@ -57,7 +57,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.19.0"
+        val secp256k1KmpVersion = "0.20.0"
 
         val commonMain by getting {
             dependencies {
@@ -68,8 +68,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.5.4")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.8.0")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
             }
         }
 

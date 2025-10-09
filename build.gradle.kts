@@ -18,7 +18,6 @@ version = "0.27.0"
 repositories {
     google()
     mavenCentral()
-    maven("https://central.sonatype.com/repository/maven-snapshots")
 }
 
 kotlin {

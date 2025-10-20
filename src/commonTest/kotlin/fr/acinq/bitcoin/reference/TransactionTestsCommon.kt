@@ -20,6 +20,7 @@ import fr.acinq.bitcoin.*
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.fail
 
 class TransactionTestsCommon {
@@ -91,7 +92,7 @@ class TransactionTestsCommon {
                             }
                         }
                         true
-                    } catch (t: Throwable) {
+                    } catch (_: Throwable) {
                         false
                     }
                     assertEquals(valid, result, "failed valid=$valid test $testCase")
@@ -115,6 +116,75 @@ class TransactionTestsCommon {
         val tests = TestHelpers.readResourceAsJson("data/tx_invalid.json")
         val count = process(tests.jsonArray, false)
         assertEquals(93, count)
+    }
+
+    @Test
+    fun `TRUC transaction with p2a -- no external input`() {
+        val priv = PrivateKey.fromHex("de1fa92dc352791cb83646513bda82bc2d44b80b42d6efceca6789a2b1b34bb8")
+        // The parent transaction usually doesn't pay any fees.
+        val parentTx = Transaction(
+            version = 3,
+            txIn = listOf(TxIn(OutPoint(TxId("007ef4c2f775ae04b67f942cd1e1dc4eb950f857401315e2aaad45eac1f355fa"), 1), 0)),
+            txOut = listOf(
+                TxOut(100_000.sat(), Script.pay2wpkh(priv.publicKey())),
+                TxOut(0.sat(), Script.pay2anchor()),
+            ),
+            lockTime = 0
+        )
+        // The child transaction is used to pay fees (CPFP using P2A).
+        // In this example, we also spend the p2wpkh output to pay the fees.
+        val unsignedChildTx = Transaction(
+            version = 3,
+            txIn = listOf(
+                TxIn(OutPoint(parentTx.txid, 0), 0),
+                TxIn(OutPoint(parentTx.txid, 1), 0),
+            ),
+            txOut = listOf(TxOut(95_000.sat(), Script.pay2wpkh(priv.publicKey()))),
+            lockTime = 0
+        )
+        val sig0 = unsignedChildTx.signInput(0, Script.pay2pkh(priv.publicKey()), SigHash.SIGHASH_ALL, 100_000.sat(), SigVersion.SIGVERSION_WITNESS_V0, priv)
+        val childTx = unsignedChildTx
+            .updateWitness(0, Script.witnessPay2wpkh(priv.publicKey(), sig0.byteVector()))
+            .updateWitness(1, Script.witnessPay2anchor())
+        Transaction.correctlySpends(childTx, listOf(parentTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        // The anchor output MUST have an empty witness to be valid.
+        assertFails { Transaction.correctlySpends(childTx.updateWitness(1, ScriptWitness(listOf(ByteVector("deadbeef")))), listOf(parentTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS) }
+    }
+
+    @Test
+    fun `TRUC transaction with p2a -- external input`() {
+        val priv = PrivateKey.fromHex("de1fa92dc352791cb83646513bda82bc2d44b80b42d6efceca6789a2b1b34bb8")
+        // The parent transaction usually doesn't pay any fees.
+        val parentTx = Transaction(
+            version = 3,
+            txIn = listOf(TxIn(OutPoint(TxId("cf637c92da728399142665f03ed7451ed5c4e501015189f593b6e5c878e40d72"), 0), 0)),
+            txOut = listOf(
+                TxOut(50_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))),
+                TxOut(0.sat(), Script.pay2anchor()),
+            ),
+            lockTime = 0
+        )
+        // The following transaction has been confirmed: its output will be used to pay fees for the parent transaction.
+        val walletTx = Transaction(
+            version = 2,
+            txIn = listOf(TxIn(OutPoint(TxId("72d59754a65ac76c75d51484279f083862cdd8d067efb1ab07e1bf9185e8436d"), 0), 0)),
+            txOut = listOf(TxOut(100_000.sat(), Script.pay2wpkh(priv.publicKey()))),
+            lockTime = 0
+        )
+        val unsignedChildTx = Transaction(
+            version = 3,
+            txIn = listOf(
+                TxIn(OutPoint(walletTx, 0), 0),
+                TxIn(OutPoint(parentTx, 1), 0),
+            ),
+            txOut = listOf(TxOut(95_000.sat(), Script.pay2wpkh(priv.publicKey()))),
+            lockTime = 0
+        )
+        val sig0 = unsignedChildTx.signInput(0, Script.pay2pkh(priv.publicKey()), SigHash.SIGHASH_ALL, 100_000.sat(), SigVersion.SIGVERSION_WITNESS_V0, priv)
+        val childTx = unsignedChildTx
+            .updateWitness(0, Script.witnessPay2wpkh(priv.publicKey(), sig0.byteVector()))
+            .updateWitness(1, Script.witnessPay2anchor())
+        Transaction.correctlySpends(childTx, listOf(walletTx, parentTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
 
     @Test

@@ -526,11 +526,11 @@ public object Script {
 
     /** Standard P2A (pay-to-anchor) output. */
     @JvmStatic
-    public fun pay2anchor(): List<ScriptElt> = listOf(OP_1, OP_PUSHDATA(ByteVector("4e73")))
+    public val pay2anchor: List<ScriptElt> = listOf(OP_1, OP_PUSHDATA(ByteVector("4e73")))
 
     /** An empty witness script is used to spend [pay2anchor] outputs. */
     @JvmStatic
-    public fun witnessPay2anchor(): ScriptWitness = ScriptWitness()
+    public val witnessPay2anchor: ScriptWitness = ScriptWitness.empty
 
     public fun removeSignature(script: List<ScriptElt>, signature: ByteVector): List<ScriptElt> {
         val toRemove = OP_PUSHDATA(signature)
@@ -1497,7 +1497,7 @@ public object Script {
                     }
                 }
                 // Standard P2A script (see github.com/bitcoin/bitcoin/pull/30352).
-                witnessVersion == 1L && program.contentEquals(byteArrayOf(0x4e, 0x73)) -> require(witness == ScriptWitness.empty) { "P2A output must be spent with an empty witness" }
+                witnessVersion == 1L && program.contentEquals(byteArrayOf(0x4e, 0x73)) -> require(witness == witnessPay2anchor) { "P2A output must be spent with an empty witness" }
                 (scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM) != 0 -> throw IllegalArgumentException("Witness version $witnessVersion reserved for soft-fork upgrades")
                 // Higher version witness scripts return true for future softfork compatibility
                 else -> {}

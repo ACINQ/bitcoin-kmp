@@ -127,7 +127,7 @@ class TransactionTestsCommon {
             txIn = listOf(TxIn(OutPoint(TxId("007ef4c2f775ae04b67f942cd1e1dc4eb950f857401315e2aaad45eac1f355fa"), 1), 0)),
             txOut = listOf(
                 TxOut(100_000.sat(), Script.pay2wpkh(priv.publicKey())),
-                TxOut(0.sat(), Script.pay2anchor()),
+                TxOut(0.sat(), Script.pay2anchor),
             ),
             lockTime = 0
         )
@@ -145,7 +145,7 @@ class TransactionTestsCommon {
         val sig0 = unsignedChildTx.signInput(0, Script.pay2pkh(priv.publicKey()), SigHash.SIGHASH_ALL, 100_000.sat(), SigVersion.SIGVERSION_WITNESS_V0, priv)
         val childTx = unsignedChildTx
             .updateWitness(0, Script.witnessPay2wpkh(priv.publicKey(), sig0.byteVector()))
-            .updateWitness(1, Script.witnessPay2anchor())
+            .updateWitness(1, Script.witnessPay2anchor)
         Transaction.correctlySpends(childTx, listOf(parentTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
         // The anchor output MUST have an empty witness to be valid.
         assertFails { Transaction.correctlySpends(childTx.updateWitness(1, ScriptWitness(listOf(ByteVector("deadbeef")))), listOf(parentTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS) }
@@ -160,7 +160,7 @@ class TransactionTestsCommon {
             txIn = listOf(TxIn(OutPoint(TxId("cf637c92da728399142665f03ed7451ed5c4e501015189f593b6e5c878e40d72"), 0), 0)),
             txOut = listOf(
                 TxOut(50_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))),
-                TxOut(0.sat(), Script.pay2anchor()),
+                TxOut(0.sat(), Script.pay2anchor),
             ),
             lockTime = 0
         )
@@ -183,7 +183,7 @@ class TransactionTestsCommon {
         val sig0 = unsignedChildTx.signInput(0, Script.pay2pkh(priv.publicKey()), SigHash.SIGHASH_ALL, 100_000.sat(), SigVersion.SIGVERSION_WITNESS_V0, priv)
         val childTx = unsignedChildTx
             .updateWitness(0, Script.witnessPay2wpkh(priv.publicKey(), sig0.byteVector()))
-            .updateWitness(1, Script.witnessPay2anchor())
+            .updateWitness(1, Script.witnessPay2anchor)
         Transaction.correctlySpends(childTx, listOf(walletTx, parentTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
 

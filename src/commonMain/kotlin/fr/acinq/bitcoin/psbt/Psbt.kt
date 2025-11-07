@@ -1129,6 +1129,8 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
             val emptied = redeemScript == null && witnessScript == null && partialSigs.isEmpty() && derivationPaths.isEmpty() && sighashType == null
             return when {
                 // @formatter:off
+                // If the input is P2A, it doesn't need any signature to be finalized, anyone can spend it.
+                witnessUtxo != null && witnessUtxo.publicKeyScript == Script.write(Script.pay2anchor).byteVector() -> Input.WitnessInput.FinalizedWitnessInput(witnessUtxo, nonWitnessUtxo, Script.witnessPay2anchor, scriptSig, ripemd160, sha256, hash160, hash256, unknown)
                 // If the input is finalized, it must have been emptied otherwise it's invalid.
                 witnessUtxo != null && scriptWitness != null && emptied -> Input.WitnessInput.FinalizedWitnessInput(witnessUtxo, nonWitnessUtxo, scriptWitness, scriptSig, ripemd160, sha256, hash160, hash256, unknown)
                 nonWitnessUtxo != null && scriptSig != null && emptied -> Input.NonWitnessInput.FinalizedNonWitnessInput(nonWitnessUtxo, txIn.outPoint.index.toInt(), scriptSig, ripemd160, sha256, hash160, hash256, unknown)

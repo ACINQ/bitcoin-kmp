@@ -350,9 +350,9 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
         return when (input) {
             is Input.PartiallySignedInputWithoutUtxo -> Either.Left(UpdateFailure.CannotSignInput(inputIndex, "cannot sign: input hasn't been updated with utxo data"))
             is Input.WitnessInput.PartiallySignedWitnessInput -> {
-                if (input.nonWitnessUtxo != null && input.nonWitnessUtxo!!.txid != txIn.outPoint.txid) {
+                if (input.nonWitnessUtxo != null && input.nonWitnessUtxo.txid != txIn.outPoint.txid) {
                     Either.Left(UpdateFailure.InvalidNonWitnessUtxo("non-witness utxo does not match unsigned tx input"))
-                } else if (input.nonWitnessUtxo != null && input.nonWitnessUtxo!!.txOut.size <= txIn.outPoint.index) {
+                } else if (input.nonWitnessUtxo != null && input.nonWitnessUtxo.txOut.size <= txIn.outPoint.index) {
                     Either.Left(UpdateFailure.InvalidNonWitnessUtxo("non-witness utxo index out of bounds"))
                 } else if (!Script.isNativeWitnessScript(input.txOut.publicKeyScript) && !Script.isPayToScript(input.txOut.publicKeyScript.toByteArray())) {
                     Either.Left(UpdateFailure.InvalidWitnessUtxo("witness utxo must use native segwit or P2SH embedded segwit"))
@@ -556,7 +556,7 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
         return try {
             Transaction.correctlySpends(finalTx, utxos.toMap(), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
             Either.Right(finalTx)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Either.Left(UpdateFailure.CannotExtractTx("extracted transaction doesn't pass standard script validation"))
         }
     }
@@ -1126,11 +1126,13 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
             taprootInternalKey: XonlyPublicKey?,
             unknown: List<DataEntry>
         ): Input {
+            val outputIndex = txIn.outPoint.index.toInt()
             val emptied = redeemScript == null && witnessScript == null && partialSigs.isEmpty() && derivationPaths.isEmpty() && sighashType == null
             return when {
                 // @formatter:off
                 // If the input is P2A, it doesn't need any signature to be finalized, anyone can spend it.
                 witnessUtxo != null && witnessUtxo.publicKeyScript == Script.write(Script.pay2anchor).byteVector() -> Input.WitnessInput.FinalizedWitnessInput(witnessUtxo, nonWitnessUtxo, Script.witnessPay2anchor, scriptSig, ripemd160, sha256, hash160, hash256, unknown)
+                nonWitnessUtxo != null && nonWitnessUtxo.txOut[outputIndex].publicKeyScript == Script.write(Script.pay2anchor).byteVector() -> Input.WitnessInput.FinalizedWitnessInput(nonWitnessUtxo.txOut[outputIndex], nonWitnessUtxo, Script.witnessPay2anchor, scriptSig, ripemd160, sha256, hash160, hash256, unknown)
                 // If the input is finalized, it must have been emptied otherwise it's invalid.
                 witnessUtxo != null && scriptWitness != null && emptied -> Input.WitnessInput.FinalizedWitnessInput(witnessUtxo, nonWitnessUtxo, scriptWitness, scriptSig, ripemd160, sha256, hash160, hash256, unknown)
                 nonWitnessUtxo != null && scriptSig != null && emptied -> Input.NonWitnessInput.FinalizedNonWitnessInput(nonWitnessUtxo, txIn.outPoint.index.toInt(), scriptSig, ripemd160, sha256, hash160, hash256, unknown)

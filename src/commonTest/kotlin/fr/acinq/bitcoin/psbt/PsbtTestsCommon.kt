@@ -1137,8 +1137,8 @@ class PsbtTestsCommon {
     @Test
     fun `read PSBT with P2A input`() {
         val walletPrivKey = PrivateKey(ByteVector32("0202020202020202020202020202020202020202020202020202020202020202"))
-        val walletTx = Transaction(2, listOf(), listOf(TxOut(100_000.sat(), Script.pay2wpkh(walletPrivKey.publicKey()))), 0)
-        val txToBump = Transaction(3, listOf(), listOf(TxOut(0.sat(), Script.pay2anchor), TxOut(50_000.sat(), Script.pay2wpkh(walletPrivKey.publicKey()))), 0)
+        val walletTx = Transaction(2, listOf(TxIn(OutPoint(TxId("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858"), 2), ByteVector.empty, 0)), listOf(TxOut(100_000.sat(), Script.pay2wpkh(walletPrivKey.publicKey()))), 0)
+        val txToBump = Transaction(3, listOf(TxIn(OutPoint(TxId("0a6a357e2f7796444e02638749d9611c008b253fb55f5dc88b739b230ed0c4c3"), 1), ByteVector.empty, 0)), listOf(TxOut(0.sat(), Script.pay2anchor), TxOut(50_000.sat(), Script.pay2wpkh(walletPrivKey.publicKey()))), 0)
         val dummyTx = Transaction(
             version = 3,
             txIn = listOf(
@@ -1150,22 +1150,36 @@ class PsbtTestsCommon {
             ),
             lockTime = 0
         )
-        val psbt = Psbt(dummyTx)
+        val psbt1 = Psbt(dummyTx)
             .updateWitnessInput(OutPoint(walletTx, 0), walletTx.txOut[0], null, Script.pay2pkh(walletPrivKey.publicKey()))
             .flatMap { it.updateWitnessInput(OutPoint(txToBump, 0), txToBump.txOut[0], null, null) }
             .flatMap { it.sign(walletPrivKey, 1) }
             .flatMap { it.psbt.finalizeWitnessInput(1, Script.witnessPay2wpkh(walletPrivKey.publicKey(), it.psbt.inputs[1].partialSigs.getValue(walletPrivKey.publicKey()))) }
             .right
-        assertNotNull(psbt)
-        val finalTx1 = psbt.finalizeWitnessInput(0, Script.witnessPay2anchor).flatMap { it.extract() }.right
+        assertNotNull(psbt1)
+        val finalTx1 = psbt1.finalizeWitnessInput(0, Script.witnessPay2anchor).flatMap { it.extract() }.right
         assertNotNull(finalTx1)
+        Transaction.correctlySpends(finalTx1, listOf(walletTx, txToBump), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+
+        val psbt2 = Psbt(dummyTx)
+            .updateWitnessInput(OutPoint(walletTx, 0), walletTx.txOut[0], null, Script.pay2pkh(walletPrivKey.publicKey()))
+            .flatMap { it.updateWitnessInputTx(txToBump, 0) }
+            .flatMap { it.sign(walletPrivKey, 1) }
+            .flatMap { it.psbt.finalizeWitnessInput(1, Script.witnessPay2wpkh(walletPrivKey.publicKey(), it.psbt.inputs[1].partialSigs.getValue(walletPrivKey.publicKey()))) }
+            .right
+        assertNotNull(psbt2)
+        val finalTx2 = psbt2.finalizeWitnessInput(0, Script.witnessPay2anchor).flatMap { it.extract() }.right
+        assertNotNull(finalTx2)
+        Transaction.correctlySpends(finalTx2, listOf(walletTx, txToBump), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
         // When serializing PSBTs, Bitcoin Core skips empty witnesses instead of encoding explicitly an empty witness stack.
         // This means that it essentially reverts the finalization of the P2A output that we may have previously done.
         // But this is fine: when reading a P2A input, we should always set its witness to an empty witness, which finalizes it.
-        val finalTx2 = Psbt.read(Psbt.write(psbt)).right?.extract()?.right
-        assertNotNull(finalTx2)
-        assertEquals(finalTx1, finalTx2)
+        listOf(psbt1, psbt2).forEach { psbt ->
+            val finalTx = Psbt.read(Psbt.write(psbt)).right?.extract()?.right
+            assertNotNull(finalTx)
+            Transaction.correctlySpends(finalTx, listOf(walletTx, txToBump), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        }
     }
 
     @Test

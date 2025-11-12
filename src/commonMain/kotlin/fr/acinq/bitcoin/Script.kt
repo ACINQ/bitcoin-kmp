@@ -22,6 +22,7 @@ import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
+import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 public object Script {
@@ -525,11 +526,11 @@ public object Script {
     }
 
     /** Standard P2A (pay-to-anchor) output. */
-    @JvmStatic
+    @JvmField
     public val pay2anchor: List<ScriptElt> = listOf(OP_1, OP_PUSHDATA(ByteVector("4e73")))
 
     /** An empty witness script is used to spend [pay2anchor] outputs. */
-    @JvmStatic
+    @JvmField
     public val witnessPay2anchor: ScriptWitness = ScriptWitness.empty
 
     public fun removeSignature(script: List<ScriptElt>, signature: ByteVector): List<ScriptElt> {

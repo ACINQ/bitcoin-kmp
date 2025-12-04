@@ -31,9 +31,8 @@ class TaprootTestsCommon {
         val key = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0/1")
         val internalKey = key.publicKey.xOnly()
         val script = Script.pay2tr(internalKey, scripts = null)
-        val outputKey = internalKey.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
+        val outputKey = internalKey.outputKey(Crypto.TaprootTweak.KeyPathTweak).first
         assertEquals("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c", internalKey.p2trAddress(Block.Testnet3GenesisBlock.hash))
-        assertEquals(script, Script.pay2tr(outputKey))
 
         // tx sends to tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c
         val tx = Transaction.read(
@@ -57,16 +56,16 @@ class TaprootTestsCommon {
         assertTrue(Crypto.verifySignatureSchnorr(hash, sig, outputKey))
 
         // re-create signature
-        val ourSig = Crypto.signSchnorr(hash, key.privateKey, Crypto.TaprootTweak.NoScriptTweak)
+        val ourSig = Crypto.signSchnorr(hash, key.privateKey, Crypto.TaprootTweak.KeyPathTweak)
         assertTrue(Crypto.verifySignatureSchnorr(hash, ourSig, outputKey))
         assertTrue(Secp256k1.verifySchnorr(ourSig.toByteArray(), hash.toByteArray(), outputKey.value.toByteArray()))
 
         // setting auxiliary random data to all-zero yields the same result as not setting any auxiliary random data
-        val ourSig1 = Crypto.signSchnorr(hash, key.privateKey, Crypto.TaprootTweak.NoScriptTweak, ByteVector32.Zeroes)
+        val ourSig1 = Crypto.signSchnorr(hash, key.privateKey, Crypto.TaprootTweak.KeyPathTweak, ByteVector32.Zeroes)
         assertEquals(ourSig, ourSig1)
 
         // setting auxiliary random data to a non-zero value yields a different result
-        val ourSig2 = Crypto.signSchnorr(hash, key.privateKey, Crypto.TaprootTweak.NoScriptTweak, ByteVector32.One)
+        val ourSig2 = Crypto.signSchnorr(hash, key.privateKey, Crypto.TaprootTweak.KeyPathTweak, ByteVector32.One)
         assertNotEquals(ourSig, ourSig2)
     }
 

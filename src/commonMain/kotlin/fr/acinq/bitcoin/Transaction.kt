@@ -679,11 +679,7 @@ public data class Transaction(
      */
     public fun signInputTaprootKeyPath(privateKey: PrivateKey, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, scriptTree: ScriptTree?, annex: ByteVector? = null, auxrand32: ByteVector32? = null): ByteVector64 {
         val data = hashForSigningTaprootKeyPath(inputIndex, inputs, sighashType, annex)
-        val tweak = when (scriptTree) {
-            null -> Crypto.TaprootTweak.NoScriptTweak
-            else -> Crypto.TaprootTweak.ScriptTweak(scriptTree.hash())
-        }
-        return Crypto.signSchnorr(data, privateKey, tweak, auxrand32)
+        return Crypto.signSchnorr(data, privateKey, Crypto.TaprootTweak.from(scriptTree?.hash()), auxrand32)
     }
 
     /**
@@ -706,7 +702,7 @@ public data class Transaction(
         auxrand32: ByteVector32? = null
     ): ByteVector64 {
         val data = hashForSigningTaprootScriptPath(inputIndex, inputs, sighashType, tapleaf, annex)
-        return Crypto.signSchnorr(data, privateKey, Crypto.SchnorrTweak.NoTweak, auxrand32)
+        return Crypto.signSchnorr(data, privateKey, null, auxrand32)
     }
 
     public fun correctlySpends(previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int) {

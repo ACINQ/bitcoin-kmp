@@ -27,10 +27,11 @@ public data class XonlyPublicKey(@JvmField val value: ByteVector32) {
     val publicKey: PublicKey = PublicKey(byteArrayOf(2) + value.toByteArray())
 
     public fun tweak(tapTweak: Crypto.TaprootTweak): ByteVector32 {
-        return when (tapTweak) {
-            Crypto.TaprootTweak.NoScriptTweak -> Crypto.taggedHash(value.toByteArray(), "TapTweak")
-            is Crypto.TaprootTweak.ScriptTweak -> Crypto.taggedHash(value.toByteArray() + tapTweak.merkleRoot.toByteArray(), "TapTweak")
+        val toHash = when (tapTweak) {
+            is Crypto.TaprootTweak.KeyPathTweak -> value.toByteArray()
+            is Crypto.TaprootTweak.ScriptPathTweak -> value.toByteArray() + tapTweak.merkleRoot.toByteArray()
         }
+        return Crypto.taggedHash(toHash, "TapTweak")
     }
 
     /**
@@ -42,17 +43,17 @@ public data class XonlyPublicKey(@JvmField val value: ByteVector32) {
     public fun outputKey(tapTweak: Crypto.TaprootTweak): Pair<XonlyPublicKey, Boolean> = this + PrivateKey(tweak(tapTweak)).publicKey()
 
     /** Tweak this key with the merkle root of the given script tree. */
-    public fun outputKey(scriptTree: ScriptTree): Pair<XonlyPublicKey, Boolean> = outputKey(Crypto.TaprootTweak.ScriptTweak(scriptTree))
+    public fun outputKey(scriptTree: ScriptTree): Pair<XonlyPublicKey, Boolean> = outputKey(scriptTree.hash())
 
     /** Tweak this key with the merkle root provided. */
-    public fun outputKey(merkleRoot: ByteVector32): Pair<XonlyPublicKey, Boolean> = outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot))
+    public fun outputKey(merkleRoot: ByteVector32): Pair<XonlyPublicKey, Boolean> = outputKey(Crypto.TaprootTweak.ScriptPathTweak(merkleRoot))
 
     /**
      * @param chainHash chain hash (i.e. hash of the genesis block of the chain we're on)
      * @return the BIP86 address for this key (i.e. the p2tr address for this key with an explicit absence of scripts).
      */
     public fun p2trAddress(chainHash: BlockHash): String {
-        val (outputKey, _) = outputKey(Crypto.TaprootTweak.NoScriptTweak)
+        val (outputKey, _) = outputKey(Crypto.TaprootTweak.KeyPathTweak)
         return Bech32.encodeWitnessAddress(Bech32.hrp(chainHash), 1, outputKey.value.toByteArray())
     }
 

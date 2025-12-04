@@ -1506,7 +1506,7 @@ class PsbtTestsCommon {
                     TxIn(OutPoint(utxos[2], 3), TxIn.SEQUENCE_FINAL),
                     TxIn(OutPoint(utxos[3], 1), TxIn.SEQUENCE_FINAL),
                 ),
-                txOut = listOf(TxOut(450_000.sat(), Script.pay2tr(getPublicKey(0)))),
+                txOut = listOf(TxOut(450_000.sat(), Script.pay2tr(getPublicKey(0), Crypto.TaprootTweak.KeyPathTweak))),
                 lockTime = 0
             )
         )

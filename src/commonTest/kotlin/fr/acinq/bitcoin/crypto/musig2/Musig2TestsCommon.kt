@@ -308,10 +308,10 @@ class Musig2TestsCommon {
 
         // Alice and Bob exchange public keys and agree on a common aggregated key.
         val internalPubKey = Musig2.aggregateKeys(listOf(alicePubKey, bobPubKey))
-        val commonPubKey = internalPubKey.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
+        val commonPubKey = internalPubKey.outputKey(Crypto.TaprootTweak.KeyPathTweak).first
 
         // This tx sends to a taproot script that doesn't contain any script path.
-        val tx = Transaction(2, listOf(), listOf(TxOut(10_000.sat(), Script.pay2tr(commonPubKey))), 0)
+        val tx = Transaction(2, listOf(), listOf(TxOut(10_000.sat(), Script.pay2tr(internalPubKey, Crypto.TaprootTweak.KeyPathTweak))), 0)
         // This tx spends the previous tx with Alice and Bob's signatures.
         val spendingTx = Transaction(2, listOf(TxIn(OutPoint(tx, 0), sequence = 0)), listOf(TxOut(10_000.sat(), Script.pay2wpkh(alicePubKey))), 0)
 
@@ -350,9 +350,9 @@ class Musig2TestsCommon {
 
         // Alice and Bob exchange public keys and agree on a common aggregated key.
         val internalPubKey = Musig2.aggregateKeys(listOf(alicePubKey, bobPubKey))
-        val commonPubKey = internalPubKey.outputKey(Crypto.TaprootTweak.NoScriptTweak).first
+        val commonPubKey = internalPubKey.outputKey(Crypto.TaprootTweak.KeyPathTweak).first
 
-        val tx = Transaction(2, listOf(), listOf(TxOut(10_000.sat(), Script.pay2tr(commonPubKey))), 0)
+        val tx = Transaction(2, listOf(), listOf(TxOut(10_000.sat(), Script.pay2tr(internalPubKey, Crypto.TaprootTweak.KeyPathTweak))), 0)
         val spendingTx = Transaction(2, listOf(TxIn(OutPoint(tx, 0), sequence = 0)), listOf(TxOut(10_000.sat(), Script.pay2wpkh(alicePubKey))), 0)
 
         val aliceNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(alicePrivKey), listOf(alicePubKey, bobPubKey), null, null)

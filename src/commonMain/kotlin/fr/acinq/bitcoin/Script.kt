@@ -479,13 +479,6 @@ public object Script {
     public fun witnessPay2wpkh(pubKey: PublicKey, sig: ByteVector): ScriptWitness = ScriptWitness(listOf(sig, pubKey.value))
 
     /**
-     * @param outputKey public key exposed by the taproot script (tweaked based on the tapscripts).
-     * @return a pay-to-taproot script.
-     */
-    @JvmStatic
-    public fun pay2tr(outputKey: XonlyPublicKey): List<ScriptElt> = listOf(OP_1, OP_PUSHDATA(outputKey.value))
-
-    /**
      * @param internalKey internal public key that will be tweaked with the [scripts] provided.
      * @param scripts optional spending scripts that can be used instead of key-path spending.
      */
@@ -498,12 +491,17 @@ public object Script {
      */
     @JvmStatic
     public fun pay2tr(internalKey: XonlyPublicKey, scriptsRoot: ByteVector32?): List<ScriptElt> {
-        val tweak = when (scriptsRoot) {
-            null -> Crypto.TaprootTweak.NoScriptTweak
-            else -> Crypto.TaprootTweak.ScriptTweak(scriptsRoot)
-        }
-        val (publicKey, _) = internalKey.outputKey(tweak)
-        return pay2tr(publicKey)
+        return pay2tr(internalKey, Crypto.TaprootTweak.from(scriptsRoot))
+    }
+
+    /**
+     * @param internalKey internal public key that will be tweaked with the provided [taprootTweak].
+     * @param taprootTweak tweak to apply to [internalKey].
+     */
+    @JvmStatic
+    public fun pay2tr(internalKey: XonlyPublicKey, taprootTweak: Crypto.TaprootTweak): List<ScriptElt> {
+        val (outputKey, _) = internalKey.outputKey(taprootTweak)
+        return listOf(OP_1, OP_PUSHDATA(outputKey.value))
     }
 
     /** NB: callers must ensure that they use the correct [Crypto.TaprootTweak] when generating their signature. */
@@ -1474,7 +1472,7 @@ public object Script {
                             Crypto.taggedHash(if (LexicographicalOrdering.isLessThan(a, b)) a.toByteArray() + b.toByteArray() else b.toByteArray() + a.toByteArray(), "TapBranch")
                         }
                         val parity = (control[0].toInt() and 0x01) == 0x01
-                        require(Pair(outputKey, parity) == internalKey.outputKey(Crypto.TaprootTweak.ScriptTweak(merkleRoot)))
+                        require(Pair(outputKey, parity) == internalKey.outputKey(Crypto.TaprootTweak.ScriptPathTweak(merkleRoot)))
 
                         if (leafVersion == TAPROOT_LEAF_TAPSCRIPT) {
                             this.context.executionData = this.context.executionData.copy(validationWeightLeft = ScriptWitness.write(witness).size + VALIDATION_WEIGHT_OFFSET)

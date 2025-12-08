@@ -206,7 +206,7 @@ class TransactionTestsCommon {
 
         val p2wpkhOutput = TxOut(Satoshi(150_000), Script.pay2wpkh(publicKey1))
         val p2wshOutput = TxOut(Satoshi(150_000), Script.pay2wsh(Script.createMultiSigMofN(1, listOf(publicKey1, publicKey2))))
-        val p2trOutput = TxOut(Satoshi(150_000), Script.pay2tr(publicKey1.xOnly()))
+        val p2trOutput = TxOut(Satoshi(150_000), Script.pay2tr(publicKey1.xOnly(), Crypto.TaprootTweak.KeyPathTweak))
         // See https://bitcoin.stackexchange.com/questions/66428/what-is-the-size-of-different-bitcoin-transaction-types
         assertEquals(p2wpkhOutput.weight(), 124)
         assertEquals(p2wshOutput.weight(), 172)

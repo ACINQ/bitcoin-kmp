@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "2.2.0"
+    kotlin("multiplatform") version "2.2.21"
     id("org.jetbrains.dokka") version "1.9.20"
     `maven-publish`
 }
@@ -18,6 +18,7 @@ version = "0.29.0-SNAPSHOT"
 repositories {
     google()
     mavenCentral()
+    maven("https://central.sonatype.com/repository/maven-snapshots")
 }
 
 kotlin {
@@ -57,7 +58,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.21.0"
+        val secp256k1KmpVersion = "0.22.0-SNAPSHOT"
 
         val commonMain by getting {
             dependencies {

@@ -167,11 +167,6 @@ public object Crypto {
          * private key is tweaked with H_TapTweak(public key || merkle_root) (this is used for key path spending, with specific Merkle root of the script tree).
          */
         public data class ScriptPathTweak(val merkleRoot: ByteVector32) : TaprootTweak()
-
-        public companion object {
-            @JvmStatic
-            public fun from(merkleRoot: ByteVector32?): TaprootTweak = merkleRoot?.let { ScriptPathTweak(it) } ?: KeyPathTweak
-        }
     }
 
     /**

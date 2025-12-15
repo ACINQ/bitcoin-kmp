@@ -316,7 +316,7 @@ public object Musig2 {
     public fun taprootSession(tx: Transaction, inputIndex: Int, inputs: List<TxOut>, publicKeys: List<PublicKey>, publicNonces: List<IndividualNonce>, scriptTree: ScriptTree?): Either<Throwable, Session> {
         return IndividualNonce.aggregate(publicNonces).flatMap { aggregateNonce ->
             val (aggregatePublicKey, keyAggCache) = KeyAggCache.create(publicKeys)
-            val tweak = aggregatePublicKey.tweak(Crypto.TaprootTweak.from(scriptTree?.hash()))
+            val tweak = aggregatePublicKey.tweak(scriptTree?.hash()?.let { Crypto.TaprootTweak.ScriptPathTweak(it) } ?: Crypto.TaprootTweak.KeyPathTweak)
             keyAggCache.tweak(tweak, isXonly = true).map { tweakedKeyAggCache ->
                 val txHash = Transaction.hashForSigningTaprootKeyPath(tx, inputIndex, inputs, SigHash.SIGHASH_DEFAULT)
                 Session.create(aggregateNonce, txHash, tweakedKeyAggCache.first)

@@ -679,7 +679,8 @@ public data class Transaction(
      */
     public fun signInputTaprootKeyPath(privateKey: PrivateKey, inputIndex: Int, inputs: List<TxOut>, sighashType: Int, scriptTree: ScriptTree?, annex: ByteVector? = null, auxrand32: ByteVector32? = null): ByteVector64 {
         val data = hashForSigningTaprootKeyPath(inputIndex, inputs, sighashType, annex)
-        return Crypto.signSchnorr(data, privateKey, Crypto.TaprootTweak.from(scriptTree?.hash()), auxrand32)
+        val tweak = scriptTree?.hash()?.let { Crypto.TaprootTweak.ScriptPathTweak(it) } ?: Crypto.TaprootTweak.KeyPathTweak
+        return Crypto.signSchnorr(data, privateKey, tweak, auxrand32)
     }
 
     /**

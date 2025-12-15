@@ -491,7 +491,8 @@ public object Script {
      */
     @JvmStatic
     public fun pay2tr(internalKey: XonlyPublicKey, scriptsRoot: ByteVector32?): List<ScriptElt> {
-        return pay2tr(internalKey, Crypto.TaprootTweak.from(scriptsRoot))
+        val tweak = scriptsRoot?.let { Crypto.TaprootTweak.ScriptPathTweak(it) } ?: Crypto.TaprootTweak.KeyPathTweak
+        return pay2tr(internalKey, tweak)
     }
 
     /**

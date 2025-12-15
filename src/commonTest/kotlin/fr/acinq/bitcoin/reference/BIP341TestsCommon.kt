@@ -57,7 +57,8 @@ class BIP341TestsCommon {
                 val internalPubkey = internalPrivkey.publicKey().xOnly()
                 val intermediary = it.jsonObject["intermediary"]!!.jsonObject
                 assertEquals(ByteVector32(intermediary["internalPubkey"]!!.jsonPrimitive.content), internalPubkey.value)
-                val tweak = internalPubkey.tweak(Crypto.TaprootTweak.from(merkleRoot))
+                val taprootTweak = merkleRoot?.let { Crypto.TaprootTweak.ScriptPathTweak(it) } ?: Crypto.TaprootTweak.KeyPathTweak
+                val tweak = internalPubkey.tweak(taprootTweak)
                 assertEquals(ByteVector32(intermediary["tweak"]!!.jsonPrimitive.content), tweak)
 
                 val tweakedPrivateKey = internalPrivkey.tweak(tweak)
@@ -66,7 +67,7 @@ class BIP341TestsCommon {
                 val hash = Transaction.hashForSigningTaprootKeyPath(rawUnsignedTx, txinIndex, utxosSpent, hashType)
                 assertEquals(ByteVector32(intermediary["sigHash"]!!.jsonPrimitive.content), hash)
 
-                val sig = Crypto.signSchnorr(hash, internalPrivkey, Crypto.TaprootTweak.from(merkleRoot))
+                val sig = Crypto.signSchnorr(hash, internalPrivkey, taprootTweak)
                 val witness = Script.witnessKeyPathPay2tr(sig, hashType)
                 val expected = it.jsonObject["expected"]!!.jsonObject
                 val witnessStack = expected["witness"]!!.jsonArray.map { jsonElt -> ByteVector(jsonElt.jsonPrimitive.content) }
@@ -88,7 +89,7 @@ class BIP341TestsCommon {
             }
 
             val intermediary = it.jsonObject["intermediary"]!!.jsonObject
-            val (tweakedKey, _) = internalPubkey.outputKey(Crypto.TaprootTweak.from(scriptTree?.hash()))
+            val (tweakedKey, _) = internalPubkey.outputKey(scriptTree?.hash()?.let { Crypto.TaprootTweak.ScriptPathTweak(it) } ?: Crypto.TaprootTweak.KeyPathTweak)
             scriptTree?.let { assertEquals(ByteVector32(intermediary["merkleRoot"]!!.jsonPrimitive.content), it.hash()) }
             assertEquals(ByteVector32(intermediary["tweakedPubkey"]!!.jsonPrimitive.content), tweakedKey.value)
 

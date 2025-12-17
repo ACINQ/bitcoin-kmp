@@ -30,7 +30,7 @@ class TaprootTestsCommon {
         val (_, master) = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPeQQADibg4WF7mEasy3piWZUHyThAzJCPNgMHDVYhTCVfev3jFbDhcYm4GimeFMbbi9z1d9rfY1aL5wfJ9mNebQ4thJ62EJb")
         val key = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0/1")
         val internalKey = key.publicKey.xOnly()
-        val script = Script.pay2tr(internalKey, scripts = null)
+        val script = Script.pay2tr(internalKey, Crypto.TaprootTweak.KeyPathTweak)
         val outputKey = internalKey.outputKey(Crypto.TaprootTweak.KeyPathTweak).first
         assertEquals("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c", internalKey.p2trAddress(Block.Testnet3GenesisBlock.hash))
 
@@ -79,7 +79,7 @@ class TaprootTestsCommon {
         val tx = Transaction.read(
             "02000000000101bf77ef36f2c0f32e0822cef0514948254997495a34bfba7dd4a73aabfcbb87900000000000fdffffff02c2c2000000000000160014b5c3dbfeb8e7d0c809c3ba3f815fd430777ef4be50c30000000000002251208c5db7f797196d6edc4dd7df6048f4ea6b883a6af6af032342088f436543790f0140583f758bea307216e03c1f54c3c6088e8923c8e1c89d96679fb00de9e808a79d0fba1cc3f9521cb686e8f43fb37cc6429f2e1480c70cc25ecb4ac0dde8921a01f1f70000"
         )
-        assertEquals(Script.pay2tr(internalKey, scripts = null), Script.parse(tx.txOut[1].publicKeyScript))
+        assertEquals(Script.pay2tr(internalKey, Crypto.TaprootTweak.KeyPathTweak), Script.parse(tx.txOut[1].publicKeyScript))
 
         // we want to spend
         val outputScript = addressToPublicKeyScript(Block.Testnet3GenesisBlock.hash, "tb1pn3g330w4n5eut7d4vxq0pp303267qc6vg8d2e0ctjuqre06gs3yqnc5yx0").right!!

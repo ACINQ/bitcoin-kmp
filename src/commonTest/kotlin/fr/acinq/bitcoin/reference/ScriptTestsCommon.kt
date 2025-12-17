@@ -193,7 +193,7 @@ class ScriptTestsCommon {
             }
             val witness = ScriptWitness(witnessStack)
             val scriptPubKey = if (scriptPubKeyText == "0x51 0x20 #TAPROOTOUTPUT#") {
-                Script.write(Script.pay2tr(priv.xOnlyPublicKey(), leaf))
+                Script.write(Script.pay2tr(priv.xOnlyPublicKey(), leaf?.let { Crypto.TaprootTweak.ScriptPathTweak(it.hash()) } ?: Crypto.TaprootTweak.KeyPathTweak))
             } else {
                 parseFromText(scriptPubKeyText)
             }

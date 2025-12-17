@@ -480,19 +480,19 @@ public object Script {
 
     /**
      * @param internalKey internal public key that will be tweaked with the [scripts] provided.
-     * @param scripts optional spending scripts that can be used instead of key-path spending.
+     * @param scripts spending script tree.
      */
     @JvmStatic
-    public fun pay2tr(internalKey: XonlyPublicKey, scripts: ScriptTree?): List<ScriptElt> = pay2tr(internalKey, scripts?.hash())
+    public fun pay2tr(internalKey: XonlyPublicKey, scripts: ScriptTree): List<ScriptElt> =
+        pay2tr(internalKey, scripts.hash())
 
     /**
      * @param internalKey internal public key that will be tweaked with the [scriptsRoot] provided.
-     * @param scriptsRoot optional merkle root of the spending scripts that can be used instead of key-path spending.
+     * @param scriptsRoot merkle root of the spending script tree.
      */
     @JvmStatic
-    public fun pay2tr(internalKey: XonlyPublicKey, scriptsRoot: ByteVector32?): List<ScriptElt> {
-        val tweak = scriptsRoot?.let { Crypto.TaprootTweak.ScriptPathTweak(it) } ?: Crypto.TaprootTweak.KeyPathTweak
-        return pay2tr(internalKey, tweak)
+    public fun pay2tr(internalKey: XonlyPublicKey, scriptsRoot: ByteVector32): List<ScriptElt> {
+        return pay2tr(internalKey, Crypto.TaprootTweak.ScriptPathTweak(scriptsRoot))
     }
 
     /**

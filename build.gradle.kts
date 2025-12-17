@@ -58,7 +58,7 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.22.0-SNAPSHOT"
+        val secp256k1KmpVersion = "0.22.0"
 
         val commonMain by getting {
             dependencies {

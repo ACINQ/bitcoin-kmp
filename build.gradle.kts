@@ -16,9 +16,7 @@ group = "fr.acinq.bitcoin"
 version = "0.29.0-SNAPSHOT"
 
 repositories {
-    google()
     mavenCentral()
-    maven("https://central.sonatype.com/repository/maven-snapshots")
 }
 
 kotlin {

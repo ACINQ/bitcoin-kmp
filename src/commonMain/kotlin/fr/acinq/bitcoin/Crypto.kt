@@ -157,40 +157,30 @@ public object Crypto {
     /**
      * Specify how private keys are tweaked when creating Schnorr signatures
      */
-    public sealed class SchnorrTweak {
-        /**
-         * private key is used as-is
-         */
-        public data object NoTweak : SchnorrTweak()
-    }
-
-    public sealed class TaprootTweak : SchnorrTweak() {
+    public sealed class TaprootTweak {
         /**
          * private key is tweaked with H_TapTweak(public key) (this is used for key path spending when no scripts are present)
          */
-        public data object NoScriptTweak : TaprootTweak()
+        public data object KeyPathTweak : TaprootTweak()
 
         /**
          * private key is tweaked with H_TapTweak(public key || merkle_root) (this is used for key path spending, with specific Merkle root of the script tree).
          */
-        public data class ScriptTweak(val merkleRoot: ByteVector32) : TaprootTweak() {
-            public constructor(scriptTree: ScriptTree) : this(scriptTree.hash())
-        }
+        public data class ScriptPathTweak(val merkleRoot: ByteVector32) : TaprootTweak()
     }
 
     /**
      * @param data data to sign (32 bytes)
      * @param privateKey private key
-     * @param schnorrTweak specify how to tweak the private key.
+     * @param taprootTweak optional tweak to apply to the private key.
      * @param auxrand32 optional auxiliary random data
      * @return the Schnorr signature of data with private key (optionally tweaked with the tapscript merkle root)
      */
     @JvmStatic
-    public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey, schnorrTweak: SchnorrTweak, auxrand32: ByteVector32? = null): ByteVector64 {
-        val priv = when (schnorrTweak) {
-            SchnorrTweak.NoTweak -> privateKey
-            is TaprootTweak.NoScriptTweak -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(schnorrTweak))
-            is TaprootTweak.ScriptTweak -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(schnorrTweak))
+    public fun signSchnorr(data: ByteVector32, privateKey: PrivateKey, taprootTweak: TaprootTweak?, auxrand32: ByteVector32? = null): ByteVector64 {
+        val priv = when (taprootTweak) {
+            null -> privateKey
+            else -> privateKey.tweak(privateKey.xOnlyPublicKey().tweak(taprootTweak))
         }
         val sig = Secp256k1.signSchnorr(data.toByteArray(), priv.value.toByteArray(), auxrand32?.toByteArray()).byteVector64()
         require(verifySignatureSchnorr(data, sig, priv.xOnlyPublicKey())) { "Cannot create Schnorr signature" }

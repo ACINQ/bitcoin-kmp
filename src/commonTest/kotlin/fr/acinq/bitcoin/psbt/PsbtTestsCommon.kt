@@ -1485,9 +1485,9 @@ class PsbtTestsCommon {
         // We make sure our utxos come from transactions with multiple outputs and are at different indices.
         val utxos = listOf(
             // @formatter:off
-            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(100_000.sat(), Script.pay2tr(getPublicKey(0), scripts = null))), lockTime = 0),
-            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(110_000.sat(), Script.pay2tr(getPublicKey(1), scripts = null)), TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef")))), lockTime = 0),
-            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(200_000.sat(), Script.pay2tr(getPublicKey(2), scripts = null))), lockTime = 0),
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(100_000.sat(), Script.pay2tr(getPublicKey(0), Crypto.TaprootTweak.KeyPathTweak))), lockTime = 0),
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(110_000.sat(), Script.pay2tr(getPublicKey(1), Crypto.TaprootTweak.KeyPathTweak)), TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef")))), lockTime = 0),
+            Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(200_000.sat(), Script.pay2tr(getPublicKey(2), Crypto.TaprootTweak.KeyPathTweak))), lockTime = 0),
             Transaction(version = 2, txIn = listOf(), txOut = listOf(TxOut(5_000.sat(), Script.pay2wsh(ByteVector("deadbeef"))), TxOut(50_000.sat(), Script.pay2pkh(p2pkhPriv.publicKey()))), lockTime = 0),
             // @formatter:on
         )
@@ -1506,7 +1506,7 @@ class PsbtTestsCommon {
                     TxIn(OutPoint(utxos[2], 3), TxIn.SEQUENCE_FINAL),
                     TxIn(OutPoint(utxos[3], 1), TxIn.SEQUENCE_FINAL),
                 ),
-                txOut = listOf(TxOut(450_000.sat(), Script.pay2tr(getPublicKey(0)))),
+                txOut = listOf(TxOut(450_000.sat(), Script.pay2tr(getPublicKey(0), Crypto.TaprootTweak.KeyPathTweak))),
                 lockTime = 0
             )
         )

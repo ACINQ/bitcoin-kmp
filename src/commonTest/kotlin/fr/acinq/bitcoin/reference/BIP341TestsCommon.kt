@@ -57,7 +57,8 @@ class BIP341TestsCommon {
                 val internalPubkey = internalPrivkey.publicKey().xOnly()
                 val intermediary = it.jsonObject["intermediary"]!!.jsonObject
                 assertEquals(ByteVector32(intermediary["internalPubkey"]!!.jsonPrimitive.content), internalPubkey.value)
-                val tweak = internalPubkey.tweak(if (merkleRoot == null) Crypto.TaprootTweak.NoScriptTweak else Crypto.TaprootTweak.ScriptTweak(merkleRoot))
+                val taprootTweak = merkleRoot?.let { Crypto.TaprootTweak.ScriptPathTweak(it) } ?: Crypto.TaprootTweak.KeyPathTweak
+                val tweak = internalPubkey.tweak(taprootTweak)
                 assertEquals(ByteVector32(intermediary["tweak"]!!.jsonPrimitive.content), tweak)
 
                 val tweakedPrivateKey = internalPrivkey.tweak(tweak)
@@ -66,7 +67,7 @@ class BIP341TestsCommon {
                 val hash = Transaction.hashForSigningTaprootKeyPath(rawUnsignedTx, txinIndex, utxosSpent, hashType)
                 assertEquals(ByteVector32(intermediary["sigHash"]!!.jsonPrimitive.content), hash)
 
-                val sig = Crypto.signSchnorr(hash, internalPrivkey, if (merkleRoot == null) Crypto.TaprootTweak.NoScriptTweak else Crypto.TaprootTweak.ScriptTweak(merkleRoot))
+                val sig = Crypto.signSchnorr(hash, internalPrivkey, taprootTweak)
                 val witness = Script.witnessKeyPathPay2tr(sig, hashType)
                 val expected = it.jsonObject["expected"]!!.jsonObject
                 val witnessStack = expected["witness"]!!.jsonArray.map { jsonElt -> ByteVector(jsonElt.jsonPrimitive.content) }
@@ -88,12 +89,13 @@ class BIP341TestsCommon {
             }
 
             val intermediary = it.jsonObject["intermediary"]!!.jsonObject
-            val (tweakedKey, _) = internalPubkey.outputKey(if (scriptTree == null) Crypto.TaprootTweak.NoScriptTweak else Crypto.TaprootTweak.ScriptTweak(scriptTree))
+            val tweak = scriptTree?.hash()?.let { Crypto.TaprootTweak.ScriptPathTweak(it) } ?: Crypto.TaprootTweak.KeyPathTweak
+            val (tweakedKey, _) = internalPubkey.outputKey(tweak)
             scriptTree?.let { assertEquals(ByteVector32(intermediary["merkleRoot"]!!.jsonPrimitive.content), it.hash()) }
             assertEquals(ByteVector32(intermediary["tweakedPubkey"]!!.jsonPrimitive.content), tweakedKey.value)
 
             val expected = it.jsonObject["expected"]!!.jsonObject
-            val script = Script.pay2tr(internalPubkey, scriptTree)
+            val script = Script.pay2tr(internalPubkey, tweak)
             assertEquals(ByteVector(expected["scriptPubKey"]!!.jsonPrimitive.content), Script.write(script).byteVector())
             val bip350Address = Bech32.encodeWitnessAddress("bc", 1.toByte(), tweakedKey.value.toByteArray())
             assertEquals(expected["bip350Address"]!!.jsonPrimitive.content, bip350Address)

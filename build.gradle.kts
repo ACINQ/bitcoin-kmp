@@ -17,6 +17,7 @@ version = "0.30.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    maven("https://central.sonatype.com/repository/maven-snapshots")
 }
 
 kotlin {
@@ -39,24 +40,26 @@ kotlin {
 
     linuxArm64()
 
-    macosX64()
-    
-    macosArm64()
+    if(currentOs.isMacOsX) {
+        macosX64()
 
-    iosX64 {
-        compilations["main"].cinterops.create("CoreCrypto")
-    }
+        macosArm64()
 
-    iosArm64 {
-        compilations["main"].cinterops.create("CoreCrypto")
-    }
+        iosX64 {
+            compilations["main"].cinterops.create("CoreCrypto")
+        }
 
-    iosSimulatorArm64 {
-        compilations["main"].cinterops.create("CoreCrypto")
+        iosArm64 {
+            compilations["main"].cinterops.create("CoreCrypto")
+        }
+
+        iosSimulatorArm64 {
+            compilations["main"].cinterops.create("CoreCrypto")
+        }
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.22.0"
+        val secp256k1KmpVersion = "0.23.0-SNAPSHOT"
 
         val commonMain by getting {
             dependencies {

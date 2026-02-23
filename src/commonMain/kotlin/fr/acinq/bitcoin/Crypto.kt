@@ -21,7 +21,6 @@ import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_LOW_S
 import fr.acinq.bitcoin.ScriptFlags.SCRIPT_VERIFY_STRICTENC
 import fr.acinq.bitcoin.crypto.Digest
 import fr.acinq.bitcoin.crypto.hmac
-import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmStatic
 
@@ -192,14 +191,6 @@ public object Crypto {
         return Secp256k1.verifySchnorr(signature.toByteArray(), data.toByteArray(), publicKey.value.toByteArray())
     }
 
-    private fun padLeft(data: ByteArray, size: Int): ByteArray = when {
-        data.size == size -> data
-        data.size < size -> ByteArray(size - data.size) + data
-        else -> throw RuntimeException("cannot pad left: byte array is too big (${data.size} > $size)")
-    }
-
-    private fun dropZeroAndFixSize(input: ByteArray, size: Int) = padLeft(input.dropWhile { it == 0.toByte() }.toByteArray(), size)
-
     @JvmStatic
     public fun compact2der(signature: ByteVector64): ByteVector {
         val normalized = Secp256k1.signatureNormalize(signature.toByteArray()).first
@@ -207,18 +198,15 @@ public object Crypto {
         return ByteVector(der)
     }
 
+    /**
+     * DER to compact format conversion
+     * @param signature a DER signature
+     * @return a compact, normalized 64 bytes signature
+     */
     @JvmStatic
     public fun der2compact(signature: ByteArray): ByteVector64 {
-        val (r, s) = decodeSignatureLax(ByteArrayInput(signature))
-        val lax = dropZeroAndFixSize(r, 32) + dropZeroAndFixSize(s, 32)
-        return ByteVector64(Secp256k1.signatureNormalize(lax).first)
-    }
-
-    @JvmStatic
-    public fun normalize(signature: ByteArray): Pair<ByteVector64, Boolean> {
-        val (r, s) = decodeSignatureLax(ByteArrayInput(signature))
-        val compact = dropZeroAndFixSize(r, 32) + dropZeroAndFixSize(s, 32)
-        return Secp256k1.signatureNormalize(compact).let { ByteVector64(it.first) to it.second }
+        val lax = decodeSignatureLax(signature)
+        return ByteVector64(Secp256k1.signatureNormalize(lax.toByteArray()).first)
     }
 
     @JvmStatic
@@ -292,7 +280,7 @@ public object Crypto {
      * @return true if the input is a "low S" signature
      */
     @JvmStatic
-    public fun isLowDERSignature(sig: ByteArray): Boolean = !Secp256k1.signatureNormalize(sig).second
+    public fun isLowDERSignature(sig: ByteArray): Boolean = !Secp256k1.signatureNormalize(Secp256k1.der2compact(sig)).second
 
     /**
      * @param sig signature (DER encoded + a trailing sighash byte)
@@ -340,35 +328,83 @@ public object Crypto {
         return true
     }
 
+    /**
+     * Decode a DER-encoded signature and return a compact signature. Allows for some violations of DER-encoding rules.
+     * @param derSignature DER-encoded signature
+     * @return a compact 64 bytes signature
+     */
     @JvmStatic
-    public fun decodeSignatureLax(input: ByteArrayInput): Pair<ByteArray, ByteArray> {
-        require(input.read() == 0x30)
+    public fun decodeSignatureLax(derSignature: ByteArray): ByteVector64 {
+        var pos = 0
+        val output = ByteArray(64)
 
-        fun readLength(): Int {
-            val len = input.read()
-            return if ((len and 0x80) == 0) {
-                len
-            } else {
-                var n = len - 0x80
-                var len1 = 0
-                while (n > 0) {
-                    len1 = (len1 shl 8) + input.read()
-                    n -= 1
-                }
-                len1
-            }
+        /* Sequence tag byte */
+        require(derSignature[pos++] == 0x30.toByte())
+
+        var lenbyte = derSignature[pos++].toInt()
+        if (lenbyte and 0x80 != 0) {
+            lenbyte -= 0x80;
+            pos += lenbyte;
         }
 
-        readLength()
-        require(input.read() == 0x02)
-        val lenR = readLength()
-        val r = ByteArray(lenR)
-        input.read(r, 0, lenR)
-        require(input.read() == 0x02)
-        val lenS = readLength()
-        val s = ByteArray(lenS)
-        input.read(s, 0, lenS)
-        return Pair(r, s)
+        require(derSignature[pos++] == 0x02.toByte())
+
+        fun readLength(): Int {
+            lenbyte = derSignature[pos++].toInt()
+            var len = 0
+            if (lenbyte and 0x80 != 0) {
+                lenbyte -= 0x80
+                while (lenbyte > 0 && derSignature[pos] == 0.toByte()) {
+                    pos++
+                    lenbyte--
+                }
+                require(lenbyte < 4)
+                while (lenbyte > 0) {
+                    len = (len shl 8) + derSignature[pos]
+                    pos++
+                    lenbyte--
+                }
+            } else {
+                len = lenbyte;
+            }
+            return len
+        }
+
+        /* Integer tag byte for R */
+        var rlen = readLength()
+        require(rlen <= derSignature.size - pos)
+        var rpos = pos
+        pos += rlen
+
+        /* Integer tag byte for S */
+        require(pos < derSignature.size && derSignature[pos++] == 0x02.toByte())
+
+        /* Integer length for S */
+        var slen = readLength()
+        require(slen <= derSignature.size - pos)
+        var spos = pos
+
+        /* Ignore leading zeroes in R */
+        while (rlen > 0 && derSignature[rpos] == 0.toByte()) {
+            rlen--
+            rpos++
+        }
+        /* Ignore leading zeroes in S */
+        while (slen > 0 && derSignature[spos] == 0.toByte()) {
+            slen--
+            spos++
+        }
+
+        // if r or s are too large, we return an invalid signature
+        if (rlen > 32 || slen > 32) return ByteVector64.Zeroes
+
+        /* Copy R value */
+        derSignature.copyInto(output, 32 - rlen, rpos, rpos + rlen)
+
+        /* Copy S value */
+        derSignature.copyInto(output, 64 - slen, spos, spos + slen)
+
+        return output.byteVector64()
     }
 
     /**

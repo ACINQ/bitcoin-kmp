@@ -52,7 +52,7 @@ class ScriptTestsCommon {
             runTest(it.jsonArray)
             count += 1
         }
-        assertEquals(1212, count)
+        assertEquals(1222, count)
     }
 
 

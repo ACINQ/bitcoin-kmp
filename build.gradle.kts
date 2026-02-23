@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "2.2.21"
+    kotlin("multiplatform") version "2.3.10"
     id("org.jetbrains.dokka") version "1.9.20"
     `maven-publish`
 }
@@ -39,24 +39,26 @@ kotlin {
 
     linuxArm64()
 
-    macosX64()
-    
-    macosArm64()
+    if(currentOs.isMacOsX) {
+        macosX64()
 
-    iosX64 {
-        compilations["main"].cinterops.create("CoreCrypto")
-    }
+        macosArm64()
 
-    iosArm64 {
-        compilations["main"].cinterops.create("CoreCrypto")
-    }
+        iosX64 {
+            compilations["main"].cinterops.create("CoreCrypto")
+        }
 
-    iosSimulatorArm64 {
-        compilations["main"].cinterops.create("CoreCrypto")
+        iosArm64 {
+            compilations["main"].cinterops.create("CoreCrypto")
+        }
+
+        iosSimulatorArm64 {
+            compilations["main"].cinterops.create("CoreCrypto")
+        }
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.22.0"
+        val secp256k1KmpVersion = "0.23.0"
 
         val commonMain by getting {
             dependencies {
@@ -67,8 +69,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.8.0")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.9.0")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
             }
         }
 

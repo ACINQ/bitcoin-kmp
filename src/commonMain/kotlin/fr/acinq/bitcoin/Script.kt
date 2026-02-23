@@ -731,7 +731,7 @@ public object Script {
                     else {
                         val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags, context.amount, signatureVersion)
                         // signature is normalized here, but high-S correctness has already been checked
-                        val normalized = Crypto.normalize(sigBytes1).first
+                        val normalized = Crypto.der2compact(sigBytes1)
                         val pub = PublicKey.parse(pubKey)
                         val result = Crypto.verifySignature(hash, normalized, pub)
                         result

@@ -199,7 +199,7 @@ public object Crypto {
     }
 
     /**
-     * DER to compact format conversion
+     * DER to compact format conversion, used specifically to verify ECDSA signatures in bitcoin transactions.
      * @param signature a DER signature
      * @return a compact, normalized 64 bytes signature
      */
@@ -330,6 +330,8 @@ public object Crypto {
 
     /**
      * Decode a DER-encoded signature and return a compact signature. Allows for some violations of DER-encoding rules.
+     * This is a "port' of Bitcoin Core's ecdsa_signature_parse_der_lax() method at commit d9c7364ac56781a16c7224b2c7a6db9db97f17d8.
+     * It is used to verify ECDSA signatures in the context of bitcoin transaction verification.
      * @param derSignature DER-encoded signature
      * @return a compact 64 bytes signature
      */

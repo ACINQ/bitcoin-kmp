@@ -18,7 +18,6 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.MnemonicCode.toMnemonics
 import fr.acinq.bitcoin.MnemonicCode.toSeed
-import fr.acinq.bitcoin.utils.runTrying
 import fr.acinq.secp256k1.Hex
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject

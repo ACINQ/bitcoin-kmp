@@ -126,7 +126,7 @@ public object Crypto {
      * @param data       data to sign
      * @param privateKey private key. If you are using bitcoin "compressed" private keys make sure to only use the first 32 bytes of
      *                   the key (there is an extra "1" appended to the key)
-     * @return a (r, s) ECDSA signature pair
+     * @return an ECDSA signature in compact format (64 bytes)
      */
     @JvmStatic
     public fun sign(data: ByteArray, privateKey: PrivateKey): ByteVector64 {
@@ -190,25 +190,7 @@ public object Crypto {
     public fun verifySignatureSchnorr(data: ByteVector32, signature: ByteVector, publicKey: XonlyPublicKey): Boolean {
         return Secp256k1.verifySchnorr(signature.toByteArray(), data.toByteArray(), publicKey.value.toByteArray())
     }
-
-    @JvmStatic
-    public fun compact2der(signature: ByteVector64): ByteVector {
-        val normalized = Secp256k1.signatureNormalize(signature.toByteArray()).first
-        val der = Secp256k1.compact2der(normalized)
-        return ByteVector(der)
-    }
-
-    /**
-     * DER to compact format conversion, used specifically to verify ECDSA signatures in bitcoin transactions.
-     * @param signature a DER signature
-     * @return a compact, normalized 64 bytes signature
-     */
-    @JvmStatic
-    public fun der2compact(signature: ByteArray): ByteVector64 {
-        val lax = decodeSignatureLax(signature)
-        return ByteVector64(Secp256k1.signatureNormalize(lax.toByteArray()).first)
-    }
-
+    
     @JvmStatic
     public fun isDERSignature(sig: ByteArray): Boolean {
         // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S] [sighash]

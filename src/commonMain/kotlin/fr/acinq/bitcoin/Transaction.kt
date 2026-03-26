@@ -607,8 +607,7 @@ public data class Transaction(
      */
     public fun signInput(inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray {
         val sig = signInputCompact(inputIndex, previousOutputScript, sighashType, amount, signatureVersion, privateKey)
-        val sigDER = Secp256k1.compact2der(sig.toByteArray())
-        return sigDER + sighashType.toByte()
+        return encodeWitnessEcdsaSig(sig, sighashType)
     }
 
     public fun signInput(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray =
@@ -1030,6 +1029,16 @@ public data class Transaction(
         @JvmStatic
         public fun signInput(tx: Transaction, inputIndex: Int, previousOutputScript: List<ScriptElt>, sighashType: Int, privateKey: PrivateKey): ByteArray =
             signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, privateKey)
+
+        /**
+         * @param sig ECDSA signature in compact format
+         * @param sighashType signature hash type, which will be appended to the signature
+         * @return an ECDSA signature in the format used in transaction witnesses and scripts: DER encoded followed by a sighash byte
+         */
+        @JvmStatic
+        public fun encodeWitnessEcdsaSig(sig: ByteVector64, sighashType: Int): ByteArray {
+            return Secp256k1.compact2der(sig.toByteArray()) + sighashType.toByte()
+        }
 
         /**
          * @param tx transaction to sign

@@ -16,6 +16,7 @@
 
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.Crypto.decodeSignatureLax
 import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Input
@@ -730,8 +731,10 @@ public object Script {
                     if (sigBytes1.isEmpty()) false
                     else {
                         val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags, context.amount, signatureVersion)
+                        // we use our "lax" decoding method here, but DER-strictness has already been checked
+                        val lax = decodeSignatureLax(sigBytes1)
                         // signature is normalized here, but high-S correctness has already been checked
-                        val normalized = Crypto.normalize(sigBytes1).first
+                        val normalized = Secp256k1.signatureNormalize(lax.toByteArray()).first.byteVector64()
                         val pub = PublicKey.parse(pubKey)
                         val result = Crypto.verifySignature(hash, normalized, pub)
                         result

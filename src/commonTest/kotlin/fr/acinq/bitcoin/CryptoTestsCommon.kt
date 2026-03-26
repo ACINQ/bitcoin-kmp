@@ -150,14 +150,6 @@ class CryptoTestsCommon {
     }
 
     @Test
-    fun `der to compact`() {
-        assertEquals(
-            ByteVector64("3f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e78223ea13203caf853b71e97e5cc149f65547d1d7ab98c96353d0d8318934e7716"),
-            Crypto.der2compact(Hex.decode("304402203f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e780220ddc15ecdfc3507ac48e1681a33eb60996631bf6bf5bc0a0682c4db743ce7ca2b01"))
-        )
-    }
-
-    @Test
     fun `generate deterministic signatures`() {
         val dataset = sequenceOf(
             Triple(
@@ -194,9 +186,9 @@ class CryptoTestsCommon {
         dataset.forEach {
             val (k, m, s) = it
             val compact = Crypto.sign(Crypto.sha256(m.encodeToByteArray()), PrivateKey.fromHex(k))
-            val sig = Crypto.compact2der(compact)
+            val sig = Secp256k1.compact2der(compact.toByteArray())
 
-            assertEquals(Hex.encode(sig.toByteArray()), s)
+            assertEquals(Hex.encode(sig), s)
         }
     }
 
@@ -212,20 +204,6 @@ class CryptoTestsCommon {
         val shared1 = Crypto.ecdh(privateKey1, privateKey2.publicKey())
         val shared2 = Crypto.ecdh(privateKey2, privateKey1.publicKey())
         assertContentEquals(shared1, shared2)
-    }
-
-    @Test
-    fun `DER encoding compatibility tests`() {
-        val sig = ByteVector64(ByteArray(64) { 0xaa.toByte() })
-        val der = Crypto.compact2der(sig)
-        assertEquals(der.size(), 71)
-    }
-
-    @Test
-    fun `DER decoding compatibility tests`() {
-        val der = Hex.decode("3045022100b50cbdd83b17b722b0e1f58e21cf3789ab18b36648023ed3811b522342ddaa9e02207182673961b7a10bfa94fe89780da0d03bfe1de137e0be32cc47a51edcaf08f301")
-        val sig = Crypto.der2compact(der)
-        assertEquals(sig, ByteVector64("b50cbdd83b17b722b0e1f58e21cf3789ab18b36648023ed3811b522342ddaa9e7182673961b7a10bfa94fe89780da0d03bfe1de137e0be32cc47a51edcaf08f3"))
     }
 
     @Test

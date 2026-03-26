@@ -24,6 +24,7 @@ import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
+import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
@@ -557,12 +558,56 @@ public data class Transaction(
      * @param amount               amount of the output claimed by this tx input
      * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
      * @param privateKey           private key
-     * @return the encoded signature of this tx for this specific tx input
+     * @return the ECDSA signature (in compact 64 bytes format) of this tx for this specific tx input
      */
-    public fun signInput(inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray {
+    public fun signInputCompact(inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector64 {
         val hash = hashForSigning(inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
         val sig = Crypto.sign(hash, privateKey)
-        return Crypto.compact2der(sig).toByteArray() + (sighashType.toByte())
+        return sig
+    }
+
+    /**
+     * sign a tx input
+     *
+     * @param inputIndex           index of the tx input that is being processed
+     * @param previousOutputScript public key script of the output claimed by this tx input
+     * @param sighashType          signature hash type, which will be appended to the signature
+     * @param amount               amount of the output claimed by this tx input
+     * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
+     * @param privateKey           private key
+     * @return the ECDSA signature (in compact 64 bytes format) of this tx for this specific tx input
+     */
+    public fun signInputCompact(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector64 =
+        signInputCompact(inputIndex, previousOutputScript.toByteArray(), sighashType, amount, signatureVersion, privateKey)
+
+    /**
+     * sign a tx input
+     *
+     * @param inputIndex           index of the tx input that is being processed
+     * @param previousOutputScript public key script of the output claimed by this tx input
+     * @param sighashType          signature hash type, which will be appended to the signature
+     * @param amount               amount of the output claimed by this tx input
+     * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
+     * @param privateKey           private key
+     * @return the ECDSA signature (in compact 64 bytes format) of this tx for this specific tx input
+     */
+    public fun signInputCompact(inputIndex: Int, previousOutputScript: List<ScriptElt>, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector64 =
+        signInputCompact(inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
+
+    /**
+     * sign a tx input
+     *
+     * @param inputIndex           index of the tx input that is being processed
+     * @param previousOutputScript public key script of the output claimed by this tx input
+     * @param sighashType          signature hash type, which will be appended to the signature
+     * @param amount               amount of the output claimed by this tx input
+     * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
+     * @param privateKey           private key
+     * @return the encoded (in DER format followed by sighash byte) ECDSA signature of this tx for this specific tx input
+     */
+    public fun signInput(inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray {
+        val sig = signInputCompact(inputIndex, previousOutputScript, sighashType, amount, signatureVersion, privateKey)
+        return encodeWitnessEcdsaSig(sig, sighashType)
     }
 
     public fun signInput(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray =
@@ -577,7 +622,7 @@ public data class Transaction(
      * @param amount               amount of the output claimed by this tx input
      * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
      * @param privateKey           private key
-     * @return the encoded signature of this tx for this specific tx input
+     * @return the encoded (in DER format followed by sighash byte) ECDSA signature of this tx for this specific tx input
      */
     public fun signInput(inputIndex: Int, previousOutputScript: List<ScriptElt>, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray =
         signInput(inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
@@ -588,7 +633,7 @@ public data class Transaction(
      * @param previousOutputScript public key script of the output claimed by this tx input
      * @param sighashType          signature hash type, which will be appended to the signature
      * @param privateKey           private key
-     * @return the encoded signature of this tx for this specific tx input
+     * @return the encoded (in DER format followed by sighash byte) ECDSA signature of this tx for this specific tx input
      */
     public fun signInput(inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, privateKey: PrivateKey): ByteArray =
         signInput(inputIndex, previousOutputScript, sighashType, Satoshi(0L), SigVersion.SIGVERSION_BASE, privateKey)
@@ -938,7 +983,7 @@ public data class Transaction(
          * @param amount               amount of the output claimed by this tx input
          * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
          * @param privateKey           private key
-         * @return the encoded signature of this tx for this specific tx input
+         * @return the encoded (in DER format followed by sighash byte) ECDSA signature of this tx for this specific tx input
          */
         @JvmStatic
         public fun signInput(tx: Transaction, inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray =
@@ -958,7 +1003,7 @@ public data class Transaction(
          * @param amount               amount of the output claimed by this tx input
          * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
          * @param privateKey           private key
-         * @return the encoded signature of this tx for this specific tx input
+         * @return the encoded (in DER format followed by sighash byte) ECDSA signature of this tx for this specific tx input
          */
         @JvmStatic
         public fun signInput(tx: Transaction, inputIndex: Int, previousOutputScript: List<ScriptElt>, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteArray =
@@ -971,7 +1016,7 @@ public data class Transaction(
          * @param previousOutputScript public key script of the output claimed by this tx input
          * @param sighashType          signature hash type, which will be appended to the signature
          * @param privateKey           private key
-         * @return the encoded signature of this tx for this specific tx input
+         * @return the encoded (in DER format followed by sighash byte) ECDSA signature of this tx for this specific tx input
          */
         @JvmStatic
         public fun signInput(tx: Transaction, inputIndex: Int, previousOutputScript: ByteArray, sighashType: Int, privateKey: PrivateKey): ByteArray =
@@ -984,6 +1029,16 @@ public data class Transaction(
         @JvmStatic
         public fun signInput(tx: Transaction, inputIndex: Int, previousOutputScript: List<ScriptElt>, sighashType: Int, privateKey: PrivateKey): ByteArray =
             signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, privateKey)
+
+        /**
+         * @param sig ECDSA signature in compact format
+         * @param sighashType signature hash type, which will be appended to the signature
+         * @return an ECDSA signature in the format used in transaction witnesses and scripts: DER encoded followed by a sighash byte
+         */
+        @JvmStatic
+        public fun encodeWitnessEcdsaSig(sig: ByteVector64, sighashType: Int): ByteArray {
+            return Secp256k1.compact2der(sig.toByteArray()) + sighashType.toByte()
+        }
 
         /**
          * @param tx transaction to sign

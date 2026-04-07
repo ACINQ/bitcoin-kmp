@@ -690,6 +690,7 @@ public data class Transaction(
         }
         val outputType = if (sighashType == SigHash.SIGHASH_DEFAULT) SigHash.SIGHASH_ALL else sighashType and SigHash.SIGHASH_OUTPUT_MASK
         if (outputType == SigHash.SIGHASH_SINGLE) {
+            require(inputIndex < txOut.size) { "SIGHASH_SINGLE requires a corresponding output" }
             out.write(Crypto.sha256(TxOut.write(txOut[inputIndex])))
         }
         if (sigVersion == SigVersion.SIGVERSION_TAPSCRIPT) {

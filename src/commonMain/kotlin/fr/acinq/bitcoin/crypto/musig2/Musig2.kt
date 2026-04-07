@@ -71,7 +71,7 @@ public data class Session(private val data: ByteVector, private val keyAggCache:
      * @return a musig2 partial signature.
      */
     public fun sign(secretNonce: SecretNonce, privateKey: PrivateKey): ByteVector32 {
-        return Secp256k1.musigPartialSign(secretNonce.data.toByteArray(), privateKey.value.toByteArray(), keyAggCache.toByteArray(), this.toByteArray()).byteVector32()
+        return Secp256k1.musigPartialSign(secretNonce.consume(), privateKey.value.toByteArray(), keyAggCache.toByteArray(), this.toByteArray()).byteVector32()
     }
 
     /**
@@ -119,15 +119,31 @@ public data class Session(private val data: ByteVector, private val keyAggCache:
  * Musig2 secret nonce, that should be treated as a private opaque blob.
  * This nonce must never be persisted or reused across signing sessions.
  */
-public data class SecretNonce(internal val data: ByteVector) {
-    public constructor(bin: ByteArray) : this(bin.byteVector())
-    public constructor(hex: String) : this(Hex.decode(hex))
+public class SecretNonce private constructor(internal val data: ByteArray, @Suppress("UNUSED_PARAMETER") copied: Boolean) {
+    public constructor(bin: ByteArray) : this(bin.copyOf(), true)
+    public constructor(hex: String) : this(Hex.decode(hex), true)
 
     init {
-        require(data.size() == Secp256k1.MUSIG2_SECRET_NONCE_SIZE) { "musig2 secret nonce must be ${Secp256k1.MUSIG2_SECRET_NONCE_SIZE} bytes" }
+        require(data.size == Secp256k1.MUSIG2_SECRET_NONCE_SIZE) { "musig2 secret nonce must be ${Secp256k1.MUSIG2_SECRET_NONCE_SIZE} bytes" }
     }
 
     override fun toString(): String = "<secret_nonce>"
+
+    private var consumed: Boolean = false
+
+    internal fun consume(): ByteArray {
+        check(!consumed) { "secret nonce has already been used" }
+        consumed = true
+        return data
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is SecretNonce) return false
+        return data.contentEquals(other.data)
+    }
+
+    override fun hashCode(): Int = data.contentHashCode()
 
     public companion object {
         /**

@@ -167,12 +167,15 @@ public abstract class BtcSerializer<T> {
         }
 
         @JvmStatic
-        public fun bytes(input: Input, size: Long): ByteArray = bytes(input, size.toInt())
+        public fun bytes(input: Input, size: Long): ByteArray {
+            require(size in 0..Int.MAX_VALUE.toLong()) { "invalid size: $size" }
+            return bytes(input, size.toInt())
+        }
 
         @JvmStatic
         public fun bytes(input: Input, size: Int): ByteArray {
             // NB: we make that check before allocating a byte array, otherwise an attacker can exhaust our heap space.
-            require(size <= input.availableBytes) { "cannot read $size bytes from a stream that has ${input.availableBytes} bytes left" }
+            require(size in 0..input.availableBytes) { "cannot read $size bytes from a stream that has ${input.availableBytes} bytes left" }
             val blob = ByteArray(size)
             if (size > 0) {
                 input.read(blob, 0, size)
@@ -192,6 +195,7 @@ public abstract class BtcSerializer<T> {
         @JvmStatic
         public fun varstring(input: Input): String {
             val length = varint(input)
+            require(length <= Int.MAX_VALUE.toULong()) { "varstring length $length exceeds maximum" }
             val bytes = bytes(input, length.toInt())
             val chars = bytes.map { it.toInt().toChar() }.toCharArray()
             return chars.concatToString()
@@ -208,8 +212,9 @@ public abstract class BtcSerializer<T> {
 
         @JvmStatic
         public fun script(input: Input): ByteArray {
-            val length = varint(input) // read size
-            return bytes(input, length.toInt()) // read bytes
+            val length = varint(input)
+            require(length <= Int.MAX_VALUE.toULong()) { "script length $length exceeds maximum" }
+            return bytes(input, length.toInt())
         }
 
         @JvmStatic
@@ -236,7 +241,9 @@ public abstract class BtcSerializer<T> {
             maxElement: Int?,
             protocolVersion: Long
         ): List<T> {
-            val count = varint(input).toInt()
+            val rawCount = varint(input)
+            require(rawCount <= Int.MAX_VALUE.toULong()) { "collection count $rawCount exceeds maximum" }
+            val count = rawCount.toInt()
             if (maxElement != null) require(count <= maxElement) { "invalid length" }
             val items = mutableListOf<T>()
             for (i in 1..count) {

@@ -25,6 +25,27 @@ import kotlin.test.*
 
 class TaprootTestsCommon {
     @Test
+    fun `taproot SIGHASH_SINGLE without corresponding output is rejected`() {
+        val prevTxHash = TxHash("0000000000000000000000000000000000000000000000000000000000000001")
+        val tx = Transaction(
+            2,
+            listOf(
+                TxIn(OutPoint(prevTxHash, 0), ByteVector.empty, TxIn.SEQUENCE_FINAL),
+                TxIn(OutPoint(prevTxHash, 1), ByteVector.empty, TxIn.SEQUENCE_FINAL),
+                TxIn(OutPoint(prevTxHash, 2), ByteVector.empty, TxIn.SEQUENCE_FINAL),
+            ),
+            listOf(TxOut(50_000.sat(), ByteVector("76a91489abcdefabbaabbaabbaabbaabbaabbaabbaabba88ac"))),
+            0
+        )
+        val inputs = List(3) { TxOut(50_000.sat(), ByteVector("76a91489abcdefabbaabbaabbaabbaabbaabbaabbaabba88ac")) }
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            hashForSigningSchnorr(tx, 2, inputs, SigHash.SIGHASH_SINGLE, SigVersion.SIGVERSION_TAPROOT)
+        }
+        assertContains(exception.message ?: "", "corresponding output")
+    }
+
+    @Test
     fun `check taproot signatures`() {
         // derive BIP86 wallet key
         val (_, master) = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPeQQADibg4WF7mEasy3piWZUHyThAzJCPNgMHDVYhTCVfev3jFbDhcYm4GimeFMbbi9z1d9rfY1aL5wfJ9mNebQ4thJ62EJb")

@@ -75,4 +75,36 @@ class BtcSerializerTestsCommon {
             assertFailsWith<IllegalArgumentException> { Script.write(listOf(it)) }
         }
     }
+
+    @Test
+    fun `reject oversized script lengths`() {
+        val input = ByteArrayInput(Hex.decode("fe00000080" + "00".repeat(100)))
+        assertFailsWith<IllegalArgumentException> {
+            BtcSerializer.script(input)
+        }
+    }
+
+    @Test
+    fun `reject oversized collection counts`() {
+        assertFailsWith<IllegalArgumentException> {
+            BtcSerializer.readCollection(ByteArrayInput(Hex.decode("ff0100000001000000")), TxOut, 10, Protocol.PROTOCOL_VERSION)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            BtcSerializer.readCollection(ByteArrayInput(Hex.decode("fe00000080")), TxOut, 10, Protocol.PROTOCOL_VERSION)
+        }
+    }
+
+    @Test
+    fun `reject transaction inputs with truncated script varints`() {
+        val outpointHash = "aa".repeat(32)
+        val outpointIndex = "00000000"
+        val scriptVarint = "ff0500000001000000"
+        val fiveScriptBytes = "0102030405"
+        val attackerSequence = "41414141"
+
+        val hex = outpointHash + outpointIndex + scriptVarint + fiveScriptBytes + attackerSequence
+        assertFailsWith<IllegalArgumentException> {
+            TxIn.read(Hex.decode(hex))
+        }
+    }
 }

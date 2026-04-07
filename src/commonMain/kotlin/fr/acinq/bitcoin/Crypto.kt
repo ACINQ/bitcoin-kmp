@@ -216,13 +216,13 @@ public object Crypto {
         if (sig[1] != (sig.size - 3).toByte()) return false
 
         // Extract the length of the R element.
-        val lenR = sig[3]
+        val lenR = sig[3].toInt() and 0xff
 
         // Make sure the length of the S element is still inside the signature.
         if (5 + lenR >= sig.size) return false
 
         // Extract the length of the S element.
-        val lenS = sig[5 + lenR]
+        val lenS = sig[5 + lenR].toInt() and 0xff
 
         // Verify that the length of the signature matches the sum of the length
         // of the elements.
@@ -232,7 +232,7 @@ public object Crypto {
         if (sig[2] != 0x02.toByte()) return false
 
         // Zero-length integers are not allowed for R.
-        if (lenR == 0.toByte()) return false
+        if (lenR == 0) return false
 
         // Negative numbers are not allowed for R.
         if ((sig[4].toInt() and 0x80) != 0) return false
@@ -245,7 +245,7 @@ public object Crypto {
         if (sig[lenR + 4] != 0x02.toByte()) return false
 
         // Zero-length integers are not allowed for S.
-        if (lenS == 0.toByte()) return false
+        if (lenS == 0) return false
 
         // Negative numbers are not allowed for S.
         if ((sig[lenR + 6].toInt() and 0x80) != 0) return false
@@ -318,23 +318,23 @@ public object Crypto {
      * @return a compact 64 bytes signature
      */
     @JvmStatic
-    public fun decodeSignatureLax(derSignature: ByteArray): ByteVector64 {
+    public fun decodeSignatureLax(derSignature: ByteArray): ByteVector64 = try {
         var pos = 0
         val output = ByteArray(64)
 
         /* Sequence tag byte */
         require(derSignature[pos++] == 0x30.toByte())
 
-        var lenbyte = derSignature[pos++].toInt()
+        var lenbyte = derSignature[pos++].toInt() and 0xff
         if (lenbyte and 0x80 != 0) {
-            lenbyte -= 0x80;
-            pos += lenbyte;
+            lenbyte -= 0x80
+            pos += lenbyte
         }
 
         require(derSignature[pos++] == 0x02.toByte())
 
         fun readLength(): Int {
-            lenbyte = derSignature[pos++].toInt()
+            lenbyte = derSignature[pos++].toInt() and 0xff
             var len = 0
             if (lenbyte and 0x80 != 0) {
                 lenbyte -= 0x80
@@ -344,12 +344,12 @@ public object Crypto {
                 }
                 require(lenbyte < 4)
                 while (lenbyte > 0) {
-                    len = (len shl 8) + derSignature[pos]
+                    len = (len shl 8) + (derSignature[pos].toInt() and 0xff)
                     pos++
                     lenbyte--
                 }
             } else {
-                len = lenbyte;
+                len = lenbyte
             }
             return len
         }
@@ -388,7 +388,11 @@ public object Crypto {
         /* Copy S value */
         derSignature.copyInto(output, 64 - slen, spos, spos + slen)
 
-        return output.byteVector64()
+        output.byteVector64()
+    } catch (_: IllegalArgumentException) {
+        ByteVector64.Zeroes
+    } catch (_: IndexOutOfBoundsException) {
+        ByteVector64.Zeroes
     }
 
     /**

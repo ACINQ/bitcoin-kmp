@@ -57,6 +57,8 @@ class Musig2TestsCommon {
         return SecretNonce(magic + serialized.take(64) + publicKeyX + publicKeyY)
     }
 
+    private fun deserializeSecretNonceBytes(hex: String): ByteArray = deserializeSecretNonce(hex).data.copyOf()
+
     @Test
     fun `generate secret nonce`() {
         val tests = TestHelpers.readResourceAsJson("musig2/nonce_gen_vectors.json")
@@ -129,7 +131,7 @@ class Musig2TestsCommon {
         val tests = TestHelpers.readResourceAsJson("musig2/sign_verify_vectors.json")
         val sk = PrivateKey.fromHex(tests.jsonObject["sk"]!!.jsonPrimitive.content)
         val pubkeys = tests.jsonObject["pubkeys"]!!.jsonArray.map { PublicKey(ByteVector(it.jsonPrimitive.content)) }
-        val secnonces = tests.jsonObject["secnonces"]!!.jsonArray.map { deserializeSecretNonce(it.jsonPrimitive.content) }
+        val secnonces = tests.jsonObject["secnonces"]!!.jsonArray.map { deserializeSecretNonceBytes(it.jsonPrimitive.content) }
         val pnonces = tests.jsonObject["pnonces"]!!.jsonArray.map { IndividualNonce(it.jsonPrimitive.content) }
         val aggnonces = tests.jsonObject["aggnonces"]!!.jsonArray.map { AggregatedNonce(it.jsonPrimitive.content) }
         val msgs = tests.jsonObject["msgs"]!!.jsonArray.map { ByteVector(it.jsonPrimitive.content) }
@@ -148,7 +150,7 @@ class Musig2TestsCommon {
             if (msgs[messageIndex].bytes.size == 32) {
                 val session = Session.create(aggnonce, ByteVector32(msgs[messageIndex]), keyagg)
                 assertNotNull(session)
-                val psig = session.sign(secnonces[keyIndices[signerIndex]], sk)
+                val psig = session.sign(SecretNonce(secnonces[keyIndices[signerIndex]]), sk)
                 assertEquals(expected, psig)
                 assertTrue(session.verify(psig, pnonces[nonceIndices[signerIndex]], pubkeys[keyIndices[signerIndex]]))
             }
@@ -224,7 +226,7 @@ class Musig2TestsCommon {
         val tweaks = tests.jsonObject["tweaks"]!!.jsonArray.map { ByteVector32.fromValidHex(it.jsonPrimitive.content) }
         val msg = ByteVector32.fromValidHex(tests.jsonObject["msg"]!!.jsonPrimitive.content)
 
-        val secnonce = deserializeSecretNonce(tests.jsonObject["secnonce"]!!.jsonPrimitive.content)
+        val secnonce = deserializeSecretNonceBytes(tests.jsonObject["secnonce"]!!.jsonPrimitive.content)
         val aggnonce = AggregatedNonce(tests.jsonObject["aggnonce"]!!.jsonPrimitive.content)
 
         assertEquals(pubkeys[0], sk.publicKey())
@@ -241,7 +243,7 @@ class Musig2TestsCommon {
             val keyagg = tweakIndices.fold(KeyAggCache.create(keyIndices.map { pubkeys[it] }).second) { keyAgg, tweakIdx -> keyAgg.tweak(tweaks[tweakIdx], isXonly[tweakIdx]).right!!.first }
             val session = Session.create(aggnonce, msg, keyagg)
             assertNotNull(session)
-            val psig = session.sign(secnonce, sk)
+            val psig = session.sign(SecretNonce(secnonce), sk)
             assertEquals(expected, psig)
             assertTrue(session.verify(psig, pnonces[nonceIndices[signerIndex]], pubkeys[keyIndices[signerIndex]]))
         }
@@ -255,6 +257,41 @@ class Musig2TestsCommon {
             val isXonly = it.jsonObject["is_xonly"]!!.jsonArray.map { it.jsonPrimitive.boolean }.first()
             val (_, keyagg) = KeyAggCache.create(keyIndices.map { pubkeys[it] })
             assertTrue(keyagg.tweak(tweak, isXonly).isLeft)
+        }
+    }
+
+    @Test
+    fun `secret nonces are single use`() {
+        val alicePrivKey = PrivateKey(ByteArray(32) { 1 })
+        val bobPrivKey = PrivateKey(ByteArray(32) { 2 })
+        val pubkeys = listOf(alicePrivKey.publicKey(), bobPrivKey.publicKey())
+        val (_, keyAggCache) = KeyAggCache.create(pubkeys)
+
+        val (aliceSecNonce, alicePubNonce) = SecretNonce.generate(
+            Random.Default.nextBytes(32).byteVector32(),
+            Either.Left(alicePrivKey),
+            null,
+            keyAggCache,
+            null
+        )
+        val (_, bobPubNonce) = SecretNonce.generate(
+            Random.Default.nextBytes(32).byteVector32(),
+            Either.Left(bobPrivKey),
+            null,
+            keyAggCache,
+            null
+        )
+
+        val aggnonce = IndividualNonce.aggregate(listOf(alicePubNonce, bobPubNonce)).right
+        assertNotNull(aggnonce)
+
+        val firstSession = Session.create(aggnonce, ByteVector32(ByteArray(31) + byteArrayOf(1)), keyAggCache)
+        val firstSig = firstSession.sign(aliceSecNonce, alicePrivKey)
+        assertTrue(firstSession.verify(firstSig, alicePubNonce, alicePrivKey.publicKey()))
+
+        val secondSession = Session.create(aggnonce, ByteVector32(ByteArray(31) + byteArrayOf(2)), keyAggCache)
+        assertFailsWith<IllegalStateException> {
+            secondSession.sign(aliceSecNonce, alicePrivKey)
         }
     }
 

@@ -118,14 +118,18 @@ public data class Session(private val data: ByteVector, private val keyAggCache:
 /**
  * Musig2 secret nonce, that should be treated as a private opaque blob.
  * This nonce must never be persisted or reused across signing sessions.
+ * Application code should use [generate] or [generateWithCounter] to create fresh nonces.
  */
-public class SecretNonce private constructor(internal val data: ByteArray, @Suppress("UNUSED_PARAMETER") copied: Boolean) {
-    public constructor(bin: ByteArray) : this(bin.copyOf(), true)
-    public constructor(hex: String) : this(Hex.decode(hex), true)
-
+public class SecretNonce private constructor(bytes: ByteArray, offset: Int, size: Int) {
     init {
-        require(data.size == Secp256k1.MUSIG2_SECRET_NONCE_SIZE) { "musig2 secret nonce must be ${Secp256k1.MUSIG2_SECRET_NONCE_SIZE} bytes" }
+        require(size == Secp256k1.MUSIG2_SECRET_NONCE_SIZE) { "musig2 secret nonce must be ${Secp256k1.MUSIG2_SECRET_NONCE_SIZE} bytes" }
+        require(offset >= 0 && offset + size <= bytes.size) { "invalid secret nonce slice" }
     }
+
+    internal val data: ByteArray = bytes.copyOfRange(offset, offset + size)
+
+    public constructor(bin: ByteArray) : this(bin, 0, bin.size)
+    public constructor(hex: String) : this(Hex.decode(hex))
 
     override fun toString(): String = "<secret_nonce>"
 
@@ -165,7 +169,7 @@ public class SecretNonce private constructor(internal val data: ByteArray, @Supp
                 is Either.Right -> Pair(null, signingKey.value)
             }
             val nonce = Secp256k1.musigNonceGen(sessionId.toByteArray(), privateKey?.value?.toByteArray(), publicKey.value.toByteArray(), message?.toByteArray(), keyAggCache?.toByteArray(), extraInput?.toByteArray())
-            val secretNonce = SecretNonce(nonce.copyOfRange(0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE))
+            val secretNonce = SecretNonce(nonce, 0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE)
             val publicNonce = IndividualNonce(nonce.copyOfRange(Secp256k1.MUSIG2_SECRET_NONCE_SIZE, Secp256k1.MUSIG2_SECRET_NONCE_SIZE + Secp256k1.MUSIG2_PUBLIC_NONCE_SIZE))
             return Pair(secretNonce, publicNonce)
         }
@@ -206,7 +210,7 @@ public class SecretNonce private constructor(internal val data: ByteArray, @Supp
         @JvmStatic
         public fun generateWithCounter(nonRepeatingCounter: Long, privateKey: PrivateKey, message: ByteVector32?, keyAggCache: KeyAggCache?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
             val nonce = Secp256k1.musigNonceGenCounter(nonRepeatingCounter.toULong(), privateKey.value.toByteArray(), message?.toByteArray(), keyAggCache?.toByteArray(), extraInput?.toByteArray())
-            val secretNonce = SecretNonce(nonce.copyOfRange(0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE))
+            val secretNonce = SecretNonce(nonce, 0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE)
             val publicNonce = IndividualNonce(nonce.copyOfRange(Secp256k1.MUSIG2_SECRET_NONCE_SIZE, Secp256k1.MUSIG2_SECRET_NONCE_SIZE + Secp256k1.MUSIG2_PUBLIC_NONCE_SIZE))
             return Pair(secretNonce, publicNonce)
         }

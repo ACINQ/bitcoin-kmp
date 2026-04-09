@@ -3,6 +3,7 @@ package fr.acinq.bitcoin.crypto.musig2
 import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.secp256k1.Hex
+import fr.acinq.secp256k1.Secp256k1
 import kotlinx.serialization.json.*
 import kotlin.random.Random
 import kotlin.test.*
@@ -258,6 +259,17 @@ class Musig2TestsCommon {
             val (_, keyagg) = KeyAggCache.create(keyIndices.map { pubkeys[it] })
             assertTrue(keyagg.tweak(tweak, isXonly).isLeft)
         }
+    }
+
+    @Test
+    fun `secret nonce constructors copy input data`() {
+        val rawNonce = ByteArray(Secp256k1.MUSIG2_SECRET_NONCE_SIZE) { it.toByte() }
+        val expectedNonce = rawNonce.copyOf()
+        val secretNonce = SecretNonce(rawNonce)
+
+        rawNonce.fill(0)
+
+        assertContentEquals(expectedNonce, secretNonce.data)
     }
 
     @Test

@@ -308,6 +308,63 @@ class Musig2TestsCommon {
     }
 
     @Test
+    fun `session signEither returns left when secret nonce is reused`() {
+        val alicePrivKey = PrivateKey(ByteArray(32) { 1 })
+        val bobPrivKey = PrivateKey(ByteArray(32) { 2 })
+        val pubkeys = listOf(alicePrivKey.publicKey(), bobPrivKey.publicKey())
+        val (_, keyAggCache) = KeyAggCache.create(pubkeys)
+
+        val (aliceSecNonce, alicePubNonce) = SecretNonce.generate(
+            Random.Default.nextBytes(32).byteVector32(),
+            Either.Left(alicePrivKey),
+            null,
+            keyAggCache,
+            null
+        )
+        val (_, bobPubNonce) = SecretNonce.generate(
+            Random.Default.nextBytes(32).byteVector32(),
+            Either.Left(bobPrivKey),
+            null,
+            keyAggCache,
+            null
+        )
+
+        val aggnonce = IndividualNonce.aggregate(listOf(alicePubNonce, bobPubNonce)).right
+        assertNotNull(aggnonce)
+
+        val firstSession = Session.create(aggnonce, ByteVector32(ByteArray(31) + byteArrayOf(1)), keyAggCache)
+        assertNotNull(firstSession.signEither(aliceSecNonce, alicePrivKey).right)
+
+        val secondSession = Session.create(aggnonce, ByteVector32(ByteArray(31) + byteArrayOf(2)), keyAggCache)
+        val error = assertIs<IllegalStateException>(secondSession.signEither(aliceSecNonce, alicePrivKey).left)
+        assertEquals("secret nonce has already been used", error.message)
+    }
+
+    @Test
+    fun `taproot signing returns left when secret nonce is reused`() {
+        val alicePrivKey = PrivateKey(ByteArray(32) { 1 })
+        val alicePubKey = alicePrivKey.publicKey()
+        val bobPrivKey = PrivateKey(ByteArray(32) { 2 })
+        val bobPubKey = bobPrivKey.publicKey()
+
+        val internalPubKey = Musig2.aggregateKeys(listOf(alicePubKey, bobPubKey))
+        val tx = Transaction(2, listOf(), listOf(TxOut(10_000.sat(), Script.pay2tr(internalPubKey, Crypto.TaprootTweak.KeyPathTweak))), 0)
+        val spendingTx = Transaction(2, listOf(TxIn(OutPoint(tx, 0), sequence = 0)), listOf(TxOut(10_000.sat(), Script.pay2wpkh(alicePubKey))), 0)
+
+        val aliceNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(alicePrivKey), listOf(alicePubKey, bobPubKey), null, null)
+        val bobNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(bobPrivKey), listOf(alicePubKey, bobPubKey), null, null)
+        val publicNonces = listOf(aliceNonce.second, bobNonce.second)
+
+        val firstSig = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null)
+        assertNotNull(firstSig.right)
+
+        val error = assertIs<IllegalStateException>(
+            Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null).left
+        )
+        assertEquals("secret nonce has already been used", error.message)
+    }
+
+    @Test
     fun `simple musig2 example`() {
         val msg = Random.Default.nextBytes(32).byteVector32()
         val privkeys = listOf(

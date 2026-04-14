@@ -70,9 +70,18 @@ public data class Session(private val data: ByteVector, private val keyAggCache:
      * @param privateKey signer's private key.
      * @return a musig2 partial signature.
      */
-    public fun sign(secretNonce: SecretNonce, privateKey: PrivateKey): ByteVector32 {
-        return Secp256k1.musigPartialSign(secretNonce.consume(), privateKey.value.toByteArray(), keyAggCache.toByteArray(), this.toByteArray()).byteVector32()
-    }
+    public fun sign(secretNonce: SecretNonce, privateKey: PrivateKey): ByteVector32 =
+        signEither(secretNonce, privateKey).getOrElse { throw it }
+
+    /**
+     * @param secretNonce signer's secret nonce (see [SecretNonce.generate]).
+     * @param privateKey signer's private key.
+     * @return a musig2 partial signature, or an error if the nonce has already been used or signing fails.
+     */
+    public fun signEither(secretNonce: SecretNonce, privateKey: PrivateKey): Either<Throwable, ByteVector32> =
+        secretNonce.consume { nonce ->
+            Secp256k1.musigPartialSign(nonce, privateKey.value.toByteArray(), keyAggCache.toByteArray(), this.toByteArray()).byteVector32()
+        }
 
     /**
      * @param partialSig musig2 partial signature.
@@ -135,10 +144,14 @@ public class SecretNonce private constructor(bytes: ByteArray, offset: Int, size
 
     private var consumed: Boolean = false
 
-    internal fun consume(): ByteArray {
-        check(!consumed) { "secret nonce has already been used" }
+    internal fun <T> consume(block: (ByteArray) -> T): Either<Throwable, T> {
+        if (consumed) return Either.Left(IllegalStateException("secret nonce has already been used"))
         consumed = true
-        return data
+        return try {
+            Either.Right(block(data))
+        } catch (t: Throwable) {
+            Either.Left(t)
+        }
     }
 
     override fun equals(other: Any?): Boolean {
@@ -355,6 +368,7 @@ public object Musig2 {
      * @param secretNonce secret nonce of the signing participant.
      * @param publicNonces public nonces of all participants of the musig2 session.
      * @param scriptTree tapscript tree of the taproot input, if it has script paths.
+     * @return a partial signature, or an error if the nonce has already been used or session creation/signing fails.
      */
     @JvmStatic
     public fun signTaprootInput(
@@ -367,7 +381,7 @@ public object Musig2 {
         publicNonces: List<IndividualNonce>,
         scriptTree: ScriptTree?
     ): Either<Throwable, ByteVector32> {
-        return taprootSession(tx, inputIndex, inputs, publicKeys, publicNonces, scriptTree).map { it.sign(secretNonce, privateKey) }
+        return taprootSession(tx, inputIndex, inputs, publicKeys, publicNonces, scriptTree).flatMap { it.signEither(secretNonce, privateKey) }
     }
 
     /**

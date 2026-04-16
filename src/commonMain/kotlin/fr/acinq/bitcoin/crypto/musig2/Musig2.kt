@@ -68,17 +68,9 @@ public data class Session(private val data: ByteVector, private val keyAggCache:
     /**
      * @param secretNonce signer's secret nonce (see [SecretNonce.generate]).
      * @param privateKey signer's private key.
-     * @return a musig2 partial signature.
-     */
-    public fun sign(secretNonce: SecretNonce, privateKey: PrivateKey): ByteVector32 =
-        signEither(secretNonce, privateKey).getOrElse { throw it }
-
-    /**
-     * @param secretNonce signer's secret nonce (see [SecretNonce.generate]).
-     * @param privateKey signer's private key.
      * @return a musig2 partial signature, or an error if the nonce has already been used or signing fails.
      */
-    public fun signEither(secretNonce: SecretNonce, privateKey: PrivateKey): Either<Throwable, ByteVector32> =
+    public fun sign(secretNonce: SecretNonce, privateKey: PrivateKey): Either<Throwable, ByteVector32> =
         secretNonce.consume { nonce ->
             Secp256k1.musigPartialSign(nonce, privateKey.value.toByteArray(), keyAggCache.toByteArray(), this.toByteArray()).byteVector32()
         }
@@ -137,8 +129,7 @@ public class SecretNonce private constructor(bytes: ByteArray, offset: Int, size
 
     internal val data: ByteArray = bytes.copyOfRange(offset, offset + size)
 
-    public constructor(bin: ByteArray) : this(bin, 0, bin.size)
-    public constructor(hex: String) : this(Hex.decode(hex))
+    internal constructor(bin: ByteArray) : this(bin, 0, bin.size)
 
     override fun toString(): String = "<secret_nonce>"
 
@@ -381,7 +372,7 @@ public object Musig2 {
         publicNonces: List<IndividualNonce>,
         scriptTree: ScriptTree?
     ): Either<Throwable, ByteVector32> {
-        return taprootSession(tx, inputIndex, inputs, publicKeys, publicNonces, scriptTree).flatMap { it.signEither(secretNonce, privateKey) }
+        return taprootSession(tx, inputIndex, inputs, publicKeys, publicNonces, scriptTree).flatMap { it.sign(secretNonce, privateKey) }
     }
 
     /**

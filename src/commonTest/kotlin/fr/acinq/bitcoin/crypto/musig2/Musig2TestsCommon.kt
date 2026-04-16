@@ -151,7 +151,7 @@ class Musig2TestsCommon {
             if (msgs[messageIndex].bytes.size == 32) {
                 val session = Session.create(aggnonce, ByteVector32(msgs[messageIndex]), keyagg)
                 assertNotNull(session)
-                val psig = session.sign(SecretNonce(secnonces[keyIndices[signerIndex]]), sk)
+                val psig = session.sign(SecretNonce(secnonces[keyIndices[signerIndex]]), sk).right!!
                 assertEquals(expected, psig)
                 assertTrue(session.verify(psig, pnonces[nonceIndices[signerIndex]], pubkeys[keyIndices[signerIndex]]))
             }
@@ -244,7 +244,7 @@ class Musig2TestsCommon {
             val keyagg = tweakIndices.fold(KeyAggCache.create(keyIndices.map { pubkeys[it] }).second) { keyAgg, tweakIdx -> keyAgg.tweak(tweaks[tweakIdx], isXonly[tweakIdx]).right!!.first }
             val session = Session.create(aggnonce, msg, keyagg)
             assertNotNull(session)
-            val psig = session.sign(SecretNonce(secnonce), sk)
+            val psig = session.sign(SecretNonce(secnonce), sk).right!!
             assertEquals(expected, psig)
             assertTrue(session.verify(psig, pnonces[nonceIndices[signerIndex]], pubkeys[keyIndices[signerIndex]]))
         }
@@ -298,45 +298,11 @@ class Musig2TestsCommon {
         assertNotNull(aggnonce)
 
         val firstSession = Session.create(aggnonce, ByteVector32(ByteArray(31) + byteArrayOf(1)), keyAggCache)
-        val firstSig = firstSession.sign(aliceSecNonce, alicePrivKey)
+        val firstSig = firstSession.sign(aliceSecNonce, alicePrivKey).right!!
         assertTrue(firstSession.verify(firstSig, alicePubNonce, alicePrivKey.publicKey()))
 
         val secondSession = Session.create(aggnonce, ByteVector32(ByteArray(31) + byteArrayOf(2)), keyAggCache)
-        assertFailsWith<IllegalStateException> {
-            secondSession.sign(aliceSecNonce, alicePrivKey)
-        }
-    }
-
-    @Test
-    fun `session signEither returns left when secret nonce is reused`() {
-        val alicePrivKey = PrivateKey(ByteArray(32) { 1 })
-        val bobPrivKey = PrivateKey(ByteArray(32) { 2 })
-        val pubkeys = listOf(alicePrivKey.publicKey(), bobPrivKey.publicKey())
-        val (_, keyAggCache) = KeyAggCache.create(pubkeys)
-
-        val (aliceSecNonce, alicePubNonce) = SecretNonce.generate(
-            Random.Default.nextBytes(32).byteVector32(),
-            Either.Left(alicePrivKey),
-            null,
-            keyAggCache,
-            null
-        )
-        val (_, bobPubNonce) = SecretNonce.generate(
-            Random.Default.nextBytes(32).byteVector32(),
-            Either.Left(bobPrivKey),
-            null,
-            keyAggCache,
-            null
-        )
-
-        val aggnonce = IndividualNonce.aggregate(listOf(alicePubNonce, bobPubNonce)).right
-        assertNotNull(aggnonce)
-
-        val firstSession = Session.create(aggnonce, ByteVector32(ByteArray(31) + byteArrayOf(1)), keyAggCache)
-        assertNotNull(firstSession.signEither(aliceSecNonce, alicePrivKey).right)
-
-        val secondSession = Session.create(aggnonce, ByteVector32(ByteArray(31) + byteArrayOf(2)), keyAggCache)
-        val error = assertIs<IllegalStateException>(secondSession.signEither(aliceSecNonce, alicePrivKey).left)
+        val error = assertIs<IllegalStateException>(secondSession.sign(aliceSecNonce, alicePrivKey).left)
         assertEquals("secret nonce has already been used", error.message)
     }
 
@@ -395,7 +361,7 @@ class Musig2TestsCommon {
 
         // Create partial signatures from each participant.
         val session = Session.create(aggnonce, msg, keyAggCache)
-        val psigs = privkeys.indices.map { session.sign(secnonces[it], privkeys[it]) }
+        val psigs = privkeys.indices.map { session.sign(secnonces[it], privkeys[it]).right!! }
         // Verify individual partial signatures.
         pubkeys.indices.forEach { assertTrue(session.verify(psigs[it], pubnonces[it], pubkeys[it])) }
         // Aggregate partial signatures into a single signature.

@@ -150,6 +150,43 @@ class CryptoTestsCommon {
     }
 
     @Test
+    fun `strict DER validation rejects high-bit length bytes without crashing`() {
+        val sig = ByteArray(73)
+        sig[0] = 0x30
+        sig[1] = 0x46
+        sig[2] = 0x02
+        sig[3] = 0x80.toByte()
+
+        assertFalse(Crypto.isDERSignature(sig))
+    }
+
+    @Test
+    fun `lax DER decoder handles BER long-form sequence lengths`() {
+        val sig = ByteArray(71)
+        sig[0] = 0x30
+        sig[1] = 0x81.toByte()
+        sig[2] = 0x44
+        sig[3] = 0x02
+        sig[4] = 0x20
+        sig[37] = 0x02
+        sig[38] = 0x20
+
+        assertEquals(ByteVector64.Zeroes, Crypto.decodeSignatureLax(sig))
+    }
+
+    @Test
+    fun `lax DER decoder rejects malformed long-form integer lengths without throwing`() {
+        val sig = ByteArray(70)
+        sig[0] = 0x30
+        sig[1] = 0x44
+        sig[2] = 0x02
+        sig[3] = 0x81.toByte()
+        sig[4] = 0x20
+
+        assertEquals(ByteVector64.Zeroes, Crypto.decodeSignatureLax(sig))
+    }
+
+    @Test
     fun `generate deterministic signatures`() {
         val dataset = sequenceOf(
             Triple(

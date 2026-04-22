@@ -1534,6 +1534,107 @@ class PsbtTestsCommon {
         Transaction.correctlySpends(extracted.right!!, utxos, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
 
+    @Test
+    fun `P2WPKH signer derives scriptCode from the witness program`() {
+        val victimPrivKey = PrivateKey(ByteVector32("0101010101010101010101010101010101010101010101010101010101010101"))
+        val victimPubKey = victimPrivKey.publicKey()
+        val attackerPubKey = PrivateKey(ByteVector32("0202020202020202020202020202020202020202020202020202020202020202")).publicKey()
+
+        val inputTx = Transaction(2, listOf(), listOf(TxOut(100000.sat(), Script.pay2wpkh(victimPubKey))), 0)
+        val correctScriptCode = Script.pay2pkh(victimPubKey)
+        val attackerScript = Script.createMultiSigMofN(1, listOf(victimPubKey, attackerPubKey))
+        val spendingTx = Transaction(
+            2,
+            listOf(TxIn(OutPoint(inputTx, 0), ByteVector.empty, 0)),
+            listOf(TxOut(90000.sat(), Script.pay2wpkh(attackerPubKey))),
+            0
+        )
+
+        val maliciousPsbt = Psbt(spendingTx)
+            .updateWitnessInputTx(inputTx, 0, null, attackerScript, SIGHASH_ALL)
+            .right!!
+
+        val signResult = maliciousPsbt.sign(victimPrivKey, 0)
+        assertTrue(signResult.isRight)
+
+        val psbtSig = signResult.right!!.sig
+        val correctSig = ByteVector(
+            spendingTx.signInput(0, correctScriptCode, SIGHASH_ALL, 100000.sat(), SigVersion.SIGVERSION_WITNESS_V0, victimPrivKey)
+        )
+        val attackerSig = ByteVector(
+            spendingTx.signInput(0, attackerScript, SIGHASH_ALL, 100000.sat(), SigVersion.SIGVERSION_WITNESS_V0, victimPrivKey)
+        )
+
+        assertEquals(correctSig, psbtSig)
+        assertNotEquals(attackerSig, psbtSig)
+    }
+
+    @Test
+    fun `P2WPKH signature cannot be reused in a P2WSH context`() {
+        val victimPrivKey = PrivateKey(ByteVector32("0101010101010101010101010101010101010101010101010101010101010101"))
+        val victimPubKey = victimPrivKey.publicKey()
+        val attackerPubKey = PrivateKey(ByteVector32("0202020202020202020202020202020202020202020202020202020202020202")).publicKey()
+
+        val multisigScript = Script.createMultiSigMofN(1, listOf(victimPubKey, attackerPubKey))
+        val p2wshAmount = 500000.sat()
+        val p2wshTx = Transaction(2, listOf(), listOf(TxOut(p2wshAmount, Script.pay2wsh(multisigScript))), 0)
+        val stealTx = Transaction(
+            2,
+            listOf(TxIn(OutPoint(p2wshTx, 0), ByteVector.empty, 0)),
+            listOf(TxOut(490000.sat(), Script.pay2wpkh(attackerPubKey))),
+            0
+        )
+
+        val maliciousPsbt = Psbt(stealTx)
+            .updateWitnessInput(
+                OutPoint(p2wshTx, 0),
+                TxOut(p2wshAmount, Script.pay2wpkh(victimPubKey)),
+                witnessScript = multisigScript,
+                sighashType = SIGHASH_ALL
+            ).right!!
+
+        val signResult = maliciousPsbt.sign(victimPrivKey, 0)
+        assertTrue(signResult.isRight)
+
+        val extractedSig = signResult.right!!.sig
+        val legitimateP2wshSig = ByteVector(
+            stealTx.signInput(0, multisigScript, SIGHASH_ALL, p2wshAmount, SigVersion.SIGVERSION_WITNESS_V0, victimPrivKey)
+        )
+        assertNotEquals(legitimateP2wshSig, extractedSig)
+
+        val witness = Script.witnessMultiSigMofN(listOf(victimPubKey, attackerPubKey), listOf(extractedSig))
+        val finalTx = stealTx.updateWitness(0, ScriptWitness(witness.stack))
+        assertFails {
+            Transaction.correctlySpends(finalTx, listOf(p2wshTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        }
+    }
+
+    @Test
+    fun `P2WPKH signing works without witnessScript`() {
+        val privKey = PrivateKey(ByteVector32("0101010101010101010101010101010101010101010101010101010101010101"))
+        val pubKey = privKey.publicKey()
+
+        val inputTx = Transaction(2, listOf(), listOf(TxOut(100000.sat(), Script.pay2wpkh(pubKey))), 0)
+        val spendingTx = Transaction(
+            2,
+            listOf(TxIn(OutPoint(inputTx, 0), ByteVector.empty, 0)),
+            listOf(TxOut(90000.sat(), Script.pay2wpkh(pubKey))),
+            0
+        )
+
+        val specCompliantPsbt = Psbt(spendingTx)
+            .updateWitnessInputTx(inputTx, 0, null, null, SIGHASH_ALL)
+            .right!!
+
+        val signResult = specCompliantPsbt.sign(privKey, 0)
+        assertTrue(signResult.isRight)
+
+        val expectedSig = ByteVector(
+            spendingTx.signInput(0, Script.pay2pkh(pubKey), SIGHASH_ALL, 100000.sat(), SigVersion.SIGVERSION_WITNESS_V0, privKey)
+        )
+        assertEquals(expectedSig, signResult.right!!.sig)
+    }
+
     private fun readValidPsbt(hex: String): Psbt {
         val result = Psbt.read(ByteVector(hex))
         assertTrue(result.isRight)

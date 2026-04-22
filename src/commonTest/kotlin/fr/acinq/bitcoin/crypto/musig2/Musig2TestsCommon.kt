@@ -3,6 +3,7 @@ package fr.acinq.bitcoin.crypto.musig2
 import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.secp256k1.Hex
+import fr.acinq.secp256k1.Secp256k1
 import kotlinx.serialization.json.*
 import kotlin.random.Random
 import kotlin.test.*
@@ -56,6 +57,8 @@ class Musig2TestsCommon {
         val magic = Hex.decode("220EDCF1")
         return SecretNonce(magic + serialized.take(64) + publicKeyX + publicKeyY)
     }
+
+    private fun deserializeSecretNonceBytes(hex: String): ByteArray = deserializeSecretNonce(hex).data.copyOf()
 
     @Test
     fun `generate secret nonce`() {
@@ -129,7 +132,7 @@ class Musig2TestsCommon {
         val tests = TestHelpers.readResourceAsJson("musig2/sign_verify_vectors.json")
         val sk = PrivateKey.fromHex(tests.jsonObject["sk"]!!.jsonPrimitive.content)
         val pubkeys = tests.jsonObject["pubkeys"]!!.jsonArray.map { PublicKey(ByteVector(it.jsonPrimitive.content)) }
-        val secnonces = tests.jsonObject["secnonces"]!!.jsonArray.map { deserializeSecretNonce(it.jsonPrimitive.content) }
+        val secnonces = tests.jsonObject["secnonces"]!!.jsonArray.map { deserializeSecretNonceBytes(it.jsonPrimitive.content) }
         val pnonces = tests.jsonObject["pnonces"]!!.jsonArray.map { IndividualNonce(it.jsonPrimitive.content) }
         val aggnonces = tests.jsonObject["aggnonces"]!!.jsonArray.map { AggregatedNonce(it.jsonPrimitive.content) }
         val msgs = tests.jsonObject["msgs"]!!.jsonArray.map { ByteVector(it.jsonPrimitive.content) }
@@ -148,7 +151,7 @@ class Musig2TestsCommon {
             if (msgs[messageIndex].bytes.size == 32) {
                 val session = Session.create(aggnonce, ByteVector32(msgs[messageIndex]), keyagg)
                 assertNotNull(session)
-                val psig = session.sign(secnonces[keyIndices[signerIndex]], sk)
+                val psig = session.sign(SecretNonce(secnonces[keyIndices[signerIndex]]), sk).right!!
                 assertEquals(expected, psig)
                 assertTrue(session.verify(psig, pnonces[nonceIndices[signerIndex]], pubkeys[keyIndices[signerIndex]]))
             }
@@ -224,7 +227,7 @@ class Musig2TestsCommon {
         val tweaks = tests.jsonObject["tweaks"]!!.jsonArray.map { ByteVector32.fromValidHex(it.jsonPrimitive.content) }
         val msg = ByteVector32.fromValidHex(tests.jsonObject["msg"]!!.jsonPrimitive.content)
 
-        val secnonce = deserializeSecretNonce(tests.jsonObject["secnonce"]!!.jsonPrimitive.content)
+        val secnonce = deserializeSecretNonceBytes(tests.jsonObject["secnonce"]!!.jsonPrimitive.content)
         val aggnonce = AggregatedNonce(tests.jsonObject["aggnonce"]!!.jsonPrimitive.content)
 
         assertEquals(pubkeys[0], sk.publicKey())
@@ -241,7 +244,7 @@ class Musig2TestsCommon {
             val keyagg = tweakIndices.fold(KeyAggCache.create(keyIndices.map { pubkeys[it] }).second) { keyAgg, tweakIdx -> keyAgg.tweak(tweaks[tweakIdx], isXonly[tweakIdx]).right!!.first }
             val session = Session.create(aggnonce, msg, keyagg)
             assertNotNull(session)
-            val psig = session.sign(secnonce, sk)
+            val psig = session.sign(SecretNonce(secnonce), sk).right!!
             assertEquals(expected, psig)
             assertTrue(session.verify(psig, pnonces[nonceIndices[signerIndex]], pubkeys[keyIndices[signerIndex]]))
         }
@@ -256,6 +259,75 @@ class Musig2TestsCommon {
             val (_, keyagg) = KeyAggCache.create(keyIndices.map { pubkeys[it] })
             assertTrue(keyagg.tweak(tweak, isXonly).isLeft)
         }
+    }
+
+    @Test
+    fun `secret nonce constructors copy input data`() {
+        val rawNonce = ByteArray(Secp256k1.MUSIG2_SECRET_NONCE_SIZE) { it.toByte() }
+        val expectedNonce = rawNonce.copyOf()
+        val secretNonce = SecretNonce(rawNonce)
+
+        rawNonce.fill(0)
+
+        assertContentEquals(expectedNonce, secretNonce.data)
+    }
+
+    @Test
+    fun `secret nonces are single use`() {
+        val alicePrivKey = PrivateKey(ByteArray(32) { 1 })
+        val bobPrivKey = PrivateKey(ByteArray(32) { 2 })
+        val pubkeys = listOf(alicePrivKey.publicKey(), bobPrivKey.publicKey())
+        val (_, keyAggCache) = KeyAggCache.create(pubkeys)
+
+        val (aliceSecNonce, alicePubNonce) = SecretNonce.generate(
+            Random.Default.nextBytes(32).byteVector32(),
+            Either.Left(alicePrivKey),
+            null,
+            keyAggCache,
+            null
+        )
+        val (_, bobPubNonce) = SecretNonce.generate(
+            Random.Default.nextBytes(32).byteVector32(),
+            Either.Left(bobPrivKey),
+            null,
+            keyAggCache,
+            null
+        )
+
+        val aggnonce = IndividualNonce.aggregate(listOf(alicePubNonce, bobPubNonce)).right
+        assertNotNull(aggnonce)
+
+        val firstSession = Session.create(aggnonce, ByteVector32(ByteArray(31) + byteArrayOf(1)), keyAggCache)
+        val firstSig = firstSession.sign(aliceSecNonce, alicePrivKey).right!!
+        assertTrue(firstSession.verify(firstSig, alicePubNonce, alicePrivKey.publicKey()))
+
+        val secondSession = Session.create(aggnonce, ByteVector32(ByteArray(31) + byteArrayOf(2)), keyAggCache)
+        val error = assertIs<IllegalStateException>(secondSession.sign(aliceSecNonce, alicePrivKey).left)
+        assertEquals("secret nonce has already been used", error.message)
+    }
+
+    @Test
+    fun `taproot signing returns left when secret nonce is reused`() {
+        val alicePrivKey = PrivateKey(ByteArray(32) { 1 })
+        val alicePubKey = alicePrivKey.publicKey()
+        val bobPrivKey = PrivateKey(ByteArray(32) { 2 })
+        val bobPubKey = bobPrivKey.publicKey()
+
+        val internalPubKey = Musig2.aggregateKeys(listOf(alicePubKey, bobPubKey))
+        val tx = Transaction(2, listOf(), listOf(TxOut(10_000.sat(), Script.pay2tr(internalPubKey, Crypto.TaprootTweak.KeyPathTweak))), 0)
+        val spendingTx = Transaction(2, listOf(TxIn(OutPoint(tx, 0), sequence = 0)), listOf(TxOut(10_000.sat(), Script.pay2wpkh(alicePubKey))), 0)
+
+        val aliceNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(alicePrivKey), listOf(alicePubKey, bobPubKey), null, null)
+        val bobNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(bobPrivKey), listOf(alicePubKey, bobPubKey), null, null)
+        val publicNonces = listOf(aliceNonce.second, bobNonce.second)
+
+        val firstSig = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null)
+        assertNotNull(firstSig.right)
+
+        val error = assertIs<IllegalStateException>(
+            Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null).left
+        )
+        assertEquals("secret nonce has already been used", error.message)
     }
 
     @Test
@@ -289,7 +361,7 @@ class Musig2TestsCommon {
 
         // Create partial signatures from each participant.
         val session = Session.create(aggnonce, msg, keyAggCache)
-        val psigs = privkeys.indices.map { session.sign(secnonces[it], privkeys[it]) }
+        val psigs = privkeys.indices.map { session.sign(secnonces[it], privkeys[it]).right!! }
         // Verify individual partial signatures.
         pubkeys.indices.forEach { assertTrue(session.verify(psigs[it], pubnonces[it], pubkeys[it])) }
         // Aggregate partial signatures into a single signature.

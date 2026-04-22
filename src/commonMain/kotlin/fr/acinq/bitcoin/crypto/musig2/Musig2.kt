@@ -68,11 +68,12 @@ public data class Session(private val data: ByteVector, private val keyAggCache:
     /**
      * @param secretNonce signer's secret nonce (see [SecretNonce.generate]).
      * @param privateKey signer's private key.
-     * @return a musig2 partial signature.
+     * @return a musig2 partial signature, or an error if the nonce has already been used or signing fails.
      */
-    public fun sign(secretNonce: SecretNonce, privateKey: PrivateKey): ByteVector32 {
-        return Secp256k1.musigPartialSign(secretNonce.data.toByteArray(), privateKey.value.toByteArray(), keyAggCache.toByteArray(), this.toByteArray()).byteVector32()
-    }
+    public fun sign(secretNonce: SecretNonce, privateKey: PrivateKey): Either<Throwable, ByteVector32> =
+        secretNonce.consume { nonce ->
+            Secp256k1.musigPartialSign(nonce, privateKey.value.toByteArray(), keyAggCache.toByteArray(), this.toByteArray()).byteVector32()
+        }
 
     /**
      * @param partialSig musig2 partial signature.
@@ -118,16 +119,39 @@ public data class Session(private val data: ByteVector, private val keyAggCache:
 /**
  * Musig2 secret nonce, that should be treated as a private opaque blob.
  * This nonce must never be persisted or reused across signing sessions.
+ * Application code should use [generate] or [generateWithCounter] to create fresh nonces.
  */
-public data class SecretNonce(internal val data: ByteVector) {
-    public constructor(bin: ByteArray) : this(bin.byteVector())
-    public constructor(hex: String) : this(Hex.decode(hex))
-
+public class SecretNonce private constructor(bytes: ByteArray, offset: Int, size: Int) {
     init {
-        require(data.size() == Secp256k1.MUSIG2_SECRET_NONCE_SIZE) { "musig2 secret nonce must be ${Secp256k1.MUSIG2_SECRET_NONCE_SIZE} bytes" }
+        require(size == Secp256k1.MUSIG2_SECRET_NONCE_SIZE) { "musig2 secret nonce must be ${Secp256k1.MUSIG2_SECRET_NONCE_SIZE} bytes" }
+        require(offset >= 0 && offset + size <= bytes.size) { "invalid secret nonce slice" }
     }
 
+    internal val data: ByteArray = bytes.copyOfRange(offset, offset + size)
+
+    internal constructor(bin: ByteArray) : this(bin, 0, bin.size)
+
     override fun toString(): String = "<secret_nonce>"
+
+    private var consumed: Boolean = false
+
+    internal fun <T> consume(block: (ByteArray) -> T): Either<Throwable, T> {
+        if (consumed) return Either.Left(IllegalStateException("secret nonce has already been used"))
+        consumed = true
+        return try {
+            Either.Right(block(data))
+        } catch (t: Throwable) {
+            Either.Left(t)
+        }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is SecretNonce) return false
+        return data.contentEquals(other.data)
+    }
+
+    override fun hashCode(): Int = data.contentHashCode()
 
     public companion object {
         /**
@@ -149,7 +173,7 @@ public data class SecretNonce(internal val data: ByteVector) {
                 is Either.Right -> Pair(null, signingKey.value)
             }
             val nonce = Secp256k1.musigNonceGen(sessionId.toByteArray(), privateKey?.value?.toByteArray(), publicKey.value.toByteArray(), message?.toByteArray(), keyAggCache?.toByteArray(), extraInput?.toByteArray())
-            val secretNonce = SecretNonce(nonce.copyOfRange(0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE))
+            val secretNonce = SecretNonce(nonce, 0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE)
             val publicNonce = IndividualNonce(nonce.copyOfRange(Secp256k1.MUSIG2_SECRET_NONCE_SIZE, Secp256k1.MUSIG2_SECRET_NONCE_SIZE + Secp256k1.MUSIG2_PUBLIC_NONCE_SIZE))
             return Pair(secretNonce, publicNonce)
         }
@@ -190,7 +214,7 @@ public data class SecretNonce(internal val data: ByteVector) {
         @JvmStatic
         public fun generateWithCounter(nonRepeatingCounter: Long, privateKey: PrivateKey, message: ByteVector32?, keyAggCache: KeyAggCache?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
             val nonce = Secp256k1.musigNonceGenCounter(nonRepeatingCounter.toULong(), privateKey.value.toByteArray(), message?.toByteArray(), keyAggCache?.toByteArray(), extraInput?.toByteArray())
-            val secretNonce = SecretNonce(nonce.copyOfRange(0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE))
+            val secretNonce = SecretNonce(nonce, 0, Secp256k1.MUSIG2_SECRET_NONCE_SIZE)
             val publicNonce = IndividualNonce(nonce.copyOfRange(Secp256k1.MUSIG2_SECRET_NONCE_SIZE, Secp256k1.MUSIG2_SECRET_NONCE_SIZE + Secp256k1.MUSIG2_PUBLIC_NONCE_SIZE))
             return Pair(secretNonce, publicNonce)
         }
@@ -335,6 +359,7 @@ public object Musig2 {
      * @param secretNonce secret nonce of the signing participant.
      * @param publicNonces public nonces of all participants of the musig2 session.
      * @param scriptTree tapscript tree of the taproot input, if it has script paths.
+     * @return a partial signature, or an error if the nonce has already been used or session creation/signing fails.
      */
     @JvmStatic
     public fun signTaprootInput(
@@ -347,7 +372,7 @@ public object Musig2 {
         publicNonces: List<IndividualNonce>,
         scriptTree: ScriptTree?
     ): Either<Throwable, ByteVector32> {
-        return taprootSession(tx, inputIndex, inputs, publicKeys, publicNonces, scriptTree).map { it.sign(secretNonce, privateKey) }
+        return taprootSession(tx, inputIndex, inputs, publicKeys, publicNonces, scriptTree).flatMap { it.sign(secretNonce, privateKey) }
     }
 
     /**

@@ -21,6 +21,7 @@ import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SegwitTestsCommon {
@@ -61,7 +62,7 @@ class SegwitTestsCommon {
             600000000L.toSatoshi(),
             1
         )
-        assertTrue(Hex.encode(hash) == "c37af31116d1b27caf68aae9e3ac82f1477929014d5b917657d0eb49478cb670")
+        assertEquals(Hex.encode(hash), "c37af31116d1b27caf68aae9e3ac82f1477929014d5b917657d0eb49478cb670")
 
         val priv = PrivateKey.fromHex("619c335025c7f4012e556c2a58b2506e30b8511b53ade95ea316fd8c3286feb901")
         val pub = priv.publicKey()
@@ -72,7 +73,10 @@ class SegwitTestsCommon {
         val tx1 = tx.updateSigScript(0, sigScript)
         val tx2 = tx1.updateWitness(1, ScriptWitness(listOf(ByteVector(sig + SIGHASH_ALL.toByte()), pub.value)))
         val bin = Transaction.write(tx2, Protocol.PROTOCOL_VERSION)
-        assertTrue(Hex.encode(bin) == "01000000000102fff7f7881a8099afa6940d42d1e7f6362bec38171ea3edf433541db4e4ad969f00000000494830450221008b9d1dc26ba6a9cb62127b02742fa9d754cd3bebf337f7a55d114c8e5cdd30be022040529b194ba3f9281a99f2b1c0a19c0489bc22ede944ccf4ecbab4cc618ef3ed01eeffffffef51e1b804cc89d182d279655c3aa89e815b1b309fe287d9b2b55d57b90ec68a0100000000ffffffff02202cb206000000001976a9148280b37df378db99f66f85c95a783a76ac7a6d5988ac9093510d000000001976a9143bde42dbee7e4dbe6a21b2d50ce2f0167faa815988ac000247304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee0121025476c2e83188368da1ff3e292e7acafcdb3566bb0ad253f62fc70f07aeee635711000000")
+        assertEquals(
+            Hex.encode(bin),
+            "01000000000102fff7f7881a8099afa6940d42d1e7f6362bec38171ea3edf433541db4e4ad969f00000000494830450221008b9d1dc26ba6a9cb62127b02742fa9d754cd3bebf337f7a55d114c8e5cdd30be022040529b194ba3f9281a99f2b1c0a19c0489bc22ede944ccf4ecbab4cc618ef3ed01eeffffffef51e1b804cc89d182d279655c3aa89e815b1b309fe287d9b2b55d57b90ec68a0100000000ffffffff02202cb206000000001976a9148280b37df378db99f66f85c95a783a76ac7a6d5988ac9093510d000000001976a9143bde42dbee7e4dbe6a21b2d50ce2f0167faa815988ac000247304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee0121025476c2e83188368da1ff3e292e7acafcdb3566bb0ad253f62fc70f07aeee635711000000"
+        )
     }
 
     @Test
@@ -95,7 +99,7 @@ class SegwitTestsCommon {
             pversion
         )
         assertTrue(tx1.hasWitness)
-        assertTrue(tx1.txIn.find { it.signatureScript.size() > 0 } == null)
+        assertNull(tx1.txIn.find { it.signatureScript.size() > 0 })
         //assert(tx1.txIn.find(!_.signatureScript.isEmpty).isEmpty)
         val tx2 = tx1.updateWitnesses(listOf(ScriptWitness.empty))
         assertTrue(tx2 != tx1)
@@ -124,13 +128,14 @@ class SegwitTestsCommon {
         val pub1 = priv1.publicKey()
         val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, pub1.hash160())
 
-        assertTrue(address1 == "mp4eLFx7CpifAJxnvCZ3FmqKsh9dQmi5dA")
+        assertEquals(address1, "mp4eLFx7CpifAJxnvCZ3FmqKsh9dQmi5dA")
 
         // this is a standard tx that sends 0.04 BTC to mp4eLFx7CpifAJxnvCZ3FmqKsh9dQmi5dA
         val tx1 = Transaction.read(
             "02000000000101516508384a3e006340f1ea700eb3635330beed5d94c7b460b6b495eb1593d55c0100000023220020a5fdf5b5f2c592362b78a50997821964b39dd90476c6e1f3e97e79acb134ca3bfdffffff0200093d00000000001976a9145dbf52b8d7af4fb5f9b75b808f0a8284493531b388aca005071d0000000017a914d77e5f7ca4d9f05dc4f25dc0aa1391f0e901bdfc87040047304402207bfb18327be173512f38bd4120b8f02545321ecc6105a852cbc25b1de687ba570220705a1225d8a8e0fbd4b35f3bc38a2840706f8524e8dc6f0151746aeff14033ce014730440220486925fb0495442e4ccb1b711692af7057d4db24f8775b5dfa3f8c74992081f102203beae7d96423e0c66b7b5f8919a5f3ad89a42dc4303f37201e4e596909478357014752210245119449d07c16992c148e3b33f1395ee05c936fc510d9fae83417f8e1901f922103eb03f67b56c88bccff90b76182c08556eac9ebc5a0efee8669bef69ae6d4ea5752ae75bb2300",
             pversion
         )
+        assertNull(Script.pay2trOutputKey(tx1.txOut[0].publicKeyScript))
 
         // now let's create a simple tx that spends tx1 and send 0.039 BTC to P2WPK output
         val tx2 = run {
@@ -218,6 +223,7 @@ class SegwitTestsCommon {
             "020000000001016ecc08b535a0c774234419dee508867ace1535a0d256d6b2aa19942441777336000000002322002073bb471aa121fbdd95942eabb5e665d66e71542e6e075c8392cd0df72a075b72fdffffff02803823030000000017a914d3c15be7951c9de644bdf9e22dcbcb77550c4ae487404b4c00000000001976a9143545b2a6659dbe5bdf841d1158135be184d81d3688ac0400473044022041cac92405e4e3215c2f9c27a67ff0792c8fb76e4182023fed081f541f4563e002203bd04d4d810ef8074aeb26a19e01e1ee1a40ad83e4d0ac2c614b8cb22825d2ae0147304402204c947b46ea480419c04098a56a5219bb1f491b07e12926fb6f304132a1f1e29e022078cc9f004c74d6c3c2b2dfcca6385d2fabe44d4eadb027a0d764e1ab9d7f09190147522102be608bf8904326b4d0ec9346aa348773fe51ee70338849acd2dd710b73bf611a2103627c19e40f67c5ee8b44df85ee911b7e978869fa5a3de1d972a461f47ea349e452ae90bb2300",
             pversion
         )
+        assertNull(Script.pay2trOutputKey(tx1.txOut[0].publicKeyScript))
 
         // now let's create a simple tx that spends tx1 and sends 0.049 BTC to a P2WSH output
         val tx2 = run {
@@ -293,7 +299,7 @@ class SegwitTestsCommon {
 
         // which we embed into a standard p2sh script
         val p2shaddress = Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, Crypto.hash160(script))
-        assertTrue(p2shaddress == "2NB3GUVxBF3P7NLMkSGNai33mWkM35ht1Xj")
+        assertEquals(p2shaddress, "2NB3GUVxBF3P7NLMkSGNai33mWkM35ht1Xj")
 
         // this tx sends 0.05 btc to our p2sh address
         val tx = Transaction.read(

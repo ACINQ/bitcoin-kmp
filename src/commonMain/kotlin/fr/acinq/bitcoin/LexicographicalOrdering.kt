@@ -23,14 +23,14 @@ import kotlin.jvm.JvmStatic
  * See https://github.com/bitcoin/bips/blob/master/bip-0069.mediawiki
  */
 public object LexicographicalOrdering {
-    private tailrec fun isLessThanInternal(a: ByteArray, b: ByteArray): Boolean {
-        return when {
-            a.isEmpty() && b.isEmpty() -> false
-            a.isEmpty() -> true
-            b.isEmpty() -> false
-            a.first() == b.first() -> isLessThanInternal(a.drop(1).toByteArray(), b.drop(1).toByteArray())
-            else -> (a.first().toInt() and 0xff) < (b.first().toInt() and 0xff)
+    private fun isLessThanInternal(a: ByteArray, b: ByteArray): Boolean {
+        val len = minOf(a.size, b.size)
+        for (i in 0 until len) {
+            val ai = a[i].toInt() and 0xff
+            val bi = b[i].toInt() and 0xff
+            if (ai != bi) return ai < bi
         }
+        return a.size < b.size
     }
 
     @JvmStatic

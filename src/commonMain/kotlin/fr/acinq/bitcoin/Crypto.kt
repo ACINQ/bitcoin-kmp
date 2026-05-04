@@ -38,7 +38,7 @@ public object Crypto {
 
     @JvmStatic
     public fun sha256(input: ByteVector): ByteArray =
-        sha256(input.toByteArray(), 0, input.size())
+        sha256(input.bytes, input.offset, input.size())
 
     @JvmStatic
     public fun ripemd160(input: ByteArray, offset: Int, len: Int): ByteArray =
@@ -50,7 +50,7 @@ public object Crypto {
 
     @JvmStatic
     public fun ripemd160(input: ByteVector): ByteArray =
-        ripemd160(input.toByteArray(), 0, input.size())
+        ripemd160(input.bytes, input.offset, input.size())
 
     @JvmStatic
     public fun hash256(input: ByteArray, offset: Int, len: Int): ByteArray =
@@ -62,7 +62,7 @@ public object Crypto {
 
     @JvmStatic
     public fun hash256(input: ByteVector): ByteArray =
-        hash256(input.toByteArray(), 0, input.size())
+        hash256(input.bytes, input.offset, input.size())
 
     @JvmStatic
     public fun hash160(input: ByteArray, offset: Int, len: Int): ByteArray =
@@ -73,7 +73,7 @@ public object Crypto {
 
     @JvmStatic
     public fun hash160(input: ByteVector): ByteArray =
-        hash160(input.toByteArray(), 0, input.size())
+        hash160(input.bytes, input.offset, input.size())
 
     @JvmStatic
     public fun hmac512(key: ByteArray, data: ByteArray): ByteArray {

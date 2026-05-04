@@ -16,9 +16,11 @@
 
 package fr.acinq.bitcoin.io
 
-public class ByteArrayInput(private val array: ByteArray) : Input {
+public class ByteArrayInput(private val array: ByteArray, offset: Int) : Input {
 
-    private var position: Int = 0
+    public constructor(array: ByteArray) : this(array, 0)
+
+    private var position: Int = offset
     override val availableBytes: Int get() = array.size - position
 
     override fun read(): Int {

@@ -22,14 +22,19 @@ import kotlin.jvm.JvmField
  * we only store the x coordinate of the pubkey, the y coordinate is always even
  */
 public data class XonlyPublicKey(@JvmField val value: ByteVector32) {
-    public constructor(pub: PublicKey) : this(pub.value.drop(1).toByteArray().byteVector32())
+    public constructor(pub: PublicKey) : this(ByteVector32(pub.value.bytes, 1))
 
-    val publicKey: PublicKey = PublicKey(byteArrayOf(2) + value.toByteArray())
+    val publicKey: PublicKey = run {
+        val data = ByteArray(33)
+        data[0] = 2
+        value.copyInto(data, 1)
+        PublicKey(data)
+    }
 
     public fun tweak(tapTweak: Crypto.TaprootTweak): ByteVector32 {
         val toHash = when (tapTweak) {
             is Crypto.TaprootTweak.KeyPathTweak -> value.toByteArray()
-            is Crypto.TaprootTweak.ScriptPathTweak -> value.toByteArray() + tapTweak.merkleRoot.toByteArray()
+            is Crypto.TaprootTweak.ScriptPathTweak -> (value + tapTweak.merkleRoot).toByteArray()
         }
         return Crypto.taggedHash(toHash, "TapTweak")
     }

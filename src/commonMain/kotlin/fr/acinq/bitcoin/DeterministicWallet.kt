@@ -59,21 +59,25 @@ public object DeterministicWallet {
          */
         public fun derivePrivateKey(index: Long): ExtendedPrivateKey {
             val I = if (isHardened(index)) {
-                val data = arrayOf(0.toByte()).toByteArray() + secretkeybytes.toByteArray() + Pack.writeInt32BE(index.toInt())
-                Crypto.hmac512(chaincode.toByteArray(), data)
+                val data1 = ByteArray(1 + secretkeybytes.size() + 4)
+                secretkeybytes.copyInto(data1, 1)
+                Pack.writeInt32BE(index.toInt(), data1, 1 + secretkeybytes.size())
+                Crypto.hmac512(chaincode.toByteArray(), data1)
             } else {
-                val data = extendedPublicKey.publickeybytes.toByteArray() + Pack.writeInt32BE(index.toInt())
-                Crypto.hmac512(chaincode.toByteArray(), data)
+                val data1 = ByteArray(extendedPublicKey.publickeybytes.size() + 4)
+                extendedPublicKey.publickeybytes.copyInto(data1, 0)
+                Pack.writeInt32BE(index.toInt(), data1, extendedPublicKey.publickeybytes.size())
+                Crypto.hmac512(chaincode.toByteArray(), data1)
             }
-            val IL = I.take(32).toByteArray()
-            val IR = I.takeLast(32).toByteArray()
-            require(Crypto.isPrivKeyValid(IL)) { "cannot generate child private key: IL is invalid" }
+            val IL = ByteVector32(I, 0)
+            val IR = ByteVector32(I, 32)
+            require(Crypto.isPrivKeyValid(IL.toByteArray())) { "cannot generate child private key: IL is invalid" }
 
             val key = PrivateKey(IL) + privateKey
             require(Crypto.isPrivKeyValid(key.value.toByteArray())) { "cannot generate child private key: resulting private key is invalid" }
             return ExtendedPrivateKey(
                 secretkeybytes = key.value,
-                chaincode = IR.byteVector32(),
+                chaincode = IR,
                 depth = depth + 1,
                 path = path.derive(index),
                 parent = fingerprint()
@@ -93,9 +97,9 @@ public object DeterministicWallet {
             out.write(depth)
             Pack.writeInt32BE(parent.toInt(), out)
             Pack.writeInt32BE(path.lastChildNumber.toInt(), out)
-            out.write(chaincode.toByteArray())
+            out.write(chaincode)
             out.write(0)
-            out.write(secretkeybytes.toByteArray())
+            out.write(secretkeybytes)
             val buffer = out.toByteArray()
             return Base58Check.encode(prefix, buffer)
         }
@@ -153,15 +157,15 @@ public object DeterministicWallet {
             val I = Crypto.hmac512(
                 chaincode.toByteArray(), publickeybytes.toByteArray() + Pack.writeInt32BE(index.toInt())
             )
-            val IL = I.take(32).toByteArray()
-            val IR = I.takeLast(32).toByteArray()
-            require(Crypto.isPrivKeyValid(IL)) { "cannot generate child public key: IL is invalid" }
+            val IL = ByteVector32(I, 0)
+            val IR = ByteVector32(I, 32)
+            require(Crypto.isPrivKeyValid(IL.toByteArray())) { "cannot generate child public key: IL is invalid" }
 
             val Ki = PrivateKey(IL).publicKey() + publicKey
             require(Crypto.isPubKeyValid(Ki.value.toByteArray())) { "cannot generate child public key: resulting public key is invalid" }
             return ExtendedPublicKey(
                 publickeybytes = Ki.value,
-                chaincode = IR.byteVector32(),
+                chaincode = IR,
                 depth = depth + 1,
                 path = path.derive(index),
                 parent = fingerprint()
@@ -189,8 +193,8 @@ public object DeterministicWallet {
             out.write(depth)
             Pack.writeInt32BE(parent.toInt(), out)
             Pack.writeInt32BE(path.lastChildNumber.toInt(), out)
-            out.write(chaincode.toByteArray())
-            out.write(publickeybytes.toByteArray())
+            out.write(chaincode)
+            out.write(publickeybytes)
         }
 
         public companion object {
@@ -218,8 +222,8 @@ public object DeterministicWallet {
     @JvmStatic
     public fun generate(seed: ByteArray): ExtendedPrivateKey {
         val I = Crypto.hmac512("Bitcoin seed".encodeToByteArray(), seed)
-        val IL = I.take(32).toByteArray().byteVector32()
-        val IR = I.takeLast(32).toByteArray().byteVector32()
+        val IL = ByteVector32(I, 0)
+        val IR = ByteVector32(I, 32)
         return ExtendedPrivateKey(IL, IR, depth = 0, path = KeyPath.empty, parent = 0L)
     }
 

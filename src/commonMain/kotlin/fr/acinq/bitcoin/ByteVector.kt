@@ -66,25 +66,58 @@ public open class ByteVector(internal val bytes: ByteArray, internal val offset:
         return ByteVector(data)
     }
 
+    public fun copyInto(dest: ByteArray, destOffset: Int = 0): Unit {
+        bytes.copyInto(dest, destOffset, offset, endIndex = offset + size)
+    }
+
     public fun padLeft(length: Int): ByteVector {
         require(size <= length) { "byte vector larger than padding target" }
         if (length == size) return this
-        return ByteVector(ByteArray(length - size) + toByteArray())
+        val data = ByteArray(length)
+        copyInto(data, length - size)
+        return ByteVector(data)
     }
 
     public fun padRight(length: Int): ByteVector {
         require(size <= length) { "byte vector larger than padding target" }
         if (length == size) return this
-        return ByteVector(toByteArray() + ByteArray(length - size))
+        val data = ByteArray(length)
+        copyInto(data, 0)
+        return ByteVector(data)
     }
 
-    public fun concat(value: Byte): ByteVector = ByteVector(toByteArray() + value)
+    public fun concat(value: Byte): ByteVector {
+        val data = ByteArray(size + 1)
+        copyInto(data, 0)
+        data[size] = value
+        return ByteVector(data)
+    }
 
-    public fun concat(other: ByteArray): ByteVector = ByteVector(toByteArray() + other)
+    public fun concat(other: ByteArray): ByteVector {
+        val data = ByteArray(size + other.size)
+        copyInto(data, 0)
+        other.copyInto(data, size)
+        return ByteVector(data)
+    }
 
-    public fun concat(other: ByteVector): ByteVector = concat(other.toByteArray())
+    public fun concat(other: ByteVector): ByteVector {
+        val data = ByteArray(size + other.size)
+        copyInto(data, 0)
+        other.copyInto(data, size)
+        return ByteVector(data)
+    }
 
-    public fun concat(others: List<ByteVector>): ByteVector = others.fold(this) { current, next -> current.concat(next) }
+    public fun concat(others: List<ByteVector>): ByteVector {
+        val data = ByteArray(size + others.map { it.size }.sum())
+        var destOffset = 0
+        copyInto(data, 0)
+        destOffset += size
+        others.forEach {
+            it.copyInto(data, destOffset)
+            destOffset += it.size
+        }
+        return ByteVector(data)
+    }
 
     public open fun reversed(): ByteVector = ByteVector(toByteArray().reversedArray())
 

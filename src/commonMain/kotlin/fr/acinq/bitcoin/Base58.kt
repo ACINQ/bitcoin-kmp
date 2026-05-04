@@ -207,10 +207,10 @@ public object Base58Check {
     @JvmStatic
     public fun decode(encoded: String): Pair<Byte, ByteArray> {
         val raw = Base58.decode(encoded)
-        val versionAndHash = raw.dropLast(4).toByteArray()
-        val checksum = raw.takeLast(4).toByteArray()
+        val versionAndHash = raw.copyOfRange(0, raw.size - 4)
+        val checksum = raw.copyOfRange(raw.size - 4, raw.size)
         require(checksum.contentEquals(checksum(versionAndHash))) { "invalid Base58Check data $encoded" }
-        return Pair(versionAndHash[0], versionAndHash.drop(1).toByteArray())
+        return Pair(versionAndHash[0], versionAndHash.copyOfRange(1, versionAndHash.size))
     }
 
     /**
@@ -238,9 +238,9 @@ public object Base58Check {
     @JvmStatic
     public fun decodeWithPrefixLen(encoded: String, prefixLen: Int): Pair<ByteArray, ByteArray> {
         val raw = Base58.decode(encoded)
-        val versionAndHash = raw.dropLast(4).toByteArray()
-        val checksum = raw.takeLast(4).toByteArray()
+        val versionAndHash = raw.copyOfRange(0, raw.size - 4)
+        val checksum = raw.copyOfRange(raw.size - 4, raw.size)
         require(checksum.contentEquals(checksum(versionAndHash))) { "invalid Base58Check data $encoded" }
-        return Pair(versionAndHash.take(prefixLen).toByteArray(), versionAndHash.drop(prefixLen).toByteArray())
+        return Pair(versionAndHash.copyOfRange(0, prefixLen), versionAndHash.copyOfRange(prefixLen, versionAndHash.size))
     }
 }

@@ -16,6 +16,7 @@
 
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.crypto.Digest
 import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
@@ -207,7 +208,7 @@ public object MerkleTree {
             else -> {
                 val tree1 = mutableListOf<ByteVector32>()
                 for (i in 0 until (tree.size / 2)) {
-                    val hash = Crypto.hash256(tree[2 * i].toByteArray() + tree[2 * i + 1].toByteArray())
+                    val hash = Crypto.hash256(tree[2 * i] + tree[2 * i + 1])
                     tree1.add(hash.byteVector32())
                 }
                 computeRoot(tree1.toList())

@@ -86,7 +86,7 @@ public object Script {
     public fun parse(blob: ByteArray): List<ScriptElt> = parse(ByteArrayInput(blob))
 
     @JvmStatic
-    public fun parse(blob: ByteVector): List<ScriptElt> = parse(blob.toByteArray())
+    public fun parse(blob: ByteVector): List<ScriptElt> = parse(ByteArrayInput(blob.bytes, blob.offset))
 
     @JvmStatic
     public fun parse(hex: String): List<ScriptElt> = parse(Hex.decode(hex))
@@ -122,7 +122,7 @@ public object Script {
 
                         else -> error("invalid OP_PUSHADATA opcode ${head.code}")
                     }
-                    out.write(head.data.toByteArray())
+                    out.write(head.data)
                 }
 
                 else -> {
@@ -782,7 +782,7 @@ public object Script {
                         context.executionData.annex,
                         context.executionData.codeSeparatorPos
                     )
-                    val result = Secp256k1.verifySchnorr(sigBytes.take(64).toByteArray(), hash.toByteArray(), pubKey)
+                    val result = Secp256k1.verifySchnorr(sigBytes.copyOf(64), hash.toByteArray(), pubKey)
                     require(result) { "Invalid Schnorr signature" }
                     result
                 }

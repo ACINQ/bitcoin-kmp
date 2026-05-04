@@ -30,8 +30,8 @@ import kotlin.jvm.JvmStatic
 public data class PrivateKey(@JvmField val value: ByteVector32) {
     public constructor(data: ByteArray) : this(
         when {
-            data.size == 32 -> ByteVector32(data.copyOf())
-            data.size == 33 && data.last() == 1.toByte() -> ByteVector32(data.copyOf(32))
+            data.size == 32 -> ByteVector32(data)
+            data.size == 33 && data.last() == 1.toByte() -> ByteVector32(data)
             else -> throw RuntimeException("invalid private key length")
         }
     )

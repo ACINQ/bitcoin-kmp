@@ -20,6 +20,7 @@ import fr.acinq.bitcoin.BtcSerializer.Companion.writeScript
 import fr.acinq.bitcoin.BtcSerializer.Companion.writeUInt32
 import fr.acinq.bitcoin.BtcSerializer.Companion.writeUInt64
 import fr.acinq.bitcoin.Protocol.PROTOCOL_VERSION
+import fr.acinq.bitcoin.crypto.Digest
 import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
@@ -87,7 +88,7 @@ public data class OutPoint(@JvmField val hash: TxHash, @JvmField val index: Long
 
         @JvmStatic
         override fun write(message: OutPoint, out: Output, protocolVersion: Long) {
-            out.write(message.hash.value.toByteArray())
+            out.write(message.hash.value)
             writeUInt32(message.index.toUInt(), out)
         }
 
@@ -260,7 +261,7 @@ public data class TxOut(@JvmField val amount: Satoshi, @JvmField val publicKeySc
 
     public fun updatePublicKeyScript(input: List<ScriptElt>): TxOut = updatePublicKeyScript(Script.write(input))
 
-    public fun totalSize(): Int = Companion.totalSize(this)
+    public fun totalSize(): Int = totalSize(this)
 
     public fun weight(): Int = weight(this)
 
@@ -309,10 +310,55 @@ public data class Transaction(
     @JvmField val lockTime: Long
 ) : BtcSerializable<Transaction> {
 
+    private val hashPrevOut: ByteArray by lazy {
+        Crypto.sha256(prevoutsSha256)
+    }
+
+    private val hashSequence: ByteArray by lazy {
+        Crypto.sha256(sequencesSha256)
+    }
+
+    private val hashOutputs: ByteArray by lazy {
+        Crypto.sha256(outputsSha256)
+    }
+
+    internal val prevoutsSha256: ByteArray by lazy {
+        val sha256 = Digest.sha256()
+        txIn.forEach {
+            val buffer = OutPoint.write(it.outPoint, PROTOCOL_VERSION)
+            sha256.update(buffer, 0, buffer.size)
+        }
+        val result = ByteArray(32)
+        sha256.doFinal(result, 0)
+        result
+    }
+
+    internal val sequencesSha256: ByteArray by lazy {
+        val sha256 = Digest.sha256()
+        txIn.forEach {
+            val buffer = writeUInt32(it.sequence.toUInt())
+            sha256.update(buffer, 0, buffer.size)
+        }
+        val result = ByteArray(32)
+        sha256.doFinal(result, 0)
+        result
+    }
+
+    internal val outputsSha256: ByteArray by lazy {
+        val sha256 = Digest.sha256()
+        txOut.forEach {
+            val buffer = TxOut.write(it, PROTOCOL_VERSION)
+            sha256.update(buffer, 0, buffer.size)
+        }
+        val result = ByteArray(32)
+        sha256.doFinal(result, 0)
+        result
+    }
+
     public val hasWitness: Boolean get() = txIn.any { it.hasWitness }
 
     @JvmField
-    public val hash: TxHash = TxHash(Crypto.hash256(Transaction.write(this, SERIALIZE_TRANSACTION_NO_WITNESS)))
+    public val hash: TxHash = TxHash(Crypto.hash256(write(this, SERIALIZE_TRANSACTION_NO_WITNESS)))
 
     @JvmField
     public val txid: TxId = TxId(hash)
@@ -404,14 +450,14 @@ public data class Transaction(
         writeUInt32(lockTime.toUInt(), out)
         val inputType = sighashType and SigHash.SIGHASH_INPUT_MASK
         if (inputType != SigHash.SIGHASH_ANYONECANPAY) {
-            out.write(prevoutsSha256(this))
+            out.write(this.prevoutsSha256)
             out.write(amountsSha256(inputs))
             out.write(scriptPubkeysSha256(inputs))
-            out.write(sequencesSha256(this))
+            out.write(this.sequencesSha256)
         }
         val outputType = if (sighashType == SigHash.SIGHASH_DEFAULT) SigHash.SIGHASH_ALL else sighashType and SigHash.SIGHASH_OUTPUT_MASK
         if (outputType == SigHash.SIGHASH_ALL) {
-            out.write(outputsSha256(this))
+            out.write(this.outputsSha256)
         }
         return out.toByteArray()
     }
@@ -482,7 +528,7 @@ public data class Transaction(
             ByteVector32.One.toByteArray()
         } else {
             val txCopy = prepareForSigning(inputIndex, previousOutputScript, sighashType)
-            Crypto.hash256(Transaction.write(txCopy, SERIALIZE_TRANSACTION_NO_WITNESS) + writeUInt32(sighashType.toUInt()))
+            Crypto.hash256(write(txCopy, SERIALIZE_TRANSACTION_NO_WITNESS) + writeUInt32(sighashType.toUInt()))
         }
     }
 
@@ -499,21 +545,15 @@ public data class Transaction(
         when (signatureVersion) {
             SigVersion.SIGVERSION_WITNESS_V0 -> {
                 val hashPrevOut = if (!SigHash.isAnyoneCanPay(sighashType)) {
-                    val arrays = txIn.map { it.outPoint }.map { OutPoint.write(it, PROTOCOL_VERSION) }
-                    val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
-                    Crypto.hash256(concatenated)
+                    this.hashPrevOut
                 } else ByteArray(32)
 
                 val hashSequence = if (!SigHash.isAnyoneCanPay(sighashType) && !SigHash.isHashSingle(sighashType) && !SigHash.isHashNone(sighashType)) {
-                    val arrays = txIn.map { it.sequence }.map { writeUInt32(it.toUInt()) }
-                    val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
-                    Crypto.hash256(concatenated)
+                    this.hashSequence
                 } else ByteArray(32)
 
                 val hashOutputs = if (!SigHash.isHashSingle(sighashType) && !SigHash.isHashNone(sighashType)) {
-                    val arrays = txOut.map { TxOut.write(it, PROTOCOL_VERSION) }
-                    val concatenated = arrays.fold(ByteArray(0)) { acc, b -> acc + b }
-                    Crypto.hash256(concatenated)
+                    this.hashOutputs
                 } else if (SigHash.isHashSingle(sighashType) && inputIndex < txOut.count()) {
                     Crypto.hash256(TxOut.write(txOut[inputIndex], PROTOCOL_VERSION))
                 } else ByteArray(32)
@@ -695,7 +735,7 @@ public data class Transaction(
         }
         if (sigVersion == SigVersion.SIGVERSION_TAPSCRIPT) {
             require(tapleaf != null) { "tapleaf hash is missing" }
-            out.write(tapleaf.toByteArray())
+            out.write(tapleaf)
             out.write(keyVersion)
             writeUInt32((codeSeparatorPos ?: 0xFFFFFFFFL).toUInt(), out)
         }
@@ -888,13 +928,6 @@ public data class Transaction(
         public fun isCoinbase(input: Transaction): Boolean = input.isCoinbase()
 
         @JvmStatic
-        public fun prevoutsSha256(tx: Transaction): ByteArray {
-            val buffer = ByteArrayOutput()
-            tx.txIn.forEach { OutPoint.write(it.outPoint, buffer) }
-            return Crypto.sha256(buffer.toByteArray())
-        }
-
-        @JvmStatic
         public fun amountsSha256(inputs: List<TxOut>): ByteArray {
             val buffer = ByteArrayOutput()
             inputs.forEach { writeUInt64(it.amount.toULong(), buffer) }
@@ -905,20 +938,6 @@ public data class Transaction(
         public fun scriptPubkeysSha256(inputs: List<TxOut>): ByteArray {
             val buffer = ByteArrayOutput()
             inputs.forEach { writeScript(it.publicKeyScript, buffer) }
-            return Crypto.sha256(buffer.toByteArray())
-        }
-
-        @JvmStatic
-        public fun sequencesSha256(tx: Transaction): ByteArray {
-            val buffer = ByteArrayOutput()
-            tx.txIn.forEach { writeUInt32(it.sequence.toUInt(), buffer) }
-            return Crypto.sha256(buffer.toByteArray())
-        }
-
-        @JvmStatic
-        public fun outputsSha256(tx: Transaction): ByteArray {
-            val buffer = ByteArrayOutput()
-            tx.txOut.forEach { TxOut.write(it, buffer) }
             return Crypto.sha256(buffer.toByteArray())
         }
 

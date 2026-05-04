@@ -16,7 +16,10 @@
 
 package fr.acinq.bitcoin.io
 
+import fr.acinq.bitcoin.ByteVector
+
 public interface Output {
     public fun write(buffer: ByteArray, offset: Int = 0, count: Int = buffer.size)
+    public fun write(buffer: ByteVector): Unit = write(buffer.bytes, buffer.offset, buffer.size())
     public fun write(byteValue: Int)
 }

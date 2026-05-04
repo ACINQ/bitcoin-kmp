@@ -39,10 +39,10 @@ class BIP341TestsCommon {
             val hashSequences = it.jsonObject["intermediary"]!!.jsonObject["hashSequences"]!!.jsonPrimitive.content
 
             assertEquals(hashAmounts, Hex.encode(Transaction.amountsSha256(utxosSpent)))
-            assertEquals(hashOutputs, Hex.encode(Transaction.outputsSha256(rawUnsignedTx)))
-            assertEquals(hashPrevouts, Hex.encode(Transaction.prevoutsSha256(rawUnsignedTx)))
+            assertEquals(hashOutputs, Hex.encode(rawUnsignedTx.outputsSha256))
+            assertEquals(hashPrevouts, Hex.encode(rawUnsignedTx.prevoutsSha256))
             assertEquals(hashScriptPubkeys, Hex.encode(Transaction.scriptPubkeysSha256(utxosSpent)))
-            assertEquals(hashSequences, Hex.encode(Transaction.sequencesSha256(rawUnsignedTx)))
+            assertEquals(hashSequences, Hex.encode(rawUnsignedTx.sequencesSha256))
 
             val previousOutputs = (fullySignedTx.txIn.map { it.outPoint }).zip(utxosSpent).toMap()
             Transaction.correctlySpends(fullySignedTx, previousOutputs, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)

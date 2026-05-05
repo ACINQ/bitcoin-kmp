@@ -103,6 +103,11 @@ public object DeterministicWallet {
         public fun fingerprint(): Long = extendedPublicKey.fingerprint()
 
         /**
+         * @return the fingerprint for this private key as a 4 byte hex string
+         */
+        public fun keyFingerprint(): String = extendedPublicKey.keyFingerprint()
+
+        /**
          * We avoid accidentally logging extended private keys.
          * You should use an explicit method if you want to convert the extended private key to a string representation.
          */
@@ -164,7 +169,7 @@ public object DeterministicWallet {
                 chaincode = IR.byteVector32(),
                 depth = depth + 1,
                 path = path.derive(index),
-                parent = fingerprint()
+                parent = keyFingerprint().toLong(16)
             )
         }
 
@@ -175,6 +180,11 @@ public object DeterministicWallet {
         public fun derivePublicKey(keyPath: String): ExtendedPublicKey = derivePublicKey(KeyPath.fromPath(keyPath))
 
         public fun fingerprint(): Long = Pack.int32LE(ByteArrayInput(Crypto.hash160(publickeybytes).take(4).reversed().toByteArray())).toLong()
+
+        /**
+         * @return the fingerprint for this public key as a 4 byte hex string
+         */
+        public fun keyFingerprint(): String = Crypto.hash160(publickeybytes).take(4).toByteArray().toHexString()
 
         public fun encode(prefix: Int): String {
             val out = ByteArrayOutput()
@@ -258,6 +268,13 @@ public object DeterministicWallet {
      */
     @JvmStatic
     public fun fingerprint(input: ExtendedPublicKey): Long = input.fingerprint()
+
+    /**
+     * @param input extended public key
+     * @return the fingerprint for this public key as a 4 byte hex string
+     */
+    @JvmStatic
+    public fun keyFingerprint(input: ExtendedPublicKey): String = input.keyFingerprint()
 
     /**
      * @param input extended private key

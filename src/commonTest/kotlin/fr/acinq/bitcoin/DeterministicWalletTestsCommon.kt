@@ -22,6 +22,7 @@ import fr.acinq.bitcoin.DeterministicWallet.encode
 import fr.acinq.bitcoin.DeterministicWallet.fingerprint
 import fr.acinq.bitcoin.DeterministicWallet.generate
 import fr.acinq.bitcoin.DeterministicWallet.hardened
+import fr.acinq.bitcoin.DeterministicWallet.isHardened
 import fr.acinq.bitcoin.DeterministicWallet.publicKey
 import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.secp256k1.Hex
@@ -32,6 +33,34 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 
 class DeterministicWalletTestsCommon {
+
+    fun deriveAndCheck(
+        parent: DeterministicWallet.ExtendedPrivateKey,
+        childNumber: Long,
+        expectedPrivateKey: String,
+        expectedPublicKey: String
+    ): Pair<DeterministicWallet.ExtendedPrivateKey, DeterministicWallet.ExtendedPublicKey> {
+        // derive private key
+        val priv = parent.derivePrivateKey(childNumber)
+        // check encoding
+        assertEquals(priv.encode(testnet = false), expectedPrivateKey)
+        // check decoding
+        assertEquals(DeterministicWallet.ExtendedPrivateKey.decode(expectedPrivateKey, parent.path).second, priv)
+        // check parent field
+        assertEquals(priv.parent, parent.fingerprint())
+        val pub = priv.extendedPublicKey
+        assertEquals(pub.encode(testnet = false), expectedPublicKey)
+        assertEquals(DeterministicWallet.ExtendedPublicKey.decode(expectedPublicKey, parent.path).second, pub)
+        assertEquals(pub.parent, parent.fingerprint())
+
+        // derive public key if applicable
+        if (!isHardened(childNumber)) {
+            assertEquals(pub, parent.extendedPublicKey.derivePublicKey(childNumber))
+        } else {
+            assertFails { parent.extendedPublicKey.derivePublicKey(childNumber) }
+        }
+        return Pair(priv, pub)
+    }
 
     @Test
     fun `generate and derive keys -- test vector no1`() {
@@ -46,82 +75,47 @@ class DeterministicWalletTestsCommon {
             m_pub.encode(testnet = false),
             "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8"
         )
-        assertEquals(m.fingerprint(), 876747070L)
+        assertEquals(0x3442193E, m.fingerprint())
 
-        val m0h = m.derivePrivateKey(hardened(0))
-        assertEquals(
-            m0h.encode(testnet = false),
-            "xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7"
-        )
-        val m0h_pub = m0h.extendedPublicKey
-        assertEquals(
-            m0h_pub.encode(testnet = false),
+        val (m0h, _) = deriveAndCheck(
+            m, hardened(0),
+            "xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7",
             "xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw"
         )
+        assertEquals(0x5C1BD648, m0h.fingerprint())
 
-        val m0h_1 = m0h.derivePrivateKey(1L)
-        assertEquals(
-            m0h_1.encode(testnet = false),
-            "xprv9wTYmMFdV23N2TdNG573QoEsfRrWKQgWeibmLntzniatZvR9BmLnvSxqu53Kw1UmYPxLgboyZQaXwTCg8MSY3H2EU4pWcQDnRnrVA1xe8fs"
-        )
-        val m0h_1_pub = m0h_1.extendedPublicKey
-        assertEquals(
-            m0h_1_pub.encode(testnet = false),
+        val (m0h_1, m0h_1_pub) = deriveAndCheck(
+            m0h, 1,
+            "xprv9wTYmMFdV23N2TdNG573QoEsfRrWKQgWeibmLntzniatZvR9BmLnvSxqu53Kw1UmYPxLgboyZQaXwTCg8MSY3H2EU4pWcQDnRnrVA1xe8fs",
             "xpub6ASuArnXKPbfEwhqN6e3mwBcDTgzisQN1wXN9BJcM47sSikHjJf3UFHKkNAWbWMiGj7Wf5uMash7SyYq527Hqck2AxYysAA7xmALppuCkwQ"
         )
+        assertEquals(0xBEF5A2F9, m0h_1.fingerprint())
 
-        // check that we can also derive this public key from the parent's public key
-        val m0h_1_pub1 = derivePublicKey(m0h_pub, 1L)
-        assertEquals(
-            encode(m0h_1_pub1, testnet = false),
-            "xpub6ASuArnXKPbfEwhqN6e3mwBcDTgzisQN1wXN9BJcM47sSikHjJf3UFHKkNAWbWMiGj7Wf5uMash7SyYq527Hqck2AxYysAA7xmALppuCkwQ"
-        )
-
-        val m0h_1_2h = derivePrivateKey(m0h_1, hardened(2))
-        assertEquals(
-            encode(m0h_1_2h, testnet = false),
-            "xprv9z4pot5VBttmtdRTWfWQmoH1taj2axGVzFqSb8C9xaxKymcFzXBDptWmT7FwuEzG3ryjH4ktypQSAewRiNMjANTtpgP4mLTj34bhnZX7UiM"
-        )
-        val m0h_1_2h_pub = publicKey(m0h_1_2h)
-        assertEquals(
-            encode(m0h_1_2h_pub, testnet = false),
+        val (m0h_1_2h, _) = deriveAndCheck(
+            m0h_1, hardened(2),
+            "xprv9z4pot5VBttmtdRTWfWQmoH1taj2axGVzFqSb8C9xaxKymcFzXBDptWmT7FwuEzG3ryjH4ktypQSAewRiNMjANTtpgP4mLTj34bhnZX7UiM",
             "xpub6D4BDPcP2GT577Vvch3R8wDkScZWzQzMMUm3PWbmWvVJrZwQY4VUNgqFJPMM3No2dFDFGTsxxpG5uJh7n7epu4trkrX7x7DogT5Uv6fcLW5"
         )
+        assertEquals(0xEE7AB90C, m0h_1_2h.fingerprint())
+
         assertFails {
             derivePublicKey(m0h_1_pub, hardened(2))
         }
 
-        val m0h_1_2h_2 = derivePrivateKey(m0h_1_2h, 2)
-        assertEquals(
-            encode(m0h_1_2h_2, testnet = false),
-            "xprvA2JDeKCSNNZky6uBCviVfJSKyQ1mDYahRjijr5idH2WwLsEd4Hsb2Tyh8RfQMuPh7f7RtyzTtdrbdqqsunu5Mm3wDvUAKRHSC34sJ7in334"
-        )
-        val m0h_1_2h_2_pub = publicKey(m0h_1_2h_2)
-        assertEquals(
-            encode(m0h_1_2h_2_pub, testnet = false),
+        val (m0h_1_2h_2, _) = deriveAndCheck(
+            m0h_1_2h, 2,
+            "xprvA2JDeKCSNNZky6uBCviVfJSKyQ1mDYahRjijr5idH2WwLsEd4Hsb2Tyh8RfQMuPh7f7RtyzTtdrbdqqsunu5Mm3wDvUAKRHSC34sJ7in334",
             "xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV"
         )
-        val m0h_1_2h_2_pub1 = derivePublicKey(m0h_1_2h_pub, 2)
-        assertEquals(
-            encode(m0h_1_2h_2_pub1, testnet = false),
-            "xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV"
-        )
+        assertEquals(0xD880D7D8, m0h_1_2h_2.fingerprint())
 
-        val m0h_1_2h_2_1000000000 = derivePrivateKey(m0h_1_2h_2, 1000000000L)
-        assertEquals(
-            encode(m0h_1_2h_2_1000000000, testnet = false),
-            "xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76"
-        )
-        val m0h_1_2h_2_1000000000_pub = publicKey(m0h_1_2h_2_1000000000)
-        assertEquals(
-            encode(m0h_1_2h_2_1000000000_pub, testnet = false),
+        val (m0h_1_2h_2_1000000000, _) = deriveAndCheck(
+            m0h_1_2h_2, 1000000000L,
+            "xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76",
             "xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy"
         )
 
-        assertEquals(
-            encode(derivePrivateKey(m, "0'/1/2'/2/1000000000"), testnet = false),
-            "xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76"
-        )
+        assertEquals(m0h_1_2h_2_1000000000, derivePrivateKey(m, "0'/1/2'/2/1000000000"))
     }
 
     @Test
@@ -138,59 +132,34 @@ class DeterministicWalletTestsCommon {
             "xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB"
         )
 
-        val m0 = derivePrivateKey(m, 0L)
-        assertEquals(
-            encode(m0, testnet = false),
-            "xprv9vHkqa6EV4sPZHYqZznhT2NPtPCjKuDKGY38FBWLvgaDx45zo9WQRUT3dKYnjwih2yJD9mkrocEZXo1ex8G81dwSM1fwqWpWkeS3v86pgKt"
-        )
-        val m0_pub = publicKey(m0)
-        assertEquals(
-            encode(m0_pub, testnet = false),
+        val (m0, _) = deriveAndCheck(
+            m, 0L,
+            "xprv9vHkqa6EV4sPZHYqZznhT2NPtPCjKuDKGY38FBWLvgaDx45zo9WQRUT3dKYnjwih2yJD9mkrocEZXo1ex8G81dwSM1fwqWpWkeS3v86pgKt",
             "xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH"
         )
 
-        val m0_2147483647h = derivePrivateKey(m0, hardened(2147483647))
-        assertEquals(
-            encode(m0_2147483647h, testnet = false),
-            "xprv9wSp6B7kry3Vj9m1zSnLvN3xH8RdsPP1Mh7fAaR7aRLcQMKTR2vidYEeEg2mUCTAwCd6vnxVrcjfy2kRgVsFawNzmjuHc2YmYRmagcEPdU9"
-        )
-        val m0_2147483647h_pub = publicKey(m0_2147483647h)
-        assertEquals(
-            encode(m0_2147483647h_pub, testnet = false),
+        val (m0_2147483647h, _) = deriveAndCheck(
+            m0, hardened(2147483647),
+            "xprv9wSp6B7kry3Vj9m1zSnLvN3xH8RdsPP1Mh7fAaR7aRLcQMKTR2vidYEeEg2mUCTAwCd6vnxVrcjfy2kRgVsFawNzmjuHc2YmYRmagcEPdU9",
             "xpub6ASAVgeehLbnwdqV6UKMHVzgqAG8Gr6riv3Fxxpj8ksbH9ebxaEyBLZ85ySDhKiLDBrQSARLq1uNRts8RuJiHjaDMBU4Zn9h8LZNnBC5y4a"
         )
 
-        val m0_2147483647h_1 = derivePrivateKey(m0_2147483647h, 1)
-        assertEquals(
-            encode(m0_2147483647h_1, testnet = false),
-            "xprv9zFnWC6h2cLgpmSA46vutJzBcfJ8yaJGg8cX1e5StJh45BBciYTRXSd25UEPVuesF9yog62tGAQtHjXajPPdbRCHuWS6T8XA2ECKADdw4Ef"
-        )
-        val m0_2147483647h_1_pub = publicKey(m0_2147483647h_1)
-        assertEquals(
-            encode(m0_2147483647h_1_pub, testnet = false),
+
+        val (m0_2147483647h_1, _) = deriveAndCheck(
+            m0_2147483647h, 1,
+            "xprv9zFnWC6h2cLgpmSA46vutJzBcfJ8yaJGg8cX1e5StJh45BBciYTRXSd25UEPVuesF9yog62tGAQtHjXajPPdbRCHuWS6T8XA2ECKADdw4Ef",
             "xpub6DF8uhdarytz3FWdA8TvFSvvAh8dP3283MY7p2V4SeE2wyWmG5mg5EwVvmdMVCQcoNJxGoWaU9DCWh89LojfZ537wTfunKau47EL2dhHKon"
         )
 
-        val m0_2147483647h_1_2147483646h = derivePrivateKey(m0_2147483647h_1, hardened(2147483646))
-        assertEquals(
-            encode(m0_2147483647h_1_2147483646h, testnet = false),
-            "xprvA1RpRA33e1JQ7ifknakTFpgNXPmW2YvmhqLQYMmrj4xJXXWYpDPS3xz7iAxn8L39njGVyuoseXzU6rcxFLJ8HFsTjSyQbLYnMpCqE2VbFWc"
-        )
-        val m0_2147483647h_1_2147483646h_pub = publicKey(m0_2147483647h_1_2147483646h)
-        assertEquals(
-            encode(m0_2147483647h_1_2147483646h_pub, testnet = false),
+        val (m0_2147483647h_1_2147483646h, _) = deriveAndCheck(
+            m0_2147483647h_1, hardened(2147483646),
+            "xprvA1RpRA33e1JQ7ifknakTFpgNXPmW2YvmhqLQYMmrj4xJXXWYpDPS3xz7iAxn8L39njGVyuoseXzU6rcxFLJ8HFsTjSyQbLYnMpCqE2VbFWc",
             "xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL"
         )
 
-        val m0_2147483647h_1_2147483646h_2 = derivePrivateKey(m0_2147483647h_1_2147483646h, 2)
-        assertEquals(m0_2147483647h_1_2147483646h_2.path.toString(), "m/0/2147483647'/1/2147483646'/2")
-        assertEquals(
-            encode(m0_2147483647h_1_2147483646h_2, testnet = false),
-            "xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j"
-        )
-        val m0_2147483647h_1_2147483646h_2_pub = publicKey(m0_2147483647h_1_2147483646h_2)
-        assertEquals(
-            encode(m0_2147483647h_1_2147483646h_2_pub, testnet = false),
+        deriveAndCheck(
+            m0_2147483647h_1_2147483646h, 2,
+            "xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j",
             "xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt"
         )
     }
@@ -206,12 +175,9 @@ class DeterministicWalletTestsCommon {
             encode(publicKey(m), testnet = false),
             "xpub661MyMwAqRbcEZVB4dScxMAdx6d4nFc9nvyvH3v4gJL378CSRZiYmhRoP7mBy6gSPSCYk6SzXPTf3ND1cZAceL7SfJ1Z3GC8vBgp2epUt13"
         )
-        assertEquals(
-            encode(derivePrivateKey(m, "0'"), testnet = false),
-            "xprv9uPDJpEQgRQfDcW7BkF7eTya6RPxXeJCqCJGHuCJ4GiRVLzkTXBAJMu2qaMWPrS7AANYqdq6vcBcBUdJCVVFceUvJFjaPdGZ2y9WACViL4L"
-        )
-        assertEquals(
-            encode(publicKey(derivePrivateKey(m, "0'")), testnet = false),
+        deriveAndCheck(
+            m, hardened(0),
+            "xprv9uPDJpEQgRQfDcW7BkF7eTya6RPxXeJCqCJGHuCJ4GiRVLzkTXBAJMu2qaMWPrS7AANYqdq6vcBcBUdJCVVFceUvJFjaPdGZ2y9WACViL4L",
             "xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y"
         )
     }
@@ -228,24 +194,16 @@ class DeterministicWalletTestsCommon {
             "xpub661MyMwAqRbcGczjuMoRm6dXaLDEhW1u34gKenbeYqAix21mdUKJyuyu5F1rzYGVxyL6tmgBUAEPrEz92mBXjByMRiJdba9wpnN37RLLAXa"
         )
 
-        val m_0h = derivePrivateKey(m, hardened(0))
-        assertEquals(m_0h.privateKey.value[0], 0) // private key starts with 0x00
-        assertEquals(
-            encode(m_0h, testnet = false),
-            "xprv9vB7xEWwNp9kh1wQRfCCQMnZUEG21LpbR9NPCNN1dwhiZkjjeGRnaALmPXCX7SgjFTiCTT6bXes17boXtjq3xLpcDjzEuGLQBM5ohqkao9G"
-        )
-        assertEquals(
-            encode(publicKey(m_0h), testnet = false),
+        val (m_0h, _) = deriveAndCheck(
+            m, hardened(0),
+            "xprv9vB7xEWwNp9kh1wQRfCCQMnZUEG21LpbR9NPCNN1dwhiZkjjeGRnaALmPXCX7SgjFTiCTT6bXes17boXtjq3xLpcDjzEuGLQBM5ohqkao9G",
             "xpub69AUMk3qDBi3uW1sXgjCmVjJ2G6WQoYSnNHyzkmdCHEhSZ4tBok37xfFEqHd2AddP56Tqp4o56AePAgCjYdvpW2PU2jbUPFKsav5ut6Ch1m"
         )
+        assertEquals(m_0h.privateKey.value[0], 0) // private key starts with 0x00
 
-        val m_0h_1h = derivePrivateKey(m_0h, hardened(1))
-        assertEquals(
-            encode(m_0h_1h, testnet = false),
-            "xprv9xJocDuwtYCMNAo3Zw76WENQeAS6WGXQ55RCy7tDJ8oALr4FWkuVoHJeHVAcAqiZLE7Je3vZJHxspZdFHfnBEjHqU5hG1Jaj32dVoS6XLT1"
-        )
-        assertEquals(
-            encode(publicKey(m_0h_1h), testnet = false),
+        deriveAndCheck(
+            m_0h, hardened(1),
+            "xprv9xJocDuwtYCMNAo3Zw76WENQeAS6WGXQ55RCy7tDJ8oALr4FWkuVoHJeHVAcAqiZLE7Je3vZJHxspZdFHfnBEjHqU5hG1Jaj32dVoS6XLT1",
             "xpub6BJA1jSqiukeaesWfxe6sNK9CCGaujFFSJLomWHprUL9DePQ4JDkM5d88n49sMGJxrhpjazuXYWdMf17C9T5XnxkopaeS7jGk1GyyVziaMt"
         )
     }

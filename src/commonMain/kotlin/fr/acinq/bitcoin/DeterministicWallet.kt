@@ -174,7 +174,7 @@ public object DeterministicWallet {
 
         public fun derivePublicKey(keyPath: String): ExtendedPublicKey = derivePublicKey(KeyPath.fromPath(keyPath))
 
-        public fun fingerprint(): Long = Pack.int32LE(ByteArrayInput(Crypto.hash160(publickeybytes).take(4).reversed().toByteArray())).toLong()
+        public fun fingerprint(): Long = Pack.int32BE(Crypto.hash160(publickeybytes)).toLong() and 0xFFFFFFFFL
 
         public fun encode(prefix: Int): String {
             val out = ByteArrayOutput()

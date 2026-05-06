@@ -16,14 +16,9 @@
 
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.DeterministicWallet.derivePrivateKey
-import fr.acinq.bitcoin.DeterministicWallet.derivePublicKey
-import fr.acinq.bitcoin.DeterministicWallet.encode
-import fr.acinq.bitcoin.DeterministicWallet.fingerprint
 import fr.acinq.bitcoin.DeterministicWallet.generate
 import fr.acinq.bitcoin.DeterministicWallet.hardened
 import fr.acinq.bitcoin.DeterministicWallet.isHardened
-import fr.acinq.bitcoin.DeterministicWallet.publicKey
 import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.secp256k1.Hex
 import kotlin.random.Random
@@ -99,7 +94,7 @@ class DeterministicWalletTestsCommon {
         assertEquals(0xEE7AB90C, m0h_1_2h.fingerprint())
 
         assertFails {
-            derivePublicKey(m0h_1_pub, hardened(2))
+            m0h_1_pub.derivePublicKey(hardened(2))
         }
 
         val (m0h_1_2h_2, _) = deriveAndCheck(
@@ -115,20 +110,20 @@ class DeterministicWalletTestsCommon {
             "xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy"
         )
 
-        assertEquals(m0h_1_2h_2_1000000000, derivePrivateKey(m, "0'/1/2'/2/1000000000"))
+        assertEquals(m0h_1_2h_2_1000000000, m.derivePrivateKey("0'/1/2'/2/1000000000"))
     }
 
     @Test
     fun `generate and derive keys -- test vector no2`() {
         val m = generate(Hex.decode("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542"))
         assertEquals(
-            encode(m, testnet = false),
+            m.encode(testnet = false),
             "xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U"
         )
 
-        val m_pub = publicKey(m)
+        val m_pub = m.extendedPublicKey
         assertEquals(
-            encode(m_pub, testnet = false),
+            m_pub.encode(testnet = false),
             "xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB"
         )
 
@@ -168,11 +163,11 @@ class DeterministicWalletTestsCommon {
     fun `generate and derive keys -- test vector no3`() {
         val m = generate(ByteVector("4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be"))
         assertEquals(
-            encode(m, testnet = false),
+            m.encode(testnet = false),
             "xprv9s21ZrQH143K25QhxbucbDDuQ4naNntJRi4KUfWT7xo4EKsHt2QJDu7KXp1A3u7Bi1j8ph3EGsZ9Xvz9dGuVrtHHs7pXeTzjuxBrCmmhgC6"
         )
         assertEquals(
-            encode(publicKey(m), testnet = false),
+            m.extendedPublicKey.encode(testnet = false),
             "xpub661MyMwAqRbcEZVB4dScxMAdx6d4nFc9nvyvH3v4gJL378CSRZiYmhRoP7mBy6gSPSCYk6SzXPTf3ND1cZAceL7SfJ1Z3GC8vBgp2epUt13"
         )
         deriveAndCheck(
@@ -186,11 +181,11 @@ class DeterministicWalletTestsCommon {
     fun `generate and derive keys -- test vector no4`() {
         val m = generate(ByteVector("3ddd5602285899a946114506157c7997e5444528f3003f6134712147db19b678"))
         assertEquals(
-            encode(m, testnet = false),
+            m.encode(testnet = false),
             "xprv9s21ZrQH143K48vGoLGRPxgo2JNkJ3J3fqkirQC2zVdk5Dgd5w14S7fRDyHH4dWNHUgkvsvNDCkvAwcSHNAQwhwgNMgZhLtQC63zxwhQmRv"
         )
         assertEquals(
-            encode(publicKey(m), testnet = false),
+            m.extendedPublicKey.encode(testnet = false),
             "xpub661MyMwAqRbcGczjuMoRm6dXaLDEhW1u34gKenbeYqAix21mdUKJyuyu5F1rzYGVxyL6tmgBUAEPrEz92mBXjByMRiJdba9wpnN37RLLAXa"
         )
 
@@ -244,20 +239,20 @@ class DeterministicWalletTestsCommon {
     fun `recover parent private key chain from master public key and child private key`() {
         val m = generate(ByteVector("000102030405060708090a0b0c0d0e0f"))
         assertEquals(
-            encode(m, testnet = false),
+            m.encode(testnet = false),
             "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi"
         )
         val masterPriv = PrivateKey(m.secretkeybytes)
-        val masterPub = publicKey(m)
+        val masterPub = m.extendedPublicKey
         assertEquals(
-            encode(masterPub, testnet = false),
+            masterPub.encode(testnet = false),
             "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8"
         )
-        assertEquals(fingerprint(m), 876747070)
+        assertEquals(m.fingerprint(), 876747070)
 
         // now we have: the master public key, and a child private key, and we want to climb the tree back up
         // to the master private key
-        val m42 = derivePrivateKey(m, 42L)
+        val m42 = m.derivePrivateKey(42L)
         val I = Crypto.hmac512(masterPub.chaincode.toByteArray(), masterPub.publickeybytes.toByteArray() + Pack.writeInt32BE(42))
         val IL = I.take(32)
         val recovered = PrivateKey(m42.secretkeybytes) - PrivateKey(IL.toByteArray())
@@ -295,16 +290,16 @@ class DeterministicWalletTestsCommon {
             val master = generate(random.nextBytes(32))
             for (j in 0..50) {
                 val index = random.nextLong()
-                val priv = derivePrivateKey(master, index)
+                val priv = master.derivePrivateKey(index)
 
-                val encodedPriv = encode(priv, DeterministicWallet.tprv)
+                val encodedPriv = priv.encode(DeterministicWallet.tprv)
                 val (prefixPriv, decodedPriv) = DeterministicWallet.ExtendedPrivateKey.decode(encodedPriv)
                 assertEquals(prefixPriv, DeterministicWallet.tprv)
                 assertEquals(decodedPriv.chaincode, priv.chaincode)
                 assertContentEquals(decodedPriv.secretkeybytes.toByteArray(), priv.secretkeybytes.toByteArray())
 
-                val pub = publicKey(priv)
-                val encodedPub = encode(pub, DeterministicWallet.tpub)
+                val pub = priv.extendedPublicKey
+                val encodedPub = pub.encode(DeterministicWallet.tpub)
                 val (prefixPub, decodedPub) = DeterministicWallet.ExtendedPublicKey.decode(encodedPub)
                 assertEquals(prefixPub, DeterministicWallet.tpub)
                 assertEquals(decodedPub.chaincode, pub.chaincode)

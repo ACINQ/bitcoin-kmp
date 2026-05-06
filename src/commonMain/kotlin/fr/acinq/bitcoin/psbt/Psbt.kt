@@ -713,7 +713,7 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 val key = ByteArrayOutput()
                 key.write(0x01) // <keytype>
                 Pack.writeInt32BE(xpub.prefix.toInt(), key)
-                DeterministicWallet.write(xpub.extendedPublicKey, key)
+                xpub.extendedPublicKey.write(key)
                 val value = ByteArrayOutput()
                 Pack.writeInt32BE(xpub.masterKeyFingerprint.toInt(), value)
                 xpub.extendedPublicKey.path.path.forEach { child -> Pack.writeInt32LE(child.toInt(), value) }

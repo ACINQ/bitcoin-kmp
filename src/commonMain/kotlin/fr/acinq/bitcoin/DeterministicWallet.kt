@@ -211,21 +211,6 @@ public object DeterministicWallet {
         }
     }
 
-    @JvmStatic
-    public fun encode(input: ExtendedPrivateKey, testnet: Boolean): String = encode(input, if (testnet) tprv else xprv)
-
-    @JvmStatic
-    public fun encode(input: ExtendedPrivateKey, prefix: Int): String = input.encode(prefix)
-
-    @JvmStatic
-    public fun encode(input: ExtendedPublicKey, testnet: Boolean): String = encode(input, if (testnet) tpub else xpub)
-
-    @JvmStatic
-    public fun encode(input: ExtendedPublicKey, prefix: Int): String = input.encode(prefix)
-
-    @JvmStatic
-    public fun write(input: ExtendedPublicKey, out: Output): Unit = input.write(out)
-
     /**
      * @param seed random seed
      * @return a "master" private key
@@ -244,62 +229,7 @@ public object DeterministicWallet {
      */
     @JvmStatic
     public fun generate(seed: ByteVector): ExtendedPrivateKey = generate(seed.toByteArray())
-
-    /**
-     * @param input extended private key
-     * @return the public key for this private key
-     */
-    @JvmStatic
-    public fun publicKey(input: ExtendedPrivateKey): ExtendedPublicKey = input.extendedPublicKey
-
-    /**
-     * @param input extended public key
-     * @return the fingerprint for this public key
-     */
-    @JvmStatic
-    public fun fingerprint(input: ExtendedPublicKey): Long = input.fingerprint()
-
-    /**
-     * @param input extended private key
-     * @return the fingerprint for this private key (which is based on the corresponding public key)
-     */
-    @JvmStatic
-    public fun fingerprint(input: ExtendedPrivateKey): Long = fingerprint(publicKey(input))
-
-    /**
-     * @param parent extended private key
-     * @param index  index of the child key
-     * @return the derived private key at the specified index
-     */
-    @JvmStatic
-    public fun derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey = parent.derivePrivateKey(index)
-
-    /**
-     * @param parent extended public key
-     * @param index  index of the child key
-     * @return the derived public key at the specified index
-     */
-    @JvmStatic
-    public fun derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey = parent.derivePublicKey(index)
-
-    @JvmStatic
-    public fun derivePrivateKey(parent: ExtendedPrivateKey, chain: List<Long>): ExtendedPrivateKey = parent.derivePrivateKey(chain)
-
-    @JvmStatic
-    public fun derivePrivateKey(parent: ExtendedPrivateKey, keyPath: KeyPath): ExtendedPrivateKey = parent.derivePrivateKey(keyPath.path)
-
-    @JvmStatic
-    public fun derivePrivateKey(parent: ExtendedPrivateKey, keyPath: String): ExtendedPrivateKey = parent.derivePrivateKey(KeyPath.fromPath(keyPath))
-
-    @JvmStatic
-    public fun derivePublicKey(parent: ExtendedPublicKey, chain: List<Long>): ExtendedPublicKey = parent.derivePublicKey(chain)
-
-    @JvmStatic
-    public fun derivePublicKey(parent: ExtendedPublicKey, keyPath: KeyPath): ExtendedPublicKey = parent.derivePublicKey(keyPath.path)
-
-    @JvmStatic
-    public fun derivePublicKey(parent: ExtendedPublicKey, keyPath: String): ExtendedPublicKey = parent.derivePublicKey(KeyPath.fromPath(keyPath))
-
+    
     // p2pkh mainnet
     public const val xprv: Int = 0x0488ade4
     public const val xpub: Int = 0x0488b21e

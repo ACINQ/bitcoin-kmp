@@ -1,7 +1,5 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.DeterministicWallet.derivePrivateKey
-import fr.acinq.bitcoin.DeterministicWallet.publicKey
 import kotlin.jvm.JvmStatic
 
 public object Descriptor {
@@ -75,16 +73,16 @@ public object Descriptor {
     @JvmStatic
     public fun BIP84Descriptors(chainHash: BlockHash, master: DeterministicWallet.ExtendedPrivateKey): Pair<String, String> {
         val (keyPath, _) = getBIP84KeyPath(chainHash)
-        val accountPub = publicKey(derivePrivateKey(master, KeyPath(keyPath)))
-        val fingerprint = DeterministicWallet.fingerprint(master) and 0xFFFFFFFFL
+        val accountPub = master.derivePrivateKey(KeyPath(keyPath)).extendedPublicKey
+        val fingerprint = master.fingerprint()
         return BIP84Descriptors(chainHash, fingerprint, accountPub)
     }
 
     @JvmStatic
     public fun BIP84Descriptors(chainHash: BlockHash, fingerprint: Long, accountPub: DeterministicWallet.ExtendedPublicKey): Pair<String, String> {
         val (keyPath, prefix) = getBIP84KeyPath(chainHash)
-        val accountDesc = "wpkh([${fingerprint.toString(16)}/$keyPath]${DeterministicWallet.encode(accountPub, prefix)}/0/*)"
-        val changeDesc = "wpkh([${fingerprint.toString(16)}/$keyPath]${DeterministicWallet.encode(accountPub, prefix)}/1/*)"
+        val accountDesc = "wpkh([${fingerprint.toString(16)}/$keyPath]${accountPub.encode(prefix)}/0/*)"
+        val changeDesc = "wpkh([${fingerprint.toString(16)}/$keyPath]${accountPub.encode(prefix)}/1/*)"
         return Pair(
             "$accountDesc#${checksum(accountDesc)}",
             "$changeDesc#${checksum(changeDesc)}"

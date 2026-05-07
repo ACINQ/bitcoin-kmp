@@ -83,7 +83,7 @@ public data class Session(private val data: ByteVector, private val keyAggCache:
      */
     public fun verify(partialSig: ByteVector32, publicNonce: IndividualNonce, publicKey: PublicKey): Boolean = try {
         Secp256k1.musigPartialSigVerify(partialSig.toByteArray(), publicNonce.toByteArray(), publicKey.value.toByteArray(), keyAggCache.toByteArray(), this.toByteArray()) == 1
-    } catch (t: Throwable) {
+    } catch (_: Throwable) {
         false
     }
 
@@ -310,7 +310,7 @@ public object Musig2 {
     public fun generateNonce(sessionId: ByteVector32, privateKey: PrivateKey?, publicKey: PublicKey, publicKeys: List<PublicKey>, message: ByteVector32?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
         privateKey?.let { require(it.publicKey() == publicKey) { "if the private key is provided, it must match the public key" } }
         val signingKey = privateKey?.let { Either.Left(it) } ?: Either.Right(publicKey)
-        return generateNonce(sessionId, signingKey, publicKeys, message,  extraInput)
+        return generateNonce(sessionId, signingKey, publicKeys, message, extraInput)
     }
 
     /**
@@ -324,6 +324,62 @@ public object Musig2 {
     public fun generateNonceWithCounter(nonRepeatingCounter: Long, privateKey: PrivateKey, publicKeys: List<PublicKey>, message: ByteVector32?, extraInput: ByteVector32?): Pair<SecretNonce, IndividualNonce> {
         val (_, keyAggCache) = KeyAggCache.create(publicKeys)
         return SecretNonce.generateWithCounter(nonRepeatingCounter, privateKey, message, keyAggCache, extraInput)
+    }
+
+    @JvmStatic
+    private fun signingSession(msg: ByteVector32, publicKeys: List<PublicKey>, publicNonces: List<IndividualNonce>): Either<Throwable, Session> {
+        return IndividualNonce.aggregate(publicNonces).map { aggregatedNonce ->
+            val (_, keyAggCache) = KeyAggCache.create(publicKeys)
+            Session.create(aggregatedNonce, msg, keyAggCache)
+        }
+    }
+
+    /**
+     * Create a partial musig2 signature for the given arbitrary message.
+     *
+     * @param privateKey private key of the signing participant.
+     * @param secretNonce secret nonce of the signing participant.
+     * @param msg message that should be signed.
+     * @param publicKeys public keys of all participants of the musig2 session: callers must verify that all public keys are valid.
+     * @param publicNonces public nonces of all participants of the musig2 session.
+     * @return a partial signature, or an error if the nonce has already been used or session creation/signing fails.
+     */
+    @JvmStatic
+    public fun sign(privateKey: PrivateKey, secretNonce: SecretNonce, msg: ByteVector32, publicKeys: List<PublicKey>, publicNonces: List<IndividualNonce>): Either<Throwable, ByteVector32> {
+        return signingSession(msg, publicKeys, publicNonces).flatMap { session ->
+            session.sign(secretNonce, privateKey)
+        }
+    }
+
+    /**
+     * Verify a partial musig2 signature of an arbitrary message.
+     *
+     * @param partialSig partial musig2 signature.
+     * @param nonce public nonce matching the secret nonce used to generate the signature.
+     * @param publicKey public key for the private key used to generate the signature.
+     * @param msg message signed.
+     * @param publicKeys public keys of all participants of the musig2 session: callers must verify that all public keys are valid.
+     * @param publicNonces public nonces of all participants of the musig2 session.
+     * @return true if the partial signature is valid.
+     */
+    @JvmStatic
+    public fun verify(partialSig: ByteVector32, nonce: IndividualNonce, publicKey: PublicKey, msg: ByteVector32, publicKeys: List<PublicKey>, publicNonces: List<IndividualNonce>): Boolean {
+        return signingSession(msg, publicKeys, publicNonces).map { session ->
+            session.verify(partialSig, nonce, publicKey)
+        }.getOrElse { false }
+    }
+
+    /**
+     * Aggregate partial musig2 signatures into a valid schnorr signature for the given arbitrary message.
+     *
+     * @param partialSigs partial musig2 signatures of all participants of the musig2 session.
+     * @param msg message signed.
+     * @param publicKeys public keys of all participants of the musig2 session: callers must verify that all public keys are valid.
+     * @param publicNonces public nonces of all participants of the musig2 session.
+     */
+    @JvmStatic
+    public fun aggregatePartialSignatures(partialSigs: List<ByteVector32>, msg: ByteVector32, publicKeys: List<PublicKey>, publicNonces: List<IndividualNonce>): Either<Throwable, ByteVector64> {
+        return signingSession(msg, publicKeys, publicNonces).flatMap { it.aggregateSigs(partialSigs) }
     }
 
     /**
@@ -377,7 +433,7 @@ public object Musig2 {
 
     /**
      * Verify a partial musig2 signature.
-
+     *
      * @param partialSig partial musig2 signature.
      * @param nonce public nonce matching the secret nonce used to generate the signature.
      * @param publicKey public key for the private key used to generate the signature.

@@ -280,14 +280,14 @@ class Musig2TestsCommon {
         val (_, keyAggCache) = KeyAggCache.create(pubkeys)
 
         val (aliceSecNonce, alicePubNonce) = SecretNonce.generate(
-            Random.Default.nextBytes(32).byteVector32(),
+            Random.nextBytes(32).byteVector32(),
             Either.Left(alicePrivKey),
             null,
             keyAggCache,
             null
         )
         val (_, bobPubNonce) = SecretNonce.generate(
-            Random.Default.nextBytes(32).byteVector32(),
+            Random.nextBytes(32).byteVector32(),
             Either.Left(bobPrivKey),
             null,
             keyAggCache,
@@ -317,8 +317,8 @@ class Musig2TestsCommon {
         val tx = Transaction(2, listOf(), listOf(TxOut(10_000.sat(), Script.pay2tr(internalPubKey, Crypto.TaprootTweak.KeyPathTweak))), 0)
         val spendingTx = Transaction(2, listOf(TxIn(OutPoint(tx, 0), sequence = 0)), listOf(TxOut(10_000.sat(), Script.pay2wpkh(alicePubKey))), 0)
 
-        val aliceNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(alicePrivKey), listOf(alicePubKey, bobPubKey), null, null)
-        val bobNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(bobPrivKey), listOf(alicePubKey, bobPubKey), null, null)
+        val aliceNonce = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(alicePrivKey), listOf(alicePubKey, bobPubKey), null, null)
+        val bobNonce = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(bobPrivKey), listOf(alicePubKey, bobPubKey), null, null)
         val publicNonces = listOf(aliceNonce.second, bobNonce.second)
 
         val firstSig = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null)
@@ -332,7 +332,7 @@ class Musig2TestsCommon {
 
     @Test
     fun `simple musig2 example`() {
-        val msg = Random.Default.nextBytes(32).byteVector32()
+        val msg = Random.nextBytes(32).byteVector32()
         val privkeys = listOf(
             PrivateKey(ByteArray(32) { 1 }),
             PrivateKey(ByteArray(32) { 2 }),
@@ -351,7 +351,7 @@ class Musig2TestsCommon {
         }
 
         // Generate secret nonces for each participant.
-        val nonces = privkeys.map { SecretNonce.generate(Random.Default.nextBytes(32).byteVector32(), Either.Left(it), message = null, keyAggCache, extraInput = null) }
+        val nonces = privkeys.map { SecretNonce.generate(Random.nextBytes(32).byteVector32(), Either.Left(it), message = null, keyAggCache, extraInput = null) }
         val secnonces = nonces.map { it.first }
         val pubnonces = nonces.map { it.second }
 
@@ -380,7 +380,6 @@ class Musig2TestsCommon {
 
         // Alice and Bob exchange public keys and agree on a common aggregated key.
         val internalPubKey = Musig2.aggregateKeys(listOf(alicePubKey, bobPubKey))
-        val commonPubKey = internalPubKey.outputKey(Crypto.TaprootTweak.KeyPathTweak).first
 
         // This tx sends to a taproot script that doesn't contain any script path.
         val tx = Transaction(2, listOf(), listOf(TxOut(10_000.sat(), Script.pay2tr(internalPubKey, Crypto.TaprootTweak.KeyPathTweak))), 0)
@@ -389,8 +388,8 @@ class Musig2TestsCommon {
 
         // The first step of a musig2 signing session is to exchange nonces.
         // If participants are disconnected before the end of the signing session, they must start again with fresh nonces.
-        val aliceNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(alicePrivKey), listOf(alicePubKey, bobPubKey), null, null)
-        val bobNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(bobPrivKey), listOf(alicePubKey, bobPubKey), null, null)
+        val aliceNonce = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(alicePrivKey), listOf(alicePubKey, bobPubKey), null, null)
+        val bobNonce = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(bobPrivKey), listOf(alicePubKey, bobPubKey), null, null)
 
         // Once they have each other's public nonce, they can produce partial signatures.
         val publicNonces = listOf(aliceNonce.second, bobNonce.second)
@@ -398,7 +397,6 @@ class Musig2TestsCommon {
         val aliceSig = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null).right
         assertNotNull(aliceSig)
         assertTrue(Musig2.verify(aliceSig, aliceNonce.second, alicePubKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), publicNonces, scriptTree = null))
-
 
         val bobSig = Musig2.signTaprootInput(bobPrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), bobNonce.first, publicNonces, scriptTree = null).right
         assertNotNull(bobSig)
@@ -422,13 +420,12 @@ class Musig2TestsCommon {
 
         // Alice and Bob exchange public keys and agree on a common aggregated key.
         val internalPubKey = Musig2.aggregateKeys(listOf(alicePubKey, bobPubKey))
-        val commonPubKey = internalPubKey.outputKey(Crypto.TaprootTweak.KeyPathTweak).first
 
         val tx = Transaction(2, listOf(), listOf(TxOut(10_000.sat(), Script.pay2tr(internalPubKey, Crypto.TaprootTweak.KeyPathTweak))), 0)
         val spendingTx = Transaction(2, listOf(TxIn(OutPoint(tx, 0), sequence = 0)), listOf(TxOut(10_000.sat(), Script.pay2wpkh(alicePubKey))), 0)
 
-        val aliceNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(alicePrivKey), listOf(alicePubKey, bobPubKey), null, null)
-        val bobNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(bobPrivKey), listOf(alicePubKey, bobPubKey), null, null)
+        val aliceNonce = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(alicePrivKey), listOf(alicePubKey, bobPubKey), null, null)
+        val bobNonce = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(bobPrivKey), listOf(alicePubKey, bobPubKey), null, null)
         val publicNonces = listOf(aliceNonce.second, bobNonce.second)
 
         val aliceSig = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, listOf(tx.txOut[0]), listOf(alicePubKey, bobPubKey), aliceNonce.first, publicNonces, scriptTree = null).right
@@ -484,8 +481,8 @@ class Musig2TestsCommon {
             )
             // The first step of a musig2 signing session is to exchange nonces.
             // If participants are disconnected before the end of the signing session, they must start again with fresh nonces.
-            val userNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(userPrivateKey), listOf(userPublicKey, serverPublicKey), null, null)
-            val serverNonce = Musig2.generateNonce(Random.Default.nextBytes(32).byteVector32(), Either.Left(serverPrivateKey), listOf(userPublicKey, serverPublicKey), null, null)
+            val userNonce = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(userPrivateKey), listOf(userPublicKey, serverPublicKey), null, null)
+            val serverNonce = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(serverPrivateKey), listOf(userPublicKey, serverPublicKey), null, null)
 
             // Once they have each other's public nonce, they can produce partial signatures.
             val publicNonces = listOf(userNonce.second, serverNonce.second)
@@ -515,6 +512,94 @@ class Musig2TestsCommon {
             val sig = Transaction.signInputTaprootScriptPath(userRefundPrivateKey, tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, scriptTree.hash())
             val signedTx = tx.updateWitness(0, Script.witnessScriptPathPay2tr(internalPubKey, scriptTree, ScriptWitness(listOf(sig)), scriptTree))
             Transaction.correctlySpends(signedTx, swapInTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        }
+    }
+
+    @Test
+    fun `sign arbitrary messages with musig2`() {
+        val priv1 = PrivateKey(Random.nextBytes(32))
+        val priv2 = PrivateKey(Random.nextBytes(32))
+        val priv3 = PrivateKey(Random.nextBytes(32))
+        val priv4 = PrivateKey(Random.nextBytes(32))
+        val msg = Random.nextBytes(32).byteVector32()
+
+        // 2-of-2 signatures:
+        run {
+            val publicKeys = listOf(priv1.publicKey(), priv2.publicKey())
+            val (nonce1, publicNonce1) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv1), publicKeys, msg, null)
+            val (nonce2, publicNonce2) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv2), publicKeys, msg, null)
+            val publicNonces = listOf(publicNonce1, publicNonce2)
+            val sig1 = Musig2.sign(priv1, nonce1, msg, publicKeys, publicNonces).right
+            assertNotNull(sig1)
+            assertTrue(Musig2.verify(sig1, publicNonce1, priv1.publicKey(), msg, publicKeys, publicNonces))
+            assertFalse(Musig2.verify(sig1, publicNonce2, priv1.publicKey(), msg, publicKeys, publicNonces))
+            val sig2 = Musig2.sign(priv2, nonce2, msg, publicKeys, publicNonces).right
+            assertNotNull(sig2)
+            assertTrue(Musig2.verify(sig2, publicNonce2, priv2.publicKey(), msg, publicKeys, publicNonces))
+            assertFalse(Musig2.verify(sig2, publicNonce2, priv1.publicKey(), msg, publicKeys, publicNonces))
+            val sig = Musig2.aggregatePartialSignatures(listOf(sig1, sig2), msg, publicKeys, publicNonces).right
+            assertNotNull(sig)
+            assertTrue(Crypto.verifySignatureSchnorr(msg, sig, Musig2.aggregateKeys(publicKeys)))
+        }
+        // 3-of-3 signatures:
+        run {
+            val publicKeys = listOf(priv1.publicKey(), priv2.publicKey(), priv3.publicKey())
+            val (nonce1, publicNonce1) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv1), publicKeys, msg, null)
+            val (nonce2, publicNonce2) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv2), publicKeys, msg, null)
+            val (nonce3, publicNonce3) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv3), publicKeys, msg, null)
+            val publicNonces = listOf(publicNonce1, publicNonce2, publicNonce3)
+            val sig1 = Musig2.sign(priv1, nonce1, msg, publicKeys, publicNonces).right
+            assertNotNull(sig1)
+            assertTrue(Musig2.verify(sig1, publicNonce1, priv1.publicKey(), msg, publicKeys, publicNonces))
+            val sig2 = Musig2.sign(priv2, nonce2, msg, publicKeys, publicNonces).right
+            assertNotNull(sig2)
+            assertTrue(Musig2.verify(sig2, publicNonce2, priv2.publicKey(), msg, publicKeys, publicNonces))
+            val sig3 = Musig2.sign(priv3, nonce3, msg, publicKeys, publicNonces).right
+            assertNotNull(sig3)
+            assertTrue(Musig2.verify(sig3, publicNonce3, priv3.publicKey(), msg, publicKeys, publicNonces))
+            // We can partially aggregate signatures, but it doesn't create a valid schnorr signature for the aggregated public key.
+            val incompleteSig = Musig2.aggregatePartialSignatures(listOf(sig1, sig2), msg, publicKeys, publicNonces).right
+            assertNotNull(incompleteSig)
+            assertFalse(Crypto.verifySignatureSchnorr(msg, incompleteSig, Musig2.aggregateKeys(publicKeys)))
+            // Including redundant partial signatures doesn't yield a valid signature.
+            val redundantSig = Musig2.aggregatePartialSignatures(listOf(sig1, sig2, sig1), msg, publicKeys, publicNonces).right
+            assertNotNull(redundantSig)
+            assertFalse(Crypto.verifySignatureSchnorr(msg, redundantSig, Musig2.aggregateKeys(publicKeys)))
+            val sig = Musig2.aggregatePartialSignatures(listOf(sig1, sig2, sig3), msg, publicKeys, publicNonces).right
+            assertNotNull(sig)
+            assertTrue(Crypto.verifySignatureSchnorr(msg, sig, Musig2.aggregateKeys(publicKeys)))
+        }
+        // 4-of-4 signatures:
+        run {
+            val publicKeys = listOf(priv1.publicKey(), priv2.publicKey(), priv3.publicKey(), priv4.publicKey())
+            val (nonce1, publicNonce1) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv1), publicKeys, msg, null)
+            val (nonce2, publicNonce2) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv2), publicKeys, msg, null)
+            val (nonce3, publicNonce3) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv3), publicKeys, msg, null)
+            val (nonce4, publicNonce4) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv4), publicKeys, msg, null)
+            val publicNonces = listOf(publicNonce1, publicNonce2, publicNonce3, publicNonce4)
+            val sig1 = Musig2.sign(priv1, nonce1, msg, publicKeys, publicNonces).right
+            assertNotNull(sig1)
+            assertTrue(Musig2.verify(sig1, publicNonce1, priv1.publicKey(), msg, publicKeys, publicNonces))
+            val sig2 = Musig2.sign(priv2, nonce2, msg, publicKeys, publicNonces).right
+            assertNotNull(sig2)
+            assertTrue(Musig2.verify(sig2, publicNonce2, priv2.publicKey(), msg, publicKeys, publicNonces))
+            val sig3 = Musig2.sign(priv3, nonce3, msg, publicKeys, publicNonces).right
+            assertNotNull(sig3)
+            assertTrue(Musig2.verify(sig3, publicNonce3, priv3.publicKey(), msg, publicKeys, publicNonces))
+            val sig4 = Musig2.sign(priv4, nonce4, msg, publicKeys, publicNonces).right
+            assertNotNull(sig4)
+            assertTrue(Musig2.verify(sig4, publicNonce4, priv4.publicKey(), msg, publicKeys, publicNonces))
+            // We can partially aggregate signatures, but it doesn't create a valid schnorr signature for the aggregated public key.
+            val incompleteSig = Musig2.aggregatePartialSignatures(listOf(sig1, sig2, sig3), msg, publicKeys, publicNonces).right
+            assertNotNull(incompleteSig)
+            assertFalse(Crypto.verifySignatureSchnorr(msg, incompleteSig, Musig2.aggregateKeys(publicKeys)))
+            // Including redundant partial signatures doesn't yield a valid signature.
+            val redundantSig = Musig2.aggregatePartialSignatures(listOf(sig1, sig2, sig2, sig4), msg, publicKeys, publicNonces).right
+            assertNotNull(redundantSig)
+            assertFalse(Crypto.verifySignatureSchnorr(msg, redundantSig, Musig2.aggregateKeys(publicKeys)))
+            val sig = Musig2.aggregatePartialSignatures(listOf(sig1, sig2, sig3, sig4), msg, publicKeys, publicNonces).right
+            assertNotNull(sig)
+            assertTrue(Crypto.verifySignatureSchnorr(msg, sig, Musig2.aggregateKeys(publicKeys)))
         }
     }
 }

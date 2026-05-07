@@ -60,6 +60,7 @@ class TaprootTestsCommon {
             "02000000000101590c995983abb86d8196f57357f2aac0e6cc6144d8239fd8a171810b476269d50000000000feffffff02a086010000000000225120bfef0f753700ac863e748f8d02c4b0d1fc7569933fd55fb6c3c598e84ff28b7c13d3abe65a060000160014353b5487959c58f5feafe63800057899f9ece4280247304402200b20c43175358c970850a583fd60d36c06588f1103b82b0968dc21e20e7d7958022027c64923623205c4985541d4a9fc6b5df4111d918fe63803337538b029c17ea20121022f685476d299e7b49d3a6b380e10aec1f93d96819fd7697669fabb533cc052624ff50000"
         )
         assertTrue(Script.isPay2tr(tx.txOut[0].publicKeyScript))
+        assertEquals(outputKey, Script.pay2trOutputKey(tx.txOut[0].publicKeyScript))
         assertEquals(script, Script.parse(tx.txOut[0].publicKeyScript))
 
         // tx1 spends tx using key path spending i.e its witness just includes a single signature that is valid for outputKey
@@ -256,6 +257,7 @@ class TaprootTestsCommon {
 
         // this is the tapscript we send funds to
         val script = Script.pay2tr(internalPubkey, scriptTree)
+        assertEquals(tweakedKey, Script.pay2trOutputKey(script))
         val bip350Address = Bech32.encodeWitnessAddress(hrp(blockchain), 1.toByte(), tweakedKey.value.toByteArray())
         assertEquals(bip350Address, "tb1p78gx95syx0qz8w5nftk8t7nce78zlpqpsxugcvq5xpfy4tvn6rasd7wk0y")
         val sweepPublicKeyScript = addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7").right!!

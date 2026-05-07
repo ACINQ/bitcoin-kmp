@@ -345,7 +345,7 @@ public object Musig2 {
      * @return a partial signature, or an error if the nonce has already been used or session creation/signing fails.
      */
     @JvmStatic
-    public fun signMessage(privateKey: PrivateKey, secretNonce: SecretNonce, msg: ByteVector32, publicKeys: List<PublicKey>, publicNonces: List<IndividualNonce>): Either<Throwable, ByteVector32> {
+    public fun sign(privateKey: PrivateKey, secretNonce: SecretNonce, msg: ByteVector32, publicKeys: List<PublicKey>, publicNonces: List<IndividualNonce>): Either<Throwable, ByteVector32> {
         return signingSession(msg, publicKeys, publicNonces).flatMap { session ->
             session.sign(secretNonce, privateKey)
         }

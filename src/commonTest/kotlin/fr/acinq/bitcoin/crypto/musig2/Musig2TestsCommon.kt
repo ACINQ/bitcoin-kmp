@@ -529,11 +529,11 @@ class Musig2TestsCommon {
             val (nonce1, publicNonce1) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv1), publicKeys, msg, null)
             val (nonce2, publicNonce2) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv2), publicKeys, msg, null)
             val publicNonces = listOf(publicNonce1, publicNonce2)
-            val sig1 = Musig2.signMessage(priv1, nonce1, msg, publicKeys, publicNonces).right
+            val sig1 = Musig2.sign(priv1, nonce1, msg, publicKeys, publicNonces).right
             assertNotNull(sig1)
             assertTrue(Musig2.verify(sig1, publicNonce1, priv1.publicKey(), msg, publicKeys, publicNonces))
             assertFalse(Musig2.verify(sig1, publicNonce2, priv1.publicKey(), msg, publicKeys, publicNonces))
-            val sig2 = Musig2.signMessage(priv2, nonce2, msg, publicKeys, publicNonces).right
+            val sig2 = Musig2.sign(priv2, nonce2, msg, publicKeys, publicNonces).right
             assertNotNull(sig2)
             assertTrue(Musig2.verify(sig2, publicNonce2, priv2.publicKey(), msg, publicKeys, publicNonces))
             assertFalse(Musig2.verify(sig2, publicNonce2, priv1.publicKey(), msg, publicKeys, publicNonces))
@@ -548,13 +548,13 @@ class Musig2TestsCommon {
             val (nonce2, publicNonce2) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv2), publicKeys, msg, null)
             val (nonce3, publicNonce3) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv3), publicKeys, msg, null)
             val publicNonces = listOf(publicNonce1, publicNonce2, publicNonce3)
-            val sig1 = Musig2.signMessage(priv1, nonce1, msg, publicKeys, publicNonces).right
+            val sig1 = Musig2.sign(priv1, nonce1, msg, publicKeys, publicNonces).right
             assertNotNull(sig1)
             assertTrue(Musig2.verify(sig1, publicNonce1, priv1.publicKey(), msg, publicKeys, publicNonces))
-            val sig2 = Musig2.signMessage(priv2, nonce2, msg, publicKeys, publicNonces).right
+            val sig2 = Musig2.sign(priv2, nonce2, msg, publicKeys, publicNonces).right
             assertNotNull(sig2)
             assertTrue(Musig2.verify(sig2, publicNonce2, priv2.publicKey(), msg, publicKeys, publicNonces))
-            val sig3 = Musig2.signMessage(priv3, nonce3, msg, publicKeys, publicNonces).right
+            val sig3 = Musig2.sign(priv3, nonce3, msg, publicKeys, publicNonces).right
             assertNotNull(sig3)
             assertTrue(Musig2.verify(sig3, publicNonce3, priv3.publicKey(), msg, publicKeys, publicNonces))
             // We can partially aggregate signatures, but it doesn't create a valid schnorr signature for the aggregated public key.
@@ -577,16 +577,16 @@ class Musig2TestsCommon {
             val (nonce3, publicNonce3) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv3), publicKeys, msg, null)
             val (nonce4, publicNonce4) = Musig2.generateNonce(Random.nextBytes(32).byteVector32(), Either.Left(priv4), publicKeys, msg, null)
             val publicNonces = listOf(publicNonce1, publicNonce2, publicNonce3, publicNonce4)
-            val sig1 = Musig2.signMessage(priv1, nonce1, msg, publicKeys, publicNonces).right
+            val sig1 = Musig2.sign(priv1, nonce1, msg, publicKeys, publicNonces).right
             assertNotNull(sig1)
             assertTrue(Musig2.verify(sig1, publicNonce1, priv1.publicKey(), msg, publicKeys, publicNonces))
-            val sig2 = Musig2.signMessage(priv2, nonce2, msg, publicKeys, publicNonces).right
+            val sig2 = Musig2.sign(priv2, nonce2, msg, publicKeys, publicNonces).right
             assertNotNull(sig2)
             assertTrue(Musig2.verify(sig2, publicNonce2, priv2.publicKey(), msg, publicKeys, publicNonces))
-            val sig3 = Musig2.signMessage(priv3, nonce3, msg, publicKeys, publicNonces).right
+            val sig3 = Musig2.sign(priv3, nonce3, msg, publicKeys, publicNonces).right
             assertNotNull(sig3)
             assertTrue(Musig2.verify(sig3, publicNonce3, priv3.publicKey(), msg, publicKeys, publicNonces))
-            val sig4 = Musig2.signMessage(priv4, nonce4, msg, publicKeys, publicNonces).right
+            val sig4 = Musig2.sign(priv4, nonce4, msg, publicKeys, publicNonces).right
             assertNotNull(sig4)
             assertTrue(Musig2.verify(sig4, publicNonce4, priv4.publicKey(), msg, publicKeys, publicNonces))
             // We can partially aggregate signatures, but it doesn't create a valid schnorr signature for the aggregated public key.

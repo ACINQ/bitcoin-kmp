@@ -589,8 +589,8 @@ class PsbtTestsCommon {
             firstInputIndex,
             Script.createMultiSigMofN(2, listOf(PublicKey.fromHex("029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f"), PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7"))),
             derivationPaths = mapOf(
-                PublicKey.fromHex("029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f") to KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/0'")),
-                PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") to KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/1'"))
+                PublicKey.fromHex("029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f") to KeyPathWithMaster(masterPrivKey.fingerprint(), KeyPath("m/0'/0'/0'")),
+                PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") to KeyPathWithMaster(masterPrivKey.fingerprint(), KeyPath("m/0'/0'/1'"))
             )
         ).flatMap {
             // Update input 2 with a witness multi-sig utxo:
@@ -605,20 +605,20 @@ class PsbtTestsCommon {
                 ),
                 Script.createMultiSigMofN(2, listOf(PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc"), PublicKey.fromHex("023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73"))),
                 derivationPaths = mapOf(
-                    PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") to KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/2'")),
-                    PublicKey.fromHex("023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73") to KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/3'"))
+                    PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") to KeyPathWithMaster(masterPrivKey.fingerprint(), KeyPath("m/0'/0'/2'")),
+                    PublicKey.fromHex("023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73") to KeyPathWithMaster(masterPrivKey.fingerprint(), KeyPath("m/0'/0'/3'"))
                 )
             )
         }.flatMap {
             // Update first output with known derivation paths:
             val paths = mapOf(
-                PublicKey.fromHex("03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") to KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/4'"))
+                PublicKey.fromHex("03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") to KeyPathWithMaster(masterPrivKey.fingerprint(), KeyPath("m/0'/0'/4'"))
             )
             it.updateNonWitnessOutput(0, derivationPaths = paths)
         }.flatMap {
             // Update second output with known derivation paths:
             val paths = mapOf(
-                PublicKey.fromHex("027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") to KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/5'"))
+                PublicKey.fromHex("027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") to KeyPathWithMaster(masterPrivKey.fingerprint(), KeyPath("m/0'/0'/5'"))
             )
             it.updateWitnessOutput(1, derivationPaths = paths)
         }
@@ -662,8 +662,8 @@ class PsbtTestsCommon {
         run {
             // First signer.
             val inputKeys = mapOf(
-                0 to DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/0'")),
-                1 to DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/2'"))
+                0 to masterPrivKey.derivePrivateKey(KeyPath("m/0'/0'/0'")),
+                1 to masterPrivKey.derivePrivateKey(KeyPath("m/0'/0'/2'"))
             )
             assertEquals(inputKeys.values.map { it.privateKey.toBase58(Base58.Prefix.SecretKeyTestnet) }.toSet(), setOf("cP53pDbR5WtAD8dYAW9hhTjuvvTVaEiQBdrz9XPrgLBeRFiyCbQr", "cR6SXDoyfQrcp4piaiHE97Rsgta9mNhGTen9XeonVgwsh4iSgw6d"))
             val signed = psbt.sign(inputKeys.getValue(0).privateKey, 0).flatMap { it.psbt.sign(inputKeys.getValue(1).privateKey, 1) }
@@ -678,8 +678,8 @@ class PsbtTestsCommon {
         run {
             // Second signer.
             val inputKeys = mapOf(
-                0 to DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/1'")),
-                1 to DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/3'"))
+                0 to masterPrivKey.derivePrivateKey(KeyPath("m/0'/0'/1'")),
+                1 to masterPrivKey.derivePrivateKey(KeyPath("m/0'/0'/3'"))
             )
             assertEquals(inputKeys.values.map { it.privateKey.toBase58(Base58.Prefix.SecretKeyTestnet) }.toSet(), setOf("cT7J9YpCwY3AVRFSjN6ukeEeWY6mhpbJPxRaDaP5QTdygQRxP9Au", "cNBc3SWUip9PPm1GjRoLEJT6T41iNzCYtD7qro84FMnM5zEqeJsE"))
             val signed = psbt.sign(inputKeys.getValue(0).privateKey, 0).flatMap { it.psbt.sign(inputKeys.getValue(1).privateKey, 1) }
@@ -740,9 +740,7 @@ class PsbtTestsCommon {
         val psbt1 = Psbt(globalTx).updateWitnessInputTx(
             inputTx1, 2, null, listOf(OP_1), SIGHASH_ALL, mapOf(
                 PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") to KeyPathWithMaster(
-                    DeterministicWallet.fingerprint(
-                        masterPrivKey
-                    ), KeyPath("m/0'/0'/2'")
+                    masterPrivKey.fingerprint(), KeyPath("m/0'/0'/2'")
                 )
             )
         )
@@ -752,7 +750,7 @@ class PsbtTestsCommon {
                 it.updateNonWitnessOutput(
                     0, derivationPaths = mapOf(
                         PublicKey.fromHex("03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") to KeyPathWithMaster(
-                            DeterministicWallet.fingerprint(masterPrivKey),
+                            masterPrivKey.fingerprint(),
                             KeyPath("m/0'/0'/4'")
                         )
                     )
@@ -761,9 +759,7 @@ class PsbtTestsCommon {
         val psbt2 = Psbt(globalTx).updateNonWitnessInput(
             inputTx1, 2, listOf(OP_2DROP), SIGHASH_NONE, mapOf(
                 PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") to KeyPathWithMaster(
-                    DeterministicWallet.fingerprint(
-                        masterPrivKey
-                    ), KeyPath("m/0'/0'/1'")
+                    masterPrivKey.fingerprint(), KeyPath("m/0'/0'/1'")
                 )
             )
         ).flatMap {
@@ -772,7 +768,7 @@ class PsbtTestsCommon {
         val psbt3 = Psbt(globalTx).updateNonWitnessOutput(
             0, listOf(OP_DIV), mapOf(
                 PublicKey.fromHex("027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") to KeyPathWithMaster(
-                    DeterministicWallet.fingerprint(masterPrivKey),
+                    masterPrivKey.fingerprint(),
                     KeyPath("m/0'/0'/5'")
                 )
             )
@@ -790,8 +786,8 @@ class PsbtTestsCommon {
                     SIGHASH_ALL,
                     mapOf(),
                     mapOf(
-                        PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") to KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/1'")),
-                        PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") to KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/2'")),
+                        PublicKey.fromHex("02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") to KeyPathWithMaster(masterPrivKey.fingerprint(), KeyPath("m/0'/0'/1'")),
+                        PublicKey.fromHex("03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") to KeyPathWithMaster(masterPrivKey.fingerprint(), KeyPath("m/0'/0'/2'")),
                     ),
                     listOf(OP_2DROP),
                     listOf(OP_1),
@@ -812,8 +808,8 @@ class PsbtTestsCommon {
                 Output.NonWitnessOutput(
                     listOf(OP_DIV),
                     mapOf(
-                        PublicKey.fromHex("03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") to KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/4'")),
-                        PublicKey.fromHex("027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") to KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/5'")),
+                        PublicKey.fromHex("03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") to KeyPathWithMaster(masterPrivKey.fingerprint(), KeyPath("m/0'/0'/4'")),
+                        PublicKey.fromHex("027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") to KeyPathWithMaster(masterPrivKey.fingerprint(), KeyPath("m/0'/0'/5'")),
                     ),
                     listOf()
                 ),
@@ -940,10 +936,10 @@ class PsbtTestsCommon {
 
     @Test
     fun `create psbt with various input types`() {
-        val masterFingerprint = DeterministicWallet.fingerprint(masterPrivKey)
-        val priv1 = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/3'/1'")).privateKey
-        val priv2 = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/3'/2'")).privateKey
-        val priv3 = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/3'/3'")).privateKey
+        val masterFingerprint = masterPrivKey.fingerprint()
+        val priv1 = masterPrivKey.derivePrivateKey(KeyPath("m/0'/3'/1'")).privateKey
+        val priv2 = masterPrivKey.derivePrivateKey(KeyPath("m/0'/3'/2'")).privateKey
+        val priv3 = masterPrivKey.derivePrivateKey(KeyPath("m/0'/3'/3'")).privateKey
         val pubKeys = listOf(priv1, priv2, priv3).map { it.publicKey() }
         val allDerivationPaths = mapOf(
             priv1.publicKey() to KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/1'")),
@@ -1184,14 +1180,14 @@ class PsbtTestsCommon {
 
     @Test
     fun `manual coinjoin workflow`() {
-        val alicePrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/1'")).privateKey
-        val aliceNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/2'")).publicKey
+        val alicePrivKey = masterPrivKey.derivePrivateKey(KeyPath("m/0'/0'/1'")).privateKey
+        val aliceNextPubKey = masterPrivKey.derivePrivateKey(KeyPath("m/0'/0'/2'")).publicKey
         val aliceInputTx = Transaction(2, listOf(), listOf(TxOut(50000.sat(), Script.pay2wpkh(alicePrivKey.publicKey()))), 0)
-        val bobPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/1'")).privateKey
-        val bobNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/2'")).publicKey
+        val bobPrivKey = masterPrivKey.derivePrivateKey(KeyPath("m/0'/1'/1'")).privateKey
+        val bobNextPubKey = masterPrivKey.derivePrivateKey(KeyPath("m/0'/1'/2'")).publicKey
         val bobInputTx = Transaction(2, listOf(), listOf(TxOut(40000.sat(), Script.pay2wpkh(bobPrivKey.publicKey()))), 0)
-        val carolPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/1'")).privateKey
-        val carolNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/2'")).publicKey
+        val carolPrivKey = masterPrivKey.derivePrivateKey(KeyPath("m/0'/2'/1'")).privateKey
+        val carolNextPubKey = masterPrivKey.derivePrivateKey(KeyPath("m/0'/2'/2'")).publicKey
         val carolInputTx = Transaction(2, listOf(), listOf(TxOut(60000.sat(), Script.pay2wpkh(carolPrivKey.publicKey()))), 0)
 
         // Each participant adds their inputs and fills their utxos.
@@ -1251,11 +1247,11 @@ class PsbtTestsCommon {
 
     @Test
     fun `2-of-3 multisig workflow`() {
-        val alicePrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/1'")).privateKey
-        val aliceNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/2'")).publicKey
-        val bobPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/0'")).privateKey
-        val bobNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/1'")).publicKey
-        val carolPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/1'")).privateKey
+        val alicePrivKey = masterPrivKey.derivePrivateKey(KeyPath("m/0'/0'/1'")).privateKey
+        val aliceNextPubKey = masterPrivKey.derivePrivateKey(KeyPath("m/0'/0'/2'")).publicKey
+        val bobPrivKey = masterPrivKey.derivePrivateKey(KeyPath("m/0'/1'/0'")).privateKey
+        val bobNextPubKey = masterPrivKey.derivePrivateKey(KeyPath("m/0'/1'/1'")).publicKey
+        val carolPrivKey = masterPrivKey.derivePrivateKey(KeyPath("m/0'/2'/1'")).privateKey
         val pubKeys = listOf(alicePrivKey, bobPrivKey, carolPrivKey).map { it.publicKey() }
         val inputTx = Transaction(2, listOf(), listOf(TxOut(250000.sat(), Script.pay2wsh(Script.createMultiSigMofN(2, pubKeys)))), 0)
 
@@ -1394,7 +1390,7 @@ class PsbtTestsCommon {
             input.derivationPaths.forEach {
                 val address = Bitcoin.computeBIP84Address(it.key, Block.RegtestGenesisBlock.hash)
                 assertEquals(spentAddress, address)
-                val privateKey = DeterministicWallet.derivePrivateKey(xprv, it.value.keyPath)
+                val privateKey = xprv.derivePrivateKey(it.value.keyPath)
                 assertEquals(privateKey.publicKey, it.key)
             }
         }
@@ -1404,11 +1400,11 @@ class PsbtTestsCommon {
             assertEquals(1, output.derivationPaths.size)
             val pub = output.derivationPaths.keys.first()
             val path = output.derivationPaths.values.first().keyPath
-            val privateKey = DeterministicWallet.derivePrivateKey(xprv, path)
+            val privateKey = xprv.derivePrivateKey(path)
             assertEquals(pub, privateKey.publicKey)
         }
-        val privateKey0 = DeterministicWallet.derivePrivateKey(xprv, "m/84'/1'/0'/0/4").privateKey
-        val privateKey1 = DeterministicWallet.derivePrivateKey(xprv, "m/84'/1'/0'/0/3").privateKey
+        val privateKey0 = xprv.derivePrivateKey("m/84'/1'/0'/0/4").privateKey
+        val privateKey1 = xprv.derivePrivateKey("m/84'/1'/0'/0/3").privateKey
         val signedTx = psbt.updateWitnessInput(psbt.global.tx.txIn[0].outPoint, psbt.inputs[0].witnessUtxo!!, witnessScript = Script.pay2pkh(privateKey0.publicKey()))
             .flatMap { it.updateWitnessInput(psbt.global.tx.txIn[1].outPoint, psbt.inputs[1].witnessUtxo!!, witnessScript = Script.pay2pkh(privateKey1.publicKey())) }
             .flatMap { it.sign(privateKey0, 0) }
@@ -1439,7 +1435,7 @@ class PsbtTestsCommon {
             input.taprootDerivationPaths.forEach {
                 val address = Bitcoin.computeBIP86Address(it.key, Block.RegtestGenesisBlock.hash)
                 assertEquals(spentAddress, address)
-                val privateKey = DeterministicWallet.derivePrivateKey(xprv, it.value.keyPath)
+                val privateKey = xprv.derivePrivateKey(it.value.keyPath)
                 assertEquals(privateKey.publicKey.xOnly(), input.taprootInternalKey)
             }
         }
@@ -1447,11 +1443,11 @@ class PsbtTestsCommon {
         run {
             val output = psbt.outputs[0]
             val path = output.taprootDerivationPaths[output.taprootInternalKey!!]!!
-            val privateKey = DeterministicWallet.derivePrivateKey(xprv, path.keyPath)
+            val privateKey = xprv.derivePrivateKey(path.keyPath)
             assertEquals(output.taprootInternalKey!!, privateKey.publicKey.xOnly())
         }
-        val privateKey0 = DeterministicWallet.derivePrivateKey(xprv, "m/86'/1'/0'/0/0").privateKey
-        val privateKey1 = DeterministicWallet.derivePrivateKey(xprv, "m/86'/1'/0'/0/1").privateKey
+        val privateKey0 = xprv.derivePrivateKey("m/86'/1'/0'/0/0").privateKey
+        val privateKey1 = xprv.derivePrivateKey("m/86'/1'/0'/0/1").privateKey
         val signedTx = psbt.sign(privateKey0, 0)
             .flatMap { it.psbt.sign(privateKey1, 1) }
             .flatMap {
@@ -1473,14 +1469,14 @@ class PsbtTestsCommon {
         val seed = ByteVector.fromHex("0101010101010101010101010101010101010101010101010101010101010101")
         val master = DeterministicWallet.generate(seed)
         // Create a BIP86 wallet from our key manager xpub.
-        val mainPriv = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0")
+        val mainPriv = master.derivePrivateKey("86'/1'/0'/0")
 
-        fun getPrivateKey(index: Long) = DeterministicWallet.derivePrivateKey(mainPriv, index).privateKey
+        fun getPrivateKey(index: Long) = mainPriv.derivePrivateKey(index).privateKey
 
-        fun getPublicKey(index: Long) = DeterministicWallet.derivePublicKey(mainPriv.extendedPublicKey, index).publicKey.xOnly()
+        fun getPublicKey(index: Long) = mainPriv.extendedPublicKey.derivePublicKey(index).publicKey.xOnly()
 
         // We also include a non-segwit input in our transaction.
-        val p2pkhPriv = DeterministicWallet.derivePrivateKey(master, "84'/1'/0'/0/0").privateKey
+        val p2pkhPriv = master.derivePrivateKey("84'/1'/0'/0/0").privateKey
 
         // We make sure our utxos come from transactions with multiple outputs and are at different indices.
         val utxos = listOf(
@@ -1518,7 +1514,7 @@ class PsbtTestsCommon {
             .flatMap { it.updateWitnessOutput(0, taprootInternalKey = getPublicKey(0), taprootDerivationPaths = mapOf(getPublicKey(0) to bip32paths[0])) }
         updated.right!!.inputs.take(3).forEach {
             val bip32path = it.taprootDerivationPaths[it.taprootInternalKey!!]!!.keyPath
-            val priv = DeterministicWallet.derivePrivateKey(master, bip32path)
+            val priv = master.derivePrivateKey(bip32path)
             assertEquals(priv.publicKey.xOnly(), it.taprootInternalKey!!)
         }
         val signed = updated.right!!

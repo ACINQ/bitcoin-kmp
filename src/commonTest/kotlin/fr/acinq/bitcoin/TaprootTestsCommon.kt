@@ -49,7 +49,7 @@ class TaprootTestsCommon {
     fun `check taproot signatures`() {
         // derive BIP86 wallet key
         val (_, master) = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPeQQADibg4WF7mEasy3piWZUHyThAzJCPNgMHDVYhTCVfev3jFbDhcYm4GimeFMbbi9z1d9rfY1aL5wfJ9mNebQ4thJ62EJb")
-        val key = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0/1")
+        val key = master.derivePrivateKey("86'/1'/0'/0/1")
         val internalKey = key.publicKey.xOnly()
         val script = Script.pay2tr(internalKey, Crypto.TaprootTweak.KeyPathTweak)
         val outputKey = internalKey.outputKey(Crypto.TaprootTweak.KeyPathTweak).first

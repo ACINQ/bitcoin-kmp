@@ -29,15 +29,15 @@ class BIP84TestsCommon {
     fun `BIP49 reference tests`() {
         val seed = MnemonicCode.toSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".split(" "), "")
         val master = DeterministicWallet.generate(seed)
-        assertEquals(DeterministicWallet.encode(master, DeterministicWallet.zprv), "zprvAWgYBBk7JR8Gjrh4UJQ2uJdG1r3WNRRfURiABBE3RvMXYSrRJL62XuezvGdPvG6GFBZduosCc1YP5wixPox7zhZLfiUm8aunE96BBa4Kei5")
-        assertEquals(DeterministicWallet.encode(DeterministicWallet.publicKey(master), DeterministicWallet.zpub), "zpub6jftahH18ngZxLmXaKw3GSZzZsszmt9WqedkyZdezFtWRFBZqsQH5hyUmb4pCEeZGmVfQuP5bedXTB8is6fTv19U1GQRyQUKQGUTzyHACMF")
+        assertEquals(master.encode(DeterministicWallet.zprv), "zprvAWgYBBk7JR8Gjrh4UJQ2uJdG1r3WNRRfURiABBE3RvMXYSrRJL62XuezvGdPvG6GFBZduosCc1YP5wixPox7zhZLfiUm8aunE96BBa4Kei5")
+        assertEquals(master.extendedPublicKey.encode(DeterministicWallet.zpub), "zpub6jftahH18ngZxLmXaKw3GSZzZsszmt9WqedkyZdezFtWRFBZqsQH5hyUmb4pCEeZGmVfQuP5bedXTB8is6fTv19U1GQRyQUKQGUTzyHACMF")
 
-        val accountKey = DeterministicWallet.derivePrivateKey(master, KeyPath("m/84'/0'/0'"))
-        assertEquals(DeterministicWallet.encode(accountKey, DeterministicWallet.zprv), "zprvAdG4iTXWBoARxkkzNpNh8r6Qag3irQB8PzEMkAFeTRXxHpbF9z4QgEvBRmfvqWvGp42t42nvgGpNgYSJA9iefm1yYNZKEm7z6qUWCroSQnE")
-        assertEquals(DeterministicWallet.encode(DeterministicWallet.publicKey(accountKey), DeterministicWallet.zpub), "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs")
+        val accountKey = master.derivePrivateKey(KeyPath("m/84'/0'/0'"))
+        assertEquals(accountKey.encode(DeterministicWallet.zprv), "zprvAdG4iTXWBoARxkkzNpNh8r6Qag3irQB8PzEMkAFeTRXxHpbF9z4QgEvBRmfvqWvGp42t42nvgGpNgYSJA9iefm1yYNZKEm7z6qUWCroSQnE")
+        assertEquals(accountKey.extendedPublicKey.encode(DeterministicWallet.zpub), "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs")
 
-        val key = DeterministicWallet.derivePrivateKey(accountKey, listOf(0L, 0L))
-        assertEquals(key.secretkeybytes, DeterministicWallet.derivePrivateKey(master, KeyPath("m/84'/0'/0'/0/0")).secretkeybytes)
+        val key = accountKey.derivePrivateKey(listOf(0L, 0L))
+        assertEquals(key.secretkeybytes, master.derivePrivateKey(KeyPath("m/84'/0'/0'/0/0")).secretkeybytes)
         assertEquals(key.privateKey.toBase58(Base58.Prefix.SecretKey), "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d")
         assertEquals(
             key.publicKey,
@@ -45,8 +45,8 @@ class BIP84TestsCommon {
         )
         assertEquals(computeBIP84Address(key.publicKey, Block.LivenetGenesisBlock.hash), "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu")
 
-        val key1 = DeterministicWallet.derivePrivateKey(accountKey, listOf(0L, 1L))
-        assertEquals(key1.secretkeybytes, DeterministicWallet.derivePrivateKey(master, KeyPath("m/84'/0'/0'/0/1")).secretkeybytes)
+        val key1 = accountKey.derivePrivateKey(listOf(0L, 1L))
+        assertEquals(key1.secretkeybytes, master.derivePrivateKey(KeyPath("m/84'/0'/0'/0/1")).secretkeybytes)
         assertEquals(key1.privateKey.toBase58(Base58.Prefix.SecretKey), "Kxpf5b8p3qX56DKEe5NqWbNUP9MnqoRFzZwHRtsFqhzuvUJsYZCy")
         assertEquals(
             key1.publicKey,
@@ -54,8 +54,8 @@ class BIP84TestsCommon {
         )
         assertEquals(computeBIP84Address(key1.publicKey, Block.LivenetGenesisBlock.hash), "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g")
 
-        val key2 = DeterministicWallet.derivePrivateKey(accountKey, listOf(1L, 0L))
-        assertEquals(key2.secretkeybytes, DeterministicWallet.derivePrivateKey(master, KeyPath("m/84'/0'/0'/1/0")).secretkeybytes)
+        val key2 = accountKey.derivePrivateKey(listOf(1L, 0L))
+        assertEquals(key2.secretkeybytes, master.derivePrivateKey(KeyPath("m/84'/0'/0'/1/0")).secretkeybytes)
         assertEquals(key2.privateKey.toBase58(Base58.Prefix.SecretKey), "KxuoxufJL5csa1Wieb2kp29VNdn92Us8CoaUG3aGtPtcF3AzeXvF")
         assertEquals(
             key2.publicKey,

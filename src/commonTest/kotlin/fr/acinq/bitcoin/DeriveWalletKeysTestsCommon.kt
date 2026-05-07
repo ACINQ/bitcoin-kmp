@@ -13,9 +13,9 @@ class DeriveWalletKeysTestsCommon {
 
     @Test
     fun `restore BIP44 wallet`() {
-        val account = DeterministicWallet.derivePrivateKey(master, KeyPath("m/44'/1'/0'"))
+        val account = master.derivePrivateKey(KeyPath("m/44'/1'/0'"))
         // some wallets will use tpub instead of upub
-        val xpub = DeterministicWallet.encode(DeterministicWallet.publicKey(account), DeterministicWallet.tpub)
+        val xpub = account.extendedPublicKey.encode(DeterministicWallet.tpub)
         assertEquals(xpub, "tpubDDamug2qVwe94yFJ38MM3ek2LiWiyjMmkQPhYMnHNZz5XHj7bj8xc7pFmyiYnCfqrSy62e1196qcpmKYhcUMcBTGMW4mEWf1v9H8wNtLZku")
         assertEquals(
             deriveAddresses(xpub, DerivationScheme.BIP44),
@@ -25,9 +25,9 @@ class DeriveWalletKeysTestsCommon {
 
     @Test
     fun `restore BIP49 wallet`() {
-        val account = DeterministicWallet.derivePrivateKey(master, KeyPath("m/49'/1'/0'"))
+        val account = master.derivePrivateKey(KeyPath("m/49'/1'/0'"))
         // some wallets will use tpub instead of upub
-        val xpub = DeterministicWallet.encode(DeterministicWallet.publicKey(account), DeterministicWallet.upub)
+        val xpub = account.extendedPublicKey.encode(DeterministicWallet.upub)
         assertEquals(xpub, "upub5DKk7kdrLoL3HqrfVdf3mLZJ59g6Bix8UtB6YJQNSKfE3E6YU2Vq7dH7E8ce87jUAac4nRag6Zd7c2cXs45Q4nJcLdrJyNWPxS5D9LFSpGL")
         assertEquals(
             deriveAddresses(xpub, DerivationScheme.BIP49),
@@ -43,9 +43,9 @@ class DeriveWalletKeysTestsCommon {
 
     @Test
     fun `restore BIP84 wallet`() {
-        val account = DeterministicWallet.derivePrivateKey(master, KeyPath("m/84'/1'/0'"))
+        val account = master.derivePrivateKey(KeyPath("m/84'/1'/0'"))
         // some wallets will use tpub instead of upub
-        val xpub = DeterministicWallet.encode(DeterministicWallet.publicKey(account), DeterministicWallet.vpub)
+        val xpub = account.extendedPublicKey.encode(DeterministicWallet.vpub)
         assertEquals(xpub, "vpub5YmxxDXhaEfLoqxn8xJExGMSQepxRbJDFqyc9FpDKyW8z966eDsgqbTHnJCvc698MhN3FDRt49DuPBgdRufopecaeyffJCUKXRKHoNn7BhX")
         assertEquals(
             deriveAddresses(xpub, DerivationScheme.BIP84),
@@ -69,7 +69,7 @@ class DeriveWalletKeysTestsCommon {
         fun deriveAddresses(xpub: String, derivationScheme: DerivationScheme): List<String> {
             val (prefix, master) = DeterministicWallet.ExtendedPublicKey.decode(xpub)
             return (0L..4L).map {
-                val pub = DeterministicWallet.derivePublicKey(master, listOf(0L, it))
+                val pub = master.derivePublicKey(listOf(0L, it))
                 val address = when {
                     prefix == DeterministicWallet.tpub && derivationScheme == DerivationScheme.BIP44 -> computeBIP44Address(pub.publicKey, Block.Testnet3GenesisBlock.hash)
                     prefix == DeterministicWallet.tpub && derivationScheme == DerivationScheme.BIP49 -> computeBIP49Address(pub.publicKey, Block.Testnet3GenesisBlock.hash)

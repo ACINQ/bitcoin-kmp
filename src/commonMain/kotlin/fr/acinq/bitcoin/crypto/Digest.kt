@@ -36,14 +36,14 @@ public interface Digest {
     /**
      * update the message digest with a single byte.
      *
-     * @param `in` the input byte to be entered.
+     * @param input the input byte to be entered.
      */
     public fun update(input: Byte)
 
     /**
      * update the message digest with a block of bytes.
      *
-     * @param `in` the byte array containing the data.
+     * @param input the byte array containing the data.
      * @param inputOffset the offset into the byte array where the data starts.
      * @param len the length of the data.
      */

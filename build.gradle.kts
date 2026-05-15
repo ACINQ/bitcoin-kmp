@@ -1,4 +1,4 @@
-import org.jetbrains.dokka.Platform
+import org.gradle.kotlin.dsl.register
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
@@ -147,18 +147,10 @@ plugins.withId("org.jetbrains.kotlin.multiplatform") {
 
 val dokkaOutputDir = layout.buildDirectory.dir("dokka")
 
-tasks.dokkaHtml {
-    outputDirectory.set(file(dokkaOutputDir))
+dokka {
     dokkaSourceSets {
         configureEach {
-            val platformName = when (platform.get()) {
-                Platform.jvm -> "jvm"
-                Platform.js -> "js"
-                Platform.native -> "native"
-                Platform.common -> "common"
-                Platform.wasm -> "wasm"
-                else -> error("unexpected platform ${platform.get()}")
-            }
+            val platformName = analysisPlatform.get().name
             displayName.set(platformName)
 
             perPackageOption {
@@ -167,17 +159,20 @@ tasks.dokkaHtml {
             }
         }
     }
+    dokkaPublications.html {
+        outputDirectory.set(file(dokkaOutputDir))
+    }
 }
 
-val deleteDokkaOutputDir by tasks.register<Delete>("deleteDokkaOutputDirectory") {
+val deleteDokkaOutputDir = tasks.register<Delete>("deleteDokkaOutputDirectory") {
     delete(dokkaOutputDir)
 }
 
 
-val javadocJar = tasks.create<Jar>("javadocJar") {
+val javadocJar = tasks.register<Jar>("javadocJar") {
     archiveClassifier.set("javadoc")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    dependsOn(deleteDokkaOutputDir, tasks.dokkaHtml)
+    dependsOn(deleteDokkaOutputDir, tasks.dokkaGenerate)
     from(dokkaOutputDir)
 }
 

@@ -5,8 +5,8 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
-    kotlin("multiplatform") version "2.3.10"
-    id("org.jetbrains.dokka") version "1.9.20"
+    alias(libs.plugins.multiplatform)
+    alias(libs.plugins.dokka)
     `maven-publish`
 }
 
@@ -58,32 +58,29 @@ kotlin {
     }
 
     sourceSets {
-        val secp256k1KmpVersion = "0.23.0"
-
         val commonMain by getting {
             dependencies {
-                api("fr.acinq.secp256k1:secp256k1-kmp:$secp256k1KmpVersion")
+                api(libs.secp256k1kmp)
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.9.0")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+                implementation(libs.kotlinx.io.core)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
 
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
-                val target = when {
-                    currentOs.isLinux -> "linux"
-                    currentOs.isMacOsX -> "darwin"
-                    currentOs.isWindows -> "mingw"
+                when {
+                    currentOs.isLinux -> implementation(libs.secp256k1kmp.jni.jvm.linux)
+                    currentOs.isMacOsX -> implementation(libs.secp256k1kmp.jni.jvm.darwin)
+                    currentOs.isWindows -> implementation(libs.secp256k1kmp.jni.jvm.mingw)
                     else -> error("Unsupported OS $currentOs")
                 }
-                implementation("fr.acinq.secp256k1:secp256k1-kmp-jni-jvm-$target:$secp256k1KmpVersion")
             }
         }
 

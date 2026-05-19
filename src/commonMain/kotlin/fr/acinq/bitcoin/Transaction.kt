@@ -310,6 +310,9 @@ public data class Transaction(
     @JvmField val lockTime: Long
 ) : BtcSerializable<Transaction> {
 
+    // the following hashes are used in the computation of the hash that is signed when a specific input is signed
+    // they are independent of the input being signed and can be computed only once, and only when needed
+    // each lazy values adds a memory overhead of a few dozen bytes for the "by lazy" delegate, plus 32 bytes once it has been initialized
     private val hashPrevOut: ByteArray by lazy {
         Crypto.sha256(prevoutsSha256)
     }

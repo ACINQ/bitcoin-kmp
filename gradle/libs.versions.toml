@@ -1,0 +1,16 @@
+[versions]
+kotlin = "2.3.10"
+secp256k1kmp = "0.23.0"
+
+[libraries]
+secp256k1kmp = { group = "fr.acinq.secp256k1", name = "secp256k1-kmp", version.ref="secp256k1kmp" }
+secp256k1kmp-jni-jvm-linux = { group = "fr.acinq.secp256k1", name = "secp256k1-kmp-jni-jvm-linux", version.ref="secp256k1kmp" }
+secp256k1kmp-jni-jvm-darwin = { group = "fr.acinq.secp256k1", name = "secp256k1-kmp-jni-jvm-darwin", version.ref="secp256k1kmp" }
+secp256k1kmp-jni-jvm-mingw = { group = "fr.acinq.secp256k1", name = "secp256k1-kmp-jni-jvm-mingw", version.ref="secp256k1kmp" }
+
+kotlinx-io-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-io-core", version = "0.9.0" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version="1.10.0" }
+
+[plugins]
+multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+dokka = { id = "org.jetbrains.dokka", version = "2.2.0" }

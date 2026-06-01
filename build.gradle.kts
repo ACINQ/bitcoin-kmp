@@ -13,7 +13,7 @@ plugins {
 val currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 group = "fr.acinq.bitcoin"
-version = "0.31.0"
+version = "0.32.0-SNAPSHOT"
 
 repositories {
     mavenCentral()

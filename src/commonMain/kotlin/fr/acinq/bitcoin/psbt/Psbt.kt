@@ -979,11 +979,11 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 val taprootDerivationPaths = known.filter { it.key[0] == 0x16.toByte() }.map {
                     when {
                         it.key.size() != 33 -> return Either.Left(ParseFailure.InvalidTxInput("taproot derivation path key must contain exactly 32 bytes"))
-                        else -> {
+                        else -> runCatching {
                             val xonlyPublicKey = XonlyPublicKey(it.key.drop(1).toByteArray().byteVector32())
                             val path = TaprootBip32DerivationPath.read(it.value.toByteArray())
                             xonlyPublicKey to path
-                        }
+                        }.getOrElse { return Either.Left(ParseFailure.InvalidTxInput("invalid taproot derivation path")) }
                     }
                 }.toMap()
                 val taprootInternalKey = known.find { it.key[0] == 0x17.toByte() }?.let {
@@ -1162,7 +1162,7 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
             object EndOfDataMap : ReadEntryFailure()
         }
 
-        private fun readDataMap(input: fr.acinq.bitcoin.io.Input, entries: List<DataEntry> = listOf()): Either<ReadEntryFailure, List<DataEntry>> {
+        private tailrec fun readDataMap(input: fr.acinq.bitcoin.io.Input, entries: List<DataEntry> = listOf()): Either<ReadEntryFailure, List<DataEntry>> {
             return when (val result = readDataEntry(input)) {
                 is Either.Right -> readDataMap(input, entries + result.value)
                 is Either.Left -> when (result.value) {

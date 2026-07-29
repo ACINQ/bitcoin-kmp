@@ -884,6 +884,32 @@ public object Script {
             // OP_ENDIF
             // OP_CHECKSIG // conditions = []
             val conditions = mutableListOf<Boolean>()
+            // Number of `false` entries in `conditions`, maintained incrementally so that testing whether we're inside
+            // a non-executed branch is O(1). Scanning `conditions` on every opcode would make script execution
+            // quadratic in the script size: the conditions stack isn't covered by MAX_STACK_SIZE and grows without
+            // bound (e.g. with `OP_1 OP_IF` repeated), and neither the opcode count nor the script size is bounded in
+            // tapscript. Bitcoin core solves this the same way, see its ConditionStack class.
+            var falseConditions = 0
+            fun pushCondition(condition: Boolean) {
+                conditions.add(0, condition)
+                if (!condition) falseConditions++
+            }
+
+            /** Flip the head of the conditions stack (OP_ELSE). */
+            fun flipCondition() {
+                val previous = conditions[0]
+                conditions[0] = !previous
+                if (previous) falseConditions++ else falseConditions--
+            }
+
+            /** Drop the head of the conditions stack (OP_ENDIF). */
+            fun popCondition() {
+                if (!conditions.removeFirst()) falseConditions--
+            }
+
+            /** True if we're inside an IF branch that is not executed. */
+            fun inNonExecutedBranch(): Boolean = falseConditions > 0
+
             var opCount = 0
             var scriptCode: List<ScriptElt> = script
 
@@ -902,51 +928,51 @@ public object Script {
                     op == OP_VERNOTIF -> throw RuntimeException("OP_VERNOTIF is always invalid")
                     op is OP_PUSHDATA && op.data.size() > MAX_SCRIPT_ELEMENT_SIZE -> throw RuntimeException("Push value size limit exceeded")
                     // check whether we are in a non-executed IF branch
-                    op == OP_IF && conditions.any { !it } -> {
-                        conditions.add(0, false)
+                    op == OP_IF && inNonExecutedBranch() -> {
+                        pushCondition(false)
                     }
 
                     op == OP_IF && stack.isEmpty() -> throw RuntimeException("Invalid OP_IF construction")
                     op == OP_IF -> {
                         val stackhead = stack.removeFirst()
                         when {
-                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditions.add(0, true)
-                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditions.add(0, false)
+                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(true)
+                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(false)
                             signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> throw RuntimeException("OP_IF argument must be minimal")
                             signatureVersion == SigVersion.SIGVERSION_TAPSCRIPT && stackhead != True && stackhead != False -> throw RuntimeException("OP_IF argument must be minimal")
-                            castToBoolean(stackhead) -> conditions.add(0, true)
-                            else -> conditions.add(0, false)
+                            castToBoolean(stackhead) -> pushCondition(true)
+                            else -> pushCondition(false)
                         }
                     }
 
-                    op == OP_NOTIF && conditions.any { !it } -> {
-                        conditions.add(0, true)
+                    op == OP_NOTIF && inNonExecutedBranch() -> {
+                        pushCondition(true)
                     }
 
                     op == OP_NOTIF && stack.isEmpty() -> throw RuntimeException("Invalid OP_NOTIF construction")
                     op == OP_NOTIF -> {
                         val stackhead = stack.removeFirst()
                         when {
-                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditions.add(0, true)
-                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditions.add(0, false)
+                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(true)
+                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(false)
                             signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> throw RuntimeException("OP_NOTIF argument must be minimal")
                             signatureVersion == SigVersion.SIGVERSION_TAPSCRIPT && stackhead != True && stackhead != False -> throw RuntimeException("OP_IF argument must be minimal")
-                            castToBoolean(stackhead) -> conditions.add(0, false)
-                            else -> conditions.add(0, true)
+                            castToBoolean(stackhead) -> pushCondition(false)
+                            else -> pushCondition(true)
                         }
                     }
 
                     op == OP_ELSE && conditions.isEmpty() -> throw RuntimeException("Invalid OP_ELSE construction")
                     op == OP_ELSE -> {
-                        conditions[0] = !conditions[0]
+                        flipCondition()
                     }
 
                     op == OP_ENDIF && conditions.isEmpty() -> throw RuntimeException("Invalid OP_ENDIF construction")
                     op == OP_ENDIF -> {
-                        conditions.removeFirst()
+                        popCondition()
                     }
 
-                    conditions.any { !it } -> {} // do nothing, we're in an IF branch that is not executed
+                    inNonExecutedBranch() -> {} // do nothing, we're in an IF branch that is not executed
 
                     // and now, things that are checked only in an executed IF branch
                     op == OP_0 -> stack.add(0, False)

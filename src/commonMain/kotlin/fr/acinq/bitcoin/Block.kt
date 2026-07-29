@@ -201,6 +201,7 @@ public data class BlockHeader(
 public object MerkleTree {
     @JvmStatic
     public tailrec fun computeRoot(tree: List<ByteVector32>): ByteVector32 {
+        require(tree.isNotEmpty())
         return when {
             tree.size == 1 -> tree[0]
             (tree.size % 2) != 0 -> computeRoot(tree + listOf(tree.last())) // append last element again
@@ -261,6 +262,7 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
         override fun validate(message: Block) {
             BlockHeader.validate(message.header)
             require(message.header.hashMerkleRoot == MerkleTree.computeRoot(message.tx.map { it.hash.value })) { "invalid block:  merkle root mismatch" }
+            require(message.tx.isNotEmpty()) { "invalid block: no transactions" }
             require(message.tx.map { it.hash }.toSet().size == message.tx.size) { "invalid block: duplicate transactions" }
             message.tx.map { Transaction.validate(it) }
         }

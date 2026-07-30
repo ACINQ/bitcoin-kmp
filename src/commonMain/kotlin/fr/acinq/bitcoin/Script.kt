@@ -25,6 +25,7 @@ import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
+import kotlin.math.sign
 
 public object Script {
     public const val MAX_SCRIPT_SIZE: Int = 10000
@@ -895,23 +896,28 @@ public object Script {
                 if (!condition) falseConditions++
             }
 
-            /** Flip the head of the conditions stack (OP_ELSE). */
+            // Flip the head of the conditions stack (OP_ELSE).
             fun flipCondition() {
                 val previous = conditions[0]
                 conditions[0] = !previous
                 if (previous) falseConditions++ else falseConditions--
             }
 
-            /** Drop the head of the conditions stack (OP_ENDIF). */
+            // Drop the head of the conditions stack (OP_ENDIF).
             fun popCondition() {
                 if (!conditions.removeFirst()) falseConditions--
             }
 
-            /** True if we're inside an IF branch that is not executed. */
+            // True if we're inside an IF branch that is not executed.
             fun inNonExecutedBranch(): Boolean = falseConditions > 0
 
             var opCount = 0
-            var scriptCode: List<ScriptElt> = script
+
+            // position of the first opcode following the last OP_CODESEPARATOR/
+            var scriptCodeStart = 0
+
+            // The script code that signatures commit to: everything after the last executed OP_CODESEPARATOR.
+            fun currentScriptCode(): List<ScriptElt> = if (scriptCodeStart == 0) script else script.subList(scriptCodeStart, script.size)
 
             for (currentPos in script.indices) {
                 val op = script[currentPos]
@@ -1073,16 +1079,21 @@ public object Script {
                         val pubKey = stack.removeFirst()
                         val sigBytes = stack.removeFirst()
                         // remove signature from script
-                        val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
-                            val scriptCode1 = removeSignature(scriptCode, sigBytes)
-                            if (scriptCode1.size != scriptCode.size && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0) {
-                                throw RuntimeException("Signature is found in scriptCode")
+                        val scriptCode1 = when (signatureVersion) {
+                            SigVersion.SIGVERSION_BASE -> {
+                                val scriptCode = currentScriptCode()
+                                val scriptCode1 = removeSignature(scriptCode, sigBytes)
+                                if (scriptCode1.size != scriptCode.size && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0) {
+                                    throw RuntimeException("Signature is found in scriptCode")
+                                }
+                                write(scriptCode1)
                             }
-                            scriptCode1
-                        } else {
-                            scriptCode
+
+                            SigVersion.SIGVERSION_WITNESS_V0 -> write(currentScriptCode())
+                            else -> ByteArray(0)
                         }
-                        val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), write(scriptCode1), signatureVersion)
+
+                        val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), scriptCode1, signatureVersion)
                         if (!success && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_NULLFAIL) != 0) {
                             require(sigBytes.isEmpty()) { "Signature must be zero for failed CHECKSIG operation" }
                         }
@@ -1100,7 +1111,7 @@ public object Script {
                         val pubKey = stack.removeFirst()
                         val num = decodeNumber(stack.removeFirst())
                         val sigBytes = stack.removeFirst()
-                        val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), write(scriptCode), signatureVersion)
+                        val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), ByteArray(0), signatureVersion)
                         stack.add(0, encodeNumber(num + (if (success) 1 else 0)))
                     }
 
@@ -1123,6 +1134,7 @@ public object Script {
                         stack.removeFirst()
 
                         // Drop the signature in pre-segwit scripts but not segwit scripts
+                        val scriptCode = currentScriptCode()
                         val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
                             val scriptCode1 = removeSignatures(scriptCode, sigs)
                             if (scriptCode1.size != scriptCode.size && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0) {
@@ -1145,7 +1157,7 @@ public object Script {
 
                     op == OP_CODESEPARATOR -> {
                         this.context.executionData = this.context.executionData.copy(codeSeparatorPos = currentPos.toLong())
-                        scriptCode = script.drop(currentPos + 1)
+                        scriptCodeStart = currentPos + 1
                     }
 
                     op == OP_DEPTH -> {

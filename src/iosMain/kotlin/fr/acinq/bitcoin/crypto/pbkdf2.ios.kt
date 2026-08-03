@@ -12,6 +12,8 @@ public actual object Pbkdf2 {
 
     @OptIn(ExperimentalUnsignedTypes::class, ExperimentalForeignApi::class)
     public actual fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray {
+        require(count >= 1) { "iteration count must be greater than 0" }
+        require(dkLen >= 1) { "derived key length must be greater than 0" }
         memScoped {
             val result = ByteArray(dkLen)
             KCCKeyDerivationPBKDF(

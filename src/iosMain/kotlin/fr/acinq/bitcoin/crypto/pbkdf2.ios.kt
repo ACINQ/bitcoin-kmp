@@ -15,7 +15,7 @@ public actual object Pbkdf2 {
         require(count >= 1) { "iteration count must be greater than 0" }
         require(dkLen >= 1) { "derived key length must be greater than 0" }
         require(password.isNotEmpty()) { "password must not be empty" }
-        require(salt.isNotEmpty()) { "password must not be empty" }
+        require(salt.isNotEmpty()) { "salt must not be empty" }
         require(password.all { it >= 0 }) { "password must not contain non-ascii characters" }
         memScoped {
             val result = ByteArray(dkLen)

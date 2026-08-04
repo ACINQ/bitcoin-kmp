@@ -14,9 +14,11 @@ public actual object Pbkdf2 {
     public actual fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray {
         require(count >= 1) { "iteration count must be greater than 0" }
         require(dkLen >= 1) { "derived key length must be greater than 0" }
+        require(password.isNotEmpty()) { "password must not be empty" }
+        require(salt.isNotEmpty()) { "password must not be empty" }
         memScoped {
             val result = ByteArray(dkLen)
-            KCCKeyDerivationPBKDF(
+            val status = KCCKeyDerivationPBKDF(
                 kCCPBKDF2,
                 password.refTo(0).getPointer(this),
                 password.size.toULong(),
@@ -27,6 +29,7 @@ public actual object Pbkdf2 {
                 result.asUByteArray().refTo(0).getPointer(this),
                 dkLen.toULong()
             )
+            require(status == 0) { "could not derive key with PBKDF2 (status=$status)" }
             return result
         }
     }

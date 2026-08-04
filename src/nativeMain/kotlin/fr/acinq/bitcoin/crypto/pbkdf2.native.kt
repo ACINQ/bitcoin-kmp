@@ -75,6 +75,10 @@ public object Pbkdf2Native {
         return t
     }
 
-    public fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray =
-        generate(salt, count, dkLen, Hmac512(password))
+    public fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray {
+        require(password.isNotEmpty()) { "password must not be empty" }
+        require(salt.isNotEmpty()) { "password must not be empty" }
+
+        return generate(salt, count, dkLen, Hmac512(password))
+    }
 }

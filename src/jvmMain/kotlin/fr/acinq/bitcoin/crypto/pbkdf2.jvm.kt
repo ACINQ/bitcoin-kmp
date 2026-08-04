@@ -7,8 +7,11 @@ import javax.crypto.spec.PBEKeySpec
 public actual object Pbkdf2 {
 
     @JvmStatic
-    public actual fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray =
-        SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512")
+    public actual fun withHmacSha512(password: ByteArray, salt: ByteArray, count: Int, dkLen: Int): ByteArray {
+        require(password.isNotEmpty()) { "password must not be empty" }
+        require(salt.isNotEmpty()) { "password must not be empty" }
+
+        return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512")
             .generateSecret(
                 PBEKeySpec(
                     CharArray(password.size) { password[it].toInt().toChar() },
@@ -18,5 +21,6 @@ public actual object Pbkdf2 {
                 )
             )
             .encoded
+    }
 
 }

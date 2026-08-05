@@ -63,27 +63,4 @@ class Pbkdf2TestsCommon {
         assertFails { Pbkdf2.withHmacSha512(password, salt, 2048, 0) }
         assertFails { Pbkdf2.withHmacSha512(password, salt, 2048, -1) }
     }
-
-    @Test
-    fun `reject non-ascii passwords`() {
-        val salt = "salt".encodeToByteArray()
-        // The JVM implementation cannot compute the key when the password contains bytes greater than 0x7f: we reject
-        // those passwords on every platform rather than accept them on some and silently return an invalid key on the JVM.
-        assertFails { Pbkdf2.withHmacSha512(byteArrayOf(0x80.toByte()), salt, 2048, 64) }
-        assertFails { Pbkdf2.withHmacSha512(byteArrayOf(0xff.toByte()), salt, 2048, 64) }
-        assertFails { Pbkdf2.withHmacSha512("café".encodeToByteArray(), salt, 2048, 64) }
-        // Non-english mnemonics are rejected as well, since they aren't ascii-encoded.
-        val japanese = "あいこくしん あいこくしん あいこくしん あいこくしん あいこくしん あいこくしん あいこくしん あいこくしん あいこくしん あいこくしん あいこくしん あおぞら"
-        assertFails { MnemonicCode.toSeed(japanese, "") }
-    }
-
-    @Test
-    fun `accept ascii passwords`() {
-        // Every byte of the 0x00-0x7f range is accepted, including 0x00.
-        val password = ByteArray(0x80) { it.toByte() }
-        assertEquals(
-            "aa9f1e16011e1ef94b756b712419467c6c17d422515bba0048fae8707d9dce43eb9d376f9bbc1572d35add40f641bd0305684c74d0406d39712f5c636c12fe93",
-            Hex.encode(Pbkdf2.withHmacSha512(password, "salt".encodeToByteArray(), 2048, 64))
-        )
-    }
 }

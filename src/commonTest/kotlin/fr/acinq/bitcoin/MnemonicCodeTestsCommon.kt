@@ -41,14 +41,35 @@ class MnemonicCodeTestsCommon {
 
     @Test
     fun `reference tests`() {
-        val tests = TestHelpers.readResourceAsJson("bip39_vectors.json")
-
-        tests.jsonObject["english"]!!.jsonArray.map {
-            val raw = it.jsonArray[0].jsonPrimitive.content
-            val mnemonics = it.jsonArray[1].jsonPrimitive.content
-            val seed = it.jsonArray[2].jsonPrimitive.content
-            assertEquals(toMnemonics(Hex.decode(raw)).joinToString(" "), mnemonics)
-            assertEquals(Hex.encode(toSeed(toMnemonics(Hex.decode(raw)), "TREZOR")), seed)
+        val tests = TestHelpers.readResourceAsJson("bip39/vectors.json")
+        val wordlists = mapOf(
+            "chinese_simplified" to TestHelpers.readResourceAsLines("bip39/chinese_simplified.txt"),
+            "chinese_traditional" to TestHelpers.readResourceAsLines("bip39/chinese_traditional.txt"),
+            "czech" to TestHelpers.readResourceAsLines("bip39/czech.txt"),
+            "english" to MnemonicCode.englishWordlist,
+            "french" to TestHelpers.readResourceAsLines("bip39/french.txt"),
+            "italian" to TestHelpers.readResourceAsLines("bip39/italian.txt"),
+            "japanese" to TestHelpers.readResourceAsLines("bip39/japanese.txt"),
+            "korean" to TestHelpers.readResourceAsLines("bip39/korean.txt"),
+            "portuguese" to TestHelpers.readResourceAsLines("bip39/portuguese.txt"),
+            "spanish" to TestHelpers.readResourceAsLines("bip39/spanish.txt"),
+        )
+        tests.jsonObject.forEach {
+            val language = it.key
+            val wordlist = wordlists[language] ?: return@forEach
+            it.value.jsonArray.forEach {
+                val raw = it.jsonArray[0].jsonPrimitive.content
+                // expected mnemonic words in test vectors are separated by white spaces except for Japanese test vectors that use Japanese full-width spaces (U+3000)
+                val expectedMnemonics = it.jsonArray[1].jsonPrimitive.content.split(Regex("[ \\t\\n\\r\\u3000]+"))
+                val expectedSeed = it.jsonArray[2].jsonPrimitive.content
+                val expectedXpriv = it.jsonArray[3].jsonPrimitive.content
+                val mnemonics = toMnemonics(Hex.decode(raw), wordlist)
+                assertEquals(expectedMnemonics, mnemonics, "$language test vectors")
+                val seed = toSeed(mnemonics, passphrase = "TREZOR")
+                assertEquals(expectedSeed, Hex.encode(seed), "$language test vectors")
+                val xpriv = DeterministicWallet.generate(seed)
+                assertEquals(expectedXpriv, xpriv.encode(DeterministicWallet.xprv), "$language test vectors")
+            }
         }
     }
 

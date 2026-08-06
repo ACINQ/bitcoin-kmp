@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 #
 # first you must sign all files with something like:
 # find release -type f -print -exec gpg -ab {} \;
@@ -40,7 +40,7 @@ do
 	    zip -r $i.zip $DIR
 	  ;;
   	upload)
-	    curl --request POST --verbose --header "Authorization: Bearer ${CENTRAL_TOKEN}" --form bundle=@$i.zip https://central.sonatype.com/api/v1/publisher/upload
+	    curl --request POST --header "Authorization: Bearer ${CENTRAL_TOKEN}" --form bundle=@$i.zip https://central.sonatype.com/api/v1/publisher/upload
     ;;
   esac
 done

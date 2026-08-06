@@ -55,7 +55,7 @@ public object MnemonicCode {
     public fun validate(mnemonics: List<String>, wordlist: List<String> = englishWordlist) {
         require(wordlist.size == 2048) { "invalid word list (size should be 2048)" }
         require(mnemonics.isNotEmpty()) { "mnemonic code cannot be empty" }
-        require(mnemonics.size % 3 == 0) { "invalid mnemonic word count " + mnemonics.size + ", it must be a multiple of 3" }
+        require(mnemonics.size in 12..24 && mnemonics.size % 3 == 0) { "invalid mnemonic word count " + mnemonics.size + ", it must be between 12 and 24 and be a multiple of 3" }
         val wordMap = wordlist.mapIndexed { index, s -> s to index }.toMap()
         mnemonics.forEach { word -> require(wordMap.contains(word)) { "invalid mnemonic word $word" } }
         val indexes = mnemonics.map { word -> wordMap.getValue(word) }
@@ -84,6 +84,7 @@ public object MnemonicCode {
      */
     @JvmStatic
     public fun toMnemonics(entropy: ByteArray, wordlist: List<String>): List<String> {
+        require(entropy.size in 16..32 && entropy.size % 4 == 0) { "invalid entropy size ${entropy.size}" }
         require(wordlist.size == 2048) { "invalid word list (size should be 2048)" }
         val digits = toBinary(entropy) + toBinary(Crypto.sha256(entropy)).take(entropy.size / 4)
 

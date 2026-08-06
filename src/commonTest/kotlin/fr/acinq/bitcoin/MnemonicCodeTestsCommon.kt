@@ -78,7 +78,7 @@ class MnemonicCodeTestsCommon {
         val random = Random
 
         for (i in 0..99) {
-            for (length in listOf(16, 20, 24, 28, 32, 36, 40)) {
+            for (length in listOf(16, 20, 24, 28, 32)) {
                 val entropy = ByteArray(length)
                 random.nextBytes(entropy)
                 val mnemonics = toMnemonics(entropy)

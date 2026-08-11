@@ -101,4 +101,12 @@ class MnemonicCodeTestsCommon {
             }
         }
     }
+
+    @Test
+    fun `reject non ASCII passphrase`() {
+        val error = assertFails {
+            toSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "café")
+        }
+        assertEquals("passphrase must only contain ASCII characters", error.message)
+    }
 }

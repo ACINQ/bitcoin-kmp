@@ -6,6 +6,8 @@ import fr.acinq.bitcoin.utils.flatMap
 import fr.acinq.bitcoin.utils.getOrElse
 import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.jvm.JvmStatic
 
 /**
@@ -121,6 +123,7 @@ public data class Session(private val data: ByteVector, private val keyAggCache:
  * This nonce must never be persisted or reused across signing sessions.
  * Application code should use [generate] or [generateWithCounter] to create fresh nonces.
  */
+@OptIn(ExperimentalAtomicApi::class)
 public class SecretNonce private constructor(bytes: ByteArray, offset: Int, size: Int) {
     init {
         require(size == Secp256k1.MUSIG2_SECRET_NONCE_SIZE) { "musig2 secret nonce must be ${Secp256k1.MUSIG2_SECRET_NONCE_SIZE} bytes" }
@@ -133,11 +136,10 @@ public class SecretNonce private constructor(bytes: ByteArray, offset: Int, size
 
     override fun toString(): String = "<secret_nonce>"
 
-    private var consumed: Boolean = false
+    private val consumed = AtomicBoolean(false)
 
     internal fun <T> consume(block: (ByteArray) -> T): Either<Throwable, T> {
-        if (consumed) return Either.Left(IllegalStateException("secret nonce has already been used"))
-        consumed = true
+        if (consumed.exchange(true)) return Either.Left(IllegalStateException("secret nonce has already been used"))
         return try {
             Either.Right(block(data))
         } catch (t: Throwable) {

@@ -55,7 +55,7 @@ public object MnemonicCode {
     public fun validate(mnemonics: List<String>, wordlist: List<String> = englishWordlist) {
         require(wordlist.size == 2048) { "invalid word list (size should be 2048)" }
         require(mnemonics.isNotEmpty()) { "mnemonic code cannot be empty" }
-        require(mnemonics.size % 3 == 0) { "invalid mnemonic word count " + mnemonics.size + ", it must be a multiple of 3" }
+        require(mnemonics.size in 12..24 && mnemonics.size % 3 == 0) { "invalid mnemonic word count " + mnemonics.size + ", it must be between 12 and 24 and be a multiple of 3" }
         val wordMap = wordlist.mapIndexed { index, s -> s to index }.toMap()
         mnemonics.forEach { word -> require(wordMap.contains(word)) { "invalid mnemonic word $word" } }
         val indexes = mnemonics.map { word -> wordMap.getValue(word) }
@@ -76,7 +76,10 @@ public object MnemonicCode {
     public fun validate(mnemonics: String): Unit = validate(mnemonics.split(" "))
 
     /**
-     * BIP39 entropy encoding
+     * BIP39 entropy encoding with custom wordlist (strongly discouraged, use the English wordlist instead)
+     *
+     * Since the vast majority of BIP39 wallets supports only the English wordlist, it is strongly discouraged to use non-English wordlists for generating the mnemonic sentences.
+     * If you still feel your application really needs to use a localized wordlist, use one of the following instead of inventing your own: https://github.com/bitcoin/bips/blob/master/bip-0039/bip-0039-wordlists.md
      *
      * @param entropy  input entropy
      * @param wordlist word list (must be 2048 words long)
@@ -84,12 +87,19 @@ public object MnemonicCode {
      */
     @JvmStatic
     public fun toMnemonics(entropy: ByteArray, wordlist: List<String>): List<String> {
+        require(entropy.size in 16..32 && entropy.size % 4 == 0) { "invalid entropy size ${entropy.size}" }
         require(wordlist.size == 2048) { "invalid word list (size should be 2048)" }
         val digits = toBinary(entropy) + toBinary(Crypto.sha256(entropy)).take(entropy.size / 4)
 
         return group(digits, 11).map(MnemonicCode::fromBinary).map { wordlist[it] }
     }
 
+    /**
+     * BIP39 entropy encoding
+     *
+     * @param entropy  input entropy
+     * @return a list of English mnemonic words that encodes the input entropy
+     */
     @JvmStatic
     public fun toMnemonics(entropy: ByteArray): List<String> = toMnemonics(entropy, englishWordlist)
 
@@ -97,12 +107,13 @@ public object MnemonicCode {
      * BIP39 seed derivation
      *
      * @param mnemonics  mnemonic words
-     * @param passphrase passphrase
+     * @param passphrase passphrase, which must only contains ASCII characters
      * @return a seed derived from the mnemonic words and passphrase
      */
     @JvmStatic
     public fun toSeed(mnemonics: List<String>, passphrase: String): ByteArray {
         val password = mnemonics.joinToString(" ").encodeToByteArray()
+        require(passphrase.all { it.code < 128 }) { "passphrase must only contain ASCII characters" }
         val salt = ("mnemonic$passphrase").encodeToByteArray()
         return Pbkdf2.withHmacSha512(password, salt, 2048, 64)
     }

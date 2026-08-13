@@ -360,11 +360,9 @@ public data class Transaction(
 
     public val hasWitness: Boolean get() = txIn.any { it.hasWitness }
 
-    @JvmField
-    public val hash: TxHash = TxHash(Crypto.hash256(write(this, SERIALIZE_TRANSACTION_NO_WITNESS)))
+    public val hash: TxHash by lazy { TxHash(Crypto.hash256(write(this, SERIALIZE_TRANSACTION_NO_WITNESS))) }
 
-    @JvmField
-    public val txid: TxId = TxId(hash)
+    public val txid: TxId by lazy { TxId(hash) }
 
     /**
      * @param i         index of the tx input to update

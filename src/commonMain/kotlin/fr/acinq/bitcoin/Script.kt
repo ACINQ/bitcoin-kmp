@@ -25,6 +25,7 @@ import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
+import kotlin.math.sign
 
 public object Script {
     public const val MAX_SCRIPT_SIZE: Int = 10000
@@ -884,8 +885,39 @@ public object Script {
             // OP_ENDIF
             // OP_CHECKSIG // conditions = []
             val conditions = mutableListOf<Boolean>()
+            // Number of `false` entries in `conditions`, maintained incrementally so that testing whether we're inside
+            // a non-executed branch is O(1). Scanning `conditions` on every opcode would make script execution
+            // quadratic in the script size: the conditions stack isn't covered by MAX_STACK_SIZE and grows without
+            // bound (e.g. with `OP_1 OP_IF` repeated), and neither the opcode count nor the script size is bounded in
+            // tapscript. Bitcoin core solves this the same way, see its ConditionStack class.
+            var falseConditions = 0
+            fun pushCondition(condition: Boolean) {
+                conditions.add(0, condition)
+                if (!condition) falseConditions++
+            }
+
+            // Flip the head of the conditions stack (OP_ELSE).
+            fun flipCondition() {
+                val previous = conditions[0]
+                conditions[0] = !previous
+                if (previous) falseConditions++ else falseConditions--
+            }
+
+            // Drop the head of the conditions stack (OP_ENDIF).
+            fun popCondition() {
+                if (!conditions.removeFirst()) falseConditions--
+            }
+
+            // True if we're inside an IF branch that is not executed.
+            fun inNonExecutedBranch(): Boolean = falseConditions > 0
+
             var opCount = 0
-            var scriptCode: List<ScriptElt> = script
+
+            // position of the first opcode following the last OP_CODESEPARATOR/
+            var scriptCodeStart = 0
+
+            // The script code that signatures commit to: everything after the last executed OP_CODESEPARATOR.
+            fun currentScriptCode(): List<ScriptElt> = if (scriptCodeStart == 0) script else script.subList(scriptCodeStart, script.size)
 
             for (currentPos in script.indices) {
                 val op = script[currentPos]
@@ -902,51 +934,51 @@ public object Script {
                     op == OP_VERNOTIF -> throw RuntimeException("OP_VERNOTIF is always invalid")
                     op is OP_PUSHDATA && op.data.size() > MAX_SCRIPT_ELEMENT_SIZE -> throw RuntimeException("Push value size limit exceeded")
                     // check whether we are in a non-executed IF branch
-                    op == OP_IF && conditions.any { !it } -> {
-                        conditions.add(0, false)
+                    op == OP_IF && inNonExecutedBranch() -> {
+                        pushCondition(false)
                     }
 
                     op == OP_IF && stack.isEmpty() -> throw RuntimeException("Invalid OP_IF construction")
                     op == OP_IF -> {
                         val stackhead = stack.removeFirst()
                         when {
-                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditions.add(0, true)
-                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditions.add(0, false)
+                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(true)
+                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(false)
                             signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> throw RuntimeException("OP_IF argument must be minimal")
                             signatureVersion == SigVersion.SIGVERSION_TAPSCRIPT && stackhead != True && stackhead != False -> throw RuntimeException("OP_IF argument must be minimal")
-                            castToBoolean(stackhead) -> conditions.add(0, true)
-                            else -> conditions.add(0, false)
+                            castToBoolean(stackhead) -> pushCondition(true)
+                            else -> pushCondition(false)
                         }
                     }
 
-                    op == OP_NOTIF && conditions.any { !it } -> {
-                        conditions.add(0, true)
+                    op == OP_NOTIF && inNonExecutedBranch() -> {
+                        pushCondition(true)
                     }
 
                     op == OP_NOTIF && stack.isEmpty() -> throw RuntimeException("Invalid OP_NOTIF construction")
                     op == OP_NOTIF -> {
                         val stackhead = stack.removeFirst()
                         when {
-                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditions.add(0, true)
-                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditions.add(0, false)
+                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(true)
+                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(false)
                             signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> throw RuntimeException("OP_NOTIF argument must be minimal")
                             signatureVersion == SigVersion.SIGVERSION_TAPSCRIPT && stackhead != True && stackhead != False -> throw RuntimeException("OP_IF argument must be minimal")
-                            castToBoolean(stackhead) -> conditions.add(0, false)
-                            else -> conditions.add(0, true)
+                            castToBoolean(stackhead) -> pushCondition(false)
+                            else -> pushCondition(true)
                         }
                     }
 
                     op == OP_ELSE && conditions.isEmpty() -> throw RuntimeException("Invalid OP_ELSE construction")
                     op == OP_ELSE -> {
-                        conditions[0] = !conditions[0]
+                        flipCondition()
                     }
 
                     op == OP_ENDIF && conditions.isEmpty() -> throw RuntimeException("Invalid OP_ENDIF construction")
                     op == OP_ENDIF -> {
-                        conditions.removeFirst()
+                        popCondition()
                     }
 
-                    conditions.any { !it } -> {} // do nothing, we're in an IF branch that is not executed
+                    inNonExecutedBranch() -> {} // do nothing, we're in an IF branch that is not executed
 
                     // and now, things that are checked only in an executed IF branch
                     op == OP_0 -> stack.add(0, False)
@@ -1047,16 +1079,21 @@ public object Script {
                         val pubKey = stack.removeFirst()
                         val sigBytes = stack.removeFirst()
                         // remove signature from script
-                        val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
-                            val scriptCode1 = removeSignature(scriptCode, sigBytes)
-                            if (scriptCode1.size != scriptCode.size && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0) {
-                                throw RuntimeException("Signature is found in scriptCode")
+                        val scriptCode1 = when (signatureVersion) {
+                            SigVersion.SIGVERSION_BASE -> {
+                                val scriptCode = currentScriptCode()
+                                val scriptCode1 = removeSignature(scriptCode, sigBytes)
+                                if (scriptCode1.size != scriptCode.size && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0) {
+                                    throw RuntimeException("Signature is found in scriptCode")
+                                }
+                                write(scriptCode1)
                             }
-                            scriptCode1
-                        } else {
-                            scriptCode
+
+                            SigVersion.SIGVERSION_WITNESS_V0 -> write(currentScriptCode())
+                            else -> ByteArray(0)
                         }
-                        val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), write(scriptCode1), signatureVersion)
+
+                        val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), scriptCode1, signatureVersion)
                         if (!success && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_NULLFAIL) != 0) {
                             require(sigBytes.isEmpty()) { "Signature must be zero for failed CHECKSIG operation" }
                         }
@@ -1074,7 +1111,7 @@ public object Script {
                         val pubKey = stack.removeFirst()
                         val num = decodeNumber(stack.removeFirst())
                         val sigBytes = stack.removeFirst()
-                        val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), write(scriptCode), signatureVersion)
+                        val success = checkSignature(pubKey.toByteArray(), sigBytes.toByteArray(), ByteArray(0), signatureVersion)
                         stack.add(0, encodeNumber(num + (if (success) 1 else 0)))
                     }
 
@@ -1097,6 +1134,7 @@ public object Script {
                         stack.removeFirst()
 
                         // Drop the signature in pre-segwit scripts but not segwit scripts
+                        val scriptCode = currentScriptCode()
                         val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
                             val scriptCode1 = removeSignatures(scriptCode, sigs)
                             if (scriptCode1.size != scriptCode.size && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0) {
@@ -1119,7 +1157,7 @@ public object Script {
 
                     op == OP_CODESEPARATOR -> {
                         this.context.executionData = this.context.executionData.copy(codeSeparatorPos = currentPos.toLong())
-                        scriptCode = script.drop(currentPos + 1)
+                        scriptCodeStart = currentPos + 1
                     }
 
                     op == OP_DEPTH -> {

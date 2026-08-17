@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.3.10"
-secp256k1kmp = "0.23.0"
+secp256k1kmp = "0.24.0"
 
 [libraries]
 secp256k1kmp = { group = "fr.acinq.secp256k1", name = "secp256k1-kmp", version.ref="secp256k1kmp" }

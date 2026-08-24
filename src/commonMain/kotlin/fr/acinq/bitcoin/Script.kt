@@ -735,10 +735,10 @@ public object Script {
 
         public fun checkSignatureEcdsa(pubKey: ByteArray, sigBytes: ByteArray, scriptCode: ByteArray, signatureVersion: Int): Boolean {
             return when {
-                sigBytes.isEmpty() -> false
                 !Crypto.checkSignatureEncoding(sigBytes, scriptFlag) -> throw RuntimeException("invalid signature encoding")
                 !Crypto.checkPubKeyEncoding(pubKey, scriptFlag, signatureVersion) -> throw RuntimeException("invalid public key encoding")
                 !Crypto.isPubKeyValid(pubKey) -> false // see how this is different from above ?
+                sigBytes.isEmpty() -> false
                 else -> {
                     val sigHashFlags = sigBytes.last().toInt() and 0xff
                     // sig hash is the last byte

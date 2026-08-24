@@ -1027,8 +1027,9 @@ public object Script {
                         stack.add(0, encodeNumber(result))
                     }
 
-                    op == OP_CHECKLOCKTIMEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) != 0) && stack.isEmpty() -> throw RuntimeException("cannot run OP_CHECKLOCKTIMEVERIFY on an empty stack")
-                    op == OP_CHECKLOCKTIMEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) != 0) -> {
+                    op == OP_CHECKLOCKTIMEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) == 0) -> {} // not enabled; treat as a NOP2
+                    op == OP_CHECKLOCKTIMEVERIFY -> {
+                        require(stack.isNotEmpty()) { "cannot run OP_CHECKLOCKTIMEVERIFY on an empty stack" }
                         // Note that elsewhere numeric opcodes are limited to
                         // operands in the range -2**31+1 to 2**31-1, however it is
                         // legal for opcodes to produce results exceeding that
@@ -1048,11 +1049,9 @@ public object Script {
                         if (!checkLockTime(locktime, context.tx, context.inputIndex)) throw RuntimeException("unsatisfied CLTV lock time")
                     }
 
-                    op == OP_CHECKLOCKTIMEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) -> throw RuntimeException("use of upgradable NOP is discouraged")
-                    op == OP_CHECKLOCKTIMEVERIFY -> {}
-
-                    op == OP_CHECKSEQUENCEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) != 0) && stack.isEmpty() -> throw RuntimeException("cannot run OP_CHECKSEQUENCEVERIFY on an empty stack")
-                    op == OP_CHECKSEQUENCEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) != 0) -> {
+                    op == OP_CHECKSEQUENCEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) == 0) -> {} // not enabled; treat as a NOP3
+                    op == OP_CHECKSEQUENCEVERIFY -> {
+                        require(stack.isNotEmpty()) { "cannot run OP_CHECKSEQUENCEVERIFY on an empty stack" }
                         // nSequence, like nLockTime, is a 32-bit unsigned integer
                         // field. See the comment in CHECKLOCKTIMEVERIFY regarding
                         // 5-byte numeric operands.
@@ -1070,9 +1069,6 @@ public object Script {
                             if (!checkSequence(sequence, context.tx, context.inputIndex)) throw RuntimeException("unsatisfied CSV lock time")
                         }
                     }
-
-                    op == OP_CHECKSEQUENCEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) -> throw RuntimeException("use of upgradable NOP is discouraged")
-                    op == OP_CHECKSEQUENCEVERIFY -> {}
 
                     op == OP_CHECKSIG && stack.size < 2 -> throw RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
                     op == OP_CHECKSIG || op == OP_CHECKSIGVERIFY -> {

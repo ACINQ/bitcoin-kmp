@@ -406,31 +406,24 @@ public data class OP_PUSHDATA(@JvmField val data: ByteVector, @JvmField val opCo
 
     public companion object {
         @JvmStatic
-        public fun codeFromDataLength(length: Int): Int {
-            val code = when {
-                length < 0x4c -> length
-                length < 0xff -> 0x4c
-                length < 0xffff -> 0x4d
-                length < 0xffffffff -> 0x4e
-                else -> {
-                    throw IllegalArgumentException("data length is $length}, too big for OP_PUSHDATA")
-                }
-            }
-            return code
+        public fun codeFromDataLength(size: Int): Int = when {
+            size < OP_PUSHDATA1.code -> size
+            size <= 0xff -> OP_PUSHDATA1.code
+            size <= 0xffff -> OP_PUSHDATA2.code
+            else -> OP_PUSHDATA4.code
         }
 
         @JvmStatic
         public fun isMinimal(data: ByteArray, code: Int): Boolean {
+            require(code >= 0 && code <= OP_PUSHDATA4.code)
             return when {
                 data.isEmpty() -> code == OP_0.code
-                data.size == 1 && data[0] >= 1 && data[0] <= 16 -> code == (OP_1.code).plus(data[0] - 1)
-                data.size == 1 && data[0] == 0x81.toByte() -> code == OP_1NEGATE.code
+                data.size == 1 && data[0] >= 1 && data[0] <= 16 -> false
+                data.size == 1 && data[0] == 0x81.toByte() -> false
                 data.size <= 75 -> code == data.size
                 data.size <= 255 -> code == OP_PUSHDATA1.code
                 data.size <= 65535 -> code == OP_PUSHDATA2.code
-                else -> {
-                    true
-                }
+                else -> true
             }
         }
     }

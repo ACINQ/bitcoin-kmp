@@ -1473,6 +1473,7 @@ public object Script {
 
                 witnessVersion == 0L && program.size == WITNESS_V0_SCRIPTHASH_SIZE -> {
                     // P2WPSH, program is the hash of the script, and witness is the stack + the script
+                    require(witness.stack.isNotEmpty()) { "Witness program was passed an empty witness" }
                     val check = Crypto.sha256(witness.stack.last())
                     require(check.contentEquals(program)) { "witness program mismatch" }
                     val finalStack = run(witness.stack.last(), witness.stack.dropLast(1).reversed(), SigVersion.SIGVERSION_WITNESS_V0)

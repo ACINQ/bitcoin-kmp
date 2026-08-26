@@ -119,7 +119,7 @@ plugins.withId("org.jetbrains.kotlin.multiplatform") {
         val currentOs = org.gradle.internal.os.OperatingSystem.current()
         val targets = when {
             currentOs.isLinux -> listOf()
-            else -> listOf("linuxX64")
+            else -> listOf("linuxX64", "linuxArm64")
         }.mapNotNull { kotlin.targets.findByName(it) as? org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget }
 
         configure(targets) {

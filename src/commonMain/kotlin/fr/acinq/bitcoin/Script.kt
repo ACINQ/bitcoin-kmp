@@ -714,7 +714,7 @@ public object Script {
 
     public class Runner(
         public val context: Context,
-        public val scriptFlag: Int = ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS,
+        public val scriptFlag: Int = ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS,
     ) {
         public companion object {
             /**
@@ -735,10 +735,10 @@ public object Script {
 
         public fun checkSignatureEcdsa(pubKey: ByteArray, sigBytes: ByteArray, scriptCode: ByteArray, signatureVersion: Int): Boolean {
             return when {
-                sigBytes.isEmpty() -> false
                 !Crypto.checkSignatureEncoding(sigBytes, scriptFlag) -> throw RuntimeException("invalid signature encoding")
                 !Crypto.checkPubKeyEncoding(pubKey, scriptFlag, signatureVersion) -> throw RuntimeException("invalid public key encoding")
                 !Crypto.isPubKeyValid(pubKey) -> false // see how this is different from above ?
+                sigBytes.isEmpty() -> false
                 else -> {
                     val sigHashFlags = sigBytes.last().toInt() and 0xff
                     // sig hash is the last byte
@@ -1027,8 +1027,9 @@ public object Script {
                         stack.add(0, encodeNumber(result))
                     }
 
-                    op == OP_CHECKLOCKTIMEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) != 0) && stack.isEmpty() -> throw RuntimeException("cannot run OP_CHECKLOCKTIMEVERIFY on an empty stack")
-                    op == OP_CHECKLOCKTIMEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) != 0) -> {
+                    op == OP_CHECKLOCKTIMEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) == 0) -> {} // not enabled; treat as a NOP2
+                    op == OP_CHECKLOCKTIMEVERIFY -> {
+                        require(stack.isNotEmpty()) { "cannot run OP_CHECKLOCKTIMEVERIFY on an empty stack" }
                         // Note that elsewhere numeric opcodes are limited to
                         // operands in the range -2**31+1 to 2**31-1, however it is
                         // legal for opcodes to produce results exceeding that
@@ -1048,11 +1049,9 @@ public object Script {
                         if (!checkLockTime(locktime, context.tx, context.inputIndex)) throw RuntimeException("unsatisfied CLTV lock time")
                     }
 
-                    op == OP_CHECKLOCKTIMEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) -> throw RuntimeException("use of upgradable NOP is discouraged")
-                    op == OP_CHECKLOCKTIMEVERIFY -> {}
-
-                    op == OP_CHECKSEQUENCEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) != 0) && stack.isEmpty() -> throw RuntimeException("cannot run OP_CHECKSEQUENCEVERIFY on an empty stack")
-                    op == OP_CHECKSEQUENCEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) != 0) -> {
+                    op == OP_CHECKSEQUENCEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) == 0) -> {} // not enabled; treat as a NOP3
+                    op == OP_CHECKSEQUENCEVERIFY -> {
+                        require(stack.isNotEmpty()) { "cannot run OP_CHECKSEQUENCEVERIFY on an empty stack" }
                         // nSequence, like nLockTime, is a 32-bit unsigned integer
                         // field. See the comment in CHECKLOCKTIMEVERIFY regarding
                         // 5-byte numeric operands.
@@ -1070,9 +1069,6 @@ public object Script {
                             if (!checkSequence(sequence, context.tx, context.inputIndex)) throw RuntimeException("unsatisfied CSV lock time")
                         }
                     }
-
-                    op == OP_CHECKSEQUENCEVERIFY && ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) -> throw RuntimeException("use of upgradable NOP is discouraged")
-                    op == OP_CHECKSEQUENCEVERIFY -> {}
 
                     op == OP_CHECKSIG && stack.size < 2 -> throw RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
                     op == OP_CHECKSIG || op == OP_CHECKSIGVERIFY -> {
@@ -1473,6 +1469,7 @@ public object Script {
 
                 witnessVersion == 0L && program.size == WITNESS_V0_SCRIPTHASH_SIZE -> {
                     // P2WPSH, program is the hash of the script, and witness is the stack + the script
+                    require(witness.stack.isNotEmpty()) { "Witness program was passed an empty witness" }
                     val check = Crypto.sha256(witness.stack.last())
                     require(check.contentEquals(program)) { "witness program mismatch" }
                     val finalStack = run(witness.stack.last(), witness.stack.dropLast(1).reversed(), SigVersion.SIGVERSION_WITNESS_V0)
@@ -1579,51 +1576,38 @@ public object Script {
          * @return true if the scripts were successfully verified
          */
         public fun verifyScripts(scriptSig: ByteArray, scriptPubKey: ByteArray, witness: ScriptWitness): Boolean {
-            fun checkStack(stack: List<ByteVector>): Boolean = when {
-                stack.isEmpty() -> false
-                !castToBoolean(stack.first()) -> false
-                (scriptFlag and ScriptFlags.SCRIPT_VERIFY_CLEANSTACK) != 0 -> {
-                    if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) == 0) throw RuntimeException("illegal script flag")
-                    stack.size == 1
+            // A witness program is any valid script that consists of a 1-byte push opcode followed by a data push between 2 and 40 bytes.
+            fun isWitnessProgram(script: ByteArray): Pair<Int, ByteArray>? = when {
+                script.size !in 4..42 -> null
+                script[0].toInt() != OP_0.code && (script[0].toInt() < OP_1.code || script[0].toInt() > OP_16.code) -> null
+                script[1].toInt() + 2 == script.size -> {
+                    val version = when (script[0].toInt()) {
+                        OP_0.code -> 0
+                        else -> script[0].toInt() - 0x50
+                    }
+                    val program = script.copyOfRange(2, script.size)
+                    version to program
                 }
 
-                else -> true
+                else -> null
             }
 
-
-            if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_WITNESS) != 0) {
-                // We can't check for correct unexpected witness data if P2SH was off, so require
-                // that WITNESS implies P2SH. Otherwise, going from WITNESS->P2SH+WITNESS would be
-                // possible, which is not a softfork.
-                require((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) != 0)
-            }
             val ssig = parse(scriptSig)
             if (((scriptFlag and ScriptFlags.SCRIPT_VERIFY_SIGPUSHONLY) != 0) && !isPushOnly(ssig)) throw RuntimeException("signature script is not PUSH-only")
-            val stack = run(scriptSig, listOf(), signatureVersion = 0)
-
-            val spub = parse(scriptPubKey)
-            val stack0 = run(scriptPubKey, stack, signatureVersion = 0)
+            val stack = run(scriptSig, listOf(), signatureVersion = SigVersion.SIGVERSION_BASE)
+            val stack0 = run(scriptPubKey, stack, signatureVersion = SigVersion.SIGVERSION_BASE)
             require(stack0.isNotEmpty()) { "Script verification failed, stack should not be empty" }
             require(castToBoolean(stack0.first())) { "Script verification failed, stack starts with 'false'" }
 
             var hadWitness = false
 
-            fun isWitnessProgram(script: List<ScriptElt>): Boolean =
-                script.size == 2 && isSimpleValue(script[0]) && simpleValue(script[0]).toInt() in 0..16 && script[1] is OP_PUSHDATA
-
-            val stack1 = if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_WITNESS) != 0 && isWitnessProgram(spub)) {
-                val witnessVersion = simpleValue(spub[0])
-                val program = spub[1] as OP_PUSHDATA
-                when {
-                    OP_PUSHDATA.isMinimal(program.data.toByteArray(), program.code) && program.data.size() in 2..40 -> {
-                        hadWitness = true
-                        require(ssig.isEmpty()) { "Malleated segwit script" }
-                        verifyWitnessProgram(witness, witnessVersion.toLong(), program.data.toByteArray(), isP2sh = false)
-                        stack0.take(1)
-                    }
-
-                    else -> stack0
-                }
+            val stack1 = if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_WITNESS) != 0) {
+                isWitnessProgram(scriptPubKey)?.let { (witnessVersion, witnessProgram) ->
+                    hadWitness = true
+                    require(ssig.isEmpty()) { "Malleated segwit script" }
+                    verifyWitnessProgram(witness, witnessVersion.toLong(), witnessProgram, isP2sh = false)
+                    stack0.take(1)
+                } ?: stack0
             } else stack0
 
             val stack2 = if (((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) != 0) && isPayToScript(scriptPubKey)) {
@@ -1636,29 +1620,34 @@ public object Script {
                 // if we got here after running script pubkey, it means that hash == HASH160(serialized script)
                 // and stack would be serialized_script :: sigN :: ... :: sig1 :: Nil
                 // we pop the first element of the stack, deserialize it and run it against the rest of the stack
-                val stackp2sh = run(stack.first(), stack.tail(), 0)
+                val stackp2sh = run(stack.first(), stack.tail(), SigVersion.SIGVERSION_BASE)
                 require(stackp2sh.isNotEmpty()) { "Script verification failed, stack should not be empty" }
                 require(castToBoolean(stackp2sh.first())) { "Script verification failed, stack starts with 'false'" }
 
                 if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_WITNESS) != 0) {
-                    val program = parse(stack.first())
-                    when {
-                        program.size == 2 && isSimpleValue(program[0]) && pushSize(program[1]) in 2..40 -> {
-                            hadWitness = true
-                            val witnessVersion = simpleValue(program[0])
-                            verifyWitnessProgram(witness, witnessVersion.toLong(), (program[1] as OP_PUSHDATA).data.toByteArray(), isP2sh = true)
-                            stackp2sh.take(1)
-                        }
-
-                        else -> stackp2sh
-                    }
+                    isWitnessProgram(stack.first().toByteArray())?.let { (witnessVersion, witnessProgram) ->
+                        hadWitness = true
+                        // The scriptSig must be _exactly_ a single push of the redeemScript. Otherwise we reintroduce malleability.
+                        require(ssig.size == 1 && ssig.first() == OP_PUSHDATA(stack.first())) { "Witness requires only-redeemscript scriptSig" }
+                        verifyWitnessProgram(witness, witnessVersion.toLong(), witnessProgram, isP2sh = true)
+                        stackp2sh.take(1)
+                    } ?: stackp2sh
                 } else stackp2sh
             } else stack1
 
-            if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_WITNESS) != 0 && !hadWitness) {
-                require(witness.isNull())
+            if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_CLEANSTACK) != 0) {
+                require((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) != 0) { "illegal script flag" }
+                require((scriptFlag and ScriptFlags.SCRIPT_VERIFY_WITNESS) != 0) { "illegal script flag" }
+                if (stack2.size != 1) {
+                    return false
+                }
             }
-            return checkStack(stack2)
+
+            if ((scriptFlag and ScriptFlags.SCRIPT_VERIFY_WITNESS) != 0) {
+                require((scriptFlag and ScriptFlags.SCRIPT_VERIFY_P2SH) != 0) { "illegal script flag" }
+                if (!hadWitness) require(witness.isNull())
+            }
+            return true
         }
     }
 }

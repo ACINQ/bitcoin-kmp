@@ -430,8 +430,12 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                     if (spentOutputs.size != this.inputs.size) {
                         Either.Left(UpdateFailure.InvalidInput("missing txOut for one of our inputs"))
                     } else {
-                        val sig = Transaction.signInputTaprootKeyPath(priv, global.tx, inputIndex, spentOutputs, input.sighashType ?: SigHash.SIGHASH_DEFAULT, null)
-                        val sigAndSighashType = input.sighashType?.let { sig.concat(it.toByte()) } ?: sig
+                        val sighashType = input.sighashType ?: SigHash.SIGHASH_DEFAULT
+                        val sig = Transaction.signInputTaprootKeyPath(priv, global.tx, inputIndex, spentOutputs, sighashType, null)
+                        // BIP-341: a 64-byte signature implies SIGHASH_DEFAULT, and a 65-byte signature whose last byte is
+                        // 0x00 is invalid (see Script.sigHashType) - that rule exists to prevent malleating 64-byte
+                        // signatures into 65-byte ones. So we must only append the byte for non-default sighash types.
+                        val sigAndSighashType = if (sighashType != SigHash.SIGHASH_DEFAULT) sig.concat(sighashType.toByte()) else sig
                         Either.Right(Pair(input.copy(taprootKeySignature = sigAndSighashType), sigAndSighashType))
                     }
                 }

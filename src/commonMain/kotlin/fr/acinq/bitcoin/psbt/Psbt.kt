@@ -1227,7 +1227,10 @@ public data class TaprootBip32DerivationPath(@JvmField val leaves: List<ByteVect
             val input = ByteArrayInput(bin)
             val numLeaves = BtcSerializer.varint(input).toInt()
             val leaves = (0 until numLeaves).map { BtcSerializer.bytes(input, 32).byteVector32() }
-            val masterKeyFingerprint = Pack.int32BE(input).toLong()
+            // The fingerprint is an unsigned 32-bit value: convert through UInt so that fingerprints whose high bit is
+            // set do not sign-extend into a negative Long. This matches how PSBT_IN_BIP32_DERIVATION and
+            // PSBT_GLOBAL_XPUB fingerprints are parsed elsewhere in this file.
+            val masterKeyFingerprint = Pack.int32BE(input).toUInt().toLong()
             val childCount = (input.availableBytes / 4)
             val keyPath = KeyPath((0 until childCount).map { _ -> Pack.int32LE(input).toUInt().toLong() })
             return TaprootBip32DerivationPath(leaves, masterKeyFingerprint, keyPath)

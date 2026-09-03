@@ -18,6 +18,7 @@ package fr.acinq.bitcoin.psbt
 
 import fr.acinq.bitcoin.*
 import fr.acinq.bitcoin.SigHash.SIGHASH_ALL
+import fr.acinq.bitcoin.SigHash.SIGHASH_DEFAULT
 import fr.acinq.bitcoin.SigHash.SIGHASH_ANYONECANPAY
 import fr.acinq.bitcoin.SigHash.SIGHASH_NONE
 import fr.acinq.bitcoin.SigHash.SIGHASH_SINGLE
@@ -1648,6 +1649,49 @@ class PsbtTestsCommon {
         assertNull(output.witnessScript)
         assertTrue(output.derivationPaths.isEmpty())
         assertTrue(output.unknown.isEmpty())
+    }
+
+    @Test
+    fun `sign a taproot input that explicitly requests SIGHASH_DEFAULT`() {
+        val seed = ByteVector.fromHex("0101010101010101010101010101010101010101010101010101010101010101")
+        val master = DeterministicWallet.generate(seed)
+        val mainPriv = master.derivePrivateKey("86'/1'/0'/0")
+        val priv = mainPriv.derivePrivateKey(0).privateKey
+        val pub = mainPriv.extendedPublicKey.derivePublicKey(0).publicKey.xOnly()
+
+        val utxo = Transaction(
+            version = 2,
+            txIn = listOf(),
+            txOut = listOf(TxOut(100_000.sat(), Script.pay2tr(pub, Crypto.TaprootTweak.KeyPathTweak))),
+            lockTime = 0
+        )
+        val psbt = Psbt(
+            tx = Transaction(
+                version = 2,
+                txIn = listOf(TxIn(OutPoint(utxo, 0), TxIn.SEQUENCE_FINAL)),
+                txOut = listOf(TxOut(90_000.sat(), Script.pay2tr(pub, Crypto.TaprootTweak.KeyPathTweak))),
+                lockTime = 0
+            )
+        )
+        // The sighash type is spelled out rather than left absent, which a PSBT creator is free to do.
+        val updated = psbt.updateWitnessInput(
+            OutPoint(utxo, 0),
+            utxo.txOut[0],
+            sighashType = SIGHASH_DEFAULT,
+            taprootInternalKey = pub,
+            taprootDerivationPaths = mapOf(pub to TaprootBip32DerivationPath(listOf(), 0, KeyPath("m/86'/1'/0'/0/0")))
+        ).right!!
+        assertEquals(SIGHASH_DEFAULT, updated.inputs[0].sighashType)
+
+        val signed = updated.sign(priv, 0).right!!
+        // BIP-341: SIGHASH_DEFAULT is implied by a 64-byte signature. Appending an explicit 0x00 byte produces a
+        // 65-byte signature that Script.sigHashType (and consensus) reject.
+        assertEquals(64, signed.psbt.inputs[0].taprootKeySignature!!.size())
+
+        val signedTx = signed.psbt
+            .finalizeWitnessInput(0, ScriptWitness(listOf(signed.sig)))
+            .flatMap { it.extract() }.right!!
+        Transaction.correctlySpends(signedTx, mapOf(OutPoint(utxo, 0) to utxo.txOut[0]), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
 
 }

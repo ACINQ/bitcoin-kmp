@@ -92,7 +92,53 @@ class BlockTestsCommon {
             "00000020620187836ab16deef958960bc1f8321fe2c32971a447ba7888bc050000000000c91a344b1a95579235f66776652529c60fd50099af021977f073388abb44862e8fbdda58c0b3271ca4e63787"
         ).map { BlockHeader.read(it) }
 
-        headers.forEach { assertTrue(BlockHeader.checkProofOfWork(it)) }
+        headers.forEach { assertTrue(BlockHeader.checkProofOfWork(it, Chain.Mainnet.chainHash)) }
+    }
+
+    @Test
+    fun `check proof of work -- reject out-of-range targets`() {
+        // A valid mainnet header (block 745762) that we tamper with: the `bits` field is attacker-controlled.
+        val header = BlockHeader.read("0000c0208d1459d7a99eb66ea054532c29771d39bba60c897314030000000000000000009fed1aefd92f59e35f1410570f90c0d5f43ab7ea58c7af6ecccef50c7c7b7ae3ed06d862afa70917308a412e")
+        assertTrue(BlockHeader.checkProofOfWork(header, Chain.Mainnet.chainHash))
+        assertTrue(BlockHeader.checkProofOfWork(header, Block.LivenetGenesisBlock.hash))
+        assertTrue(BlockHeader.checkProofOfWork(header, Block.Testnet3GenesisBlock.hash))
+        assertTrue(BlockHeader.checkProofOfWork(header, Block.Testnet4GenesisBlock.hash))
+        // Overflowing targets: the mantissa is shifted out and the decoded target is (almost) 2^256, so any hash passes.
+        assertFalse(BlockHeader.checkProofOfWork(header.copy(bits = 0x227fffffL), Chain.Mainnet.chainHash))
+        assertFalse(BlockHeader.checkProofOfWork(header.copy(bits = 0x217fffffL), Chain.Mainnet.chainHash))
+        assertFalse(BlockHeader.checkProofOfWork(header.copy(bits = 0x2300ffffL), Chain.Mainnet.chainHash))
+        assertFalse(BlockHeader.checkProofOfWork(header.copy(bits = 0x227fffffL), Block.RegtestGenesisBlock.hash))
+        // Negative target (sign bit set in the mantissa).
+        assertFalse(BlockHeader.checkProofOfWork(header.copy(bits = 0x1d80ffffL), Chain.Mainnet.chainHash))
+        assertFalse(BlockHeader.checkProofOfWork(header.copy(bits = 0x1d80ffffL), Block.RegtestGenesisBlock.hash))
+        // Zero target.
+        assertFalse(BlockHeader.checkProofOfWork(header.copy(bits = 0x1d000000L), Chain.Mainnet.chainHash))
+        assertFalse(BlockHeader.checkProofOfWork(header.copy(bits = 0x00000000L), Chain.Mainnet.chainHash))
+        assertFalse(BlockHeader.checkProofOfWork(header.copy(bits = 0x1d000000L), Block.RegtestGenesisBlock.hash))
+        // Real genesis blocks validate against their own chain's limit: mainnet's genesis block uses exactly the
+        // mainnet limit (0x1d00ffff), signet's genesis block uses exactly the signet limit (0x1e0377ae) and regtest's
+        // genesis block uses exactly the regtest limit (0x207fffff).
+        assertEquals(0x1d00ffffL, Block.LivenetGenesisBlock.header.bits)
+        assertEquals(0x1e0377aeL, Block.SignetGenesisBlock.header.bits)
+        assertEquals(0x207fffffL, Block.RegtestGenesisBlock.header.bits)
+        assertTrue(Block.checkProofOfWork(Block.LivenetGenesisBlock))
+        assertTrue(Block.checkProofOfWork(Block.LivenetGenesisBlock, Block.LivenetGenesisBlock.hash))
+        assertTrue(Block.checkProofOfWork(Block.Testnet3GenesisBlock, Block.Testnet3GenesisBlock.hash))
+        assertTrue(Block.checkProofOfWork(Block.Testnet4GenesisBlock, Block.Testnet4GenesisBlock.hash))
+        assertTrue(Block.checkProofOfWork(Block.SignetGenesisBlock, Block.SignetGenesisBlock.hash))
+        assertTrue(Block.checkProofOfWork(Block.RegtestGenesisBlock, Block.RegtestGenesisBlock.hash))
+        // Targets above the chain's proof-of-work limit contain no meaningful work and must be rejected, even though
+        // the header hash is below the claimed target.
+        assertFalse(Block.checkProofOfWork(Block.SignetGenesisBlock))
+        assertFalse(Block.checkProofOfWork(Block.SignetGenesisBlock, Block.LivenetGenesisBlock.hash))
+        assertFalse(Block.checkProofOfWork(Block.SignetGenesisBlock, Block.Testnet4GenesisBlock.hash))
+        assertFalse(Block.checkProofOfWork(Block.RegtestGenesisBlock))
+        assertFalse(Block.checkProofOfWork(Block.RegtestGenesisBlock, Block.LivenetGenesisBlock.hash))
+        assertFalse(Block.checkProofOfWork(Block.RegtestGenesisBlock, Block.SignetGenesisBlock.hash))
+        // Explicit limits can also be provided.
+        assertTrue(BlockHeader.checkProofOfWork(Block.RegtestGenesisBlock.header, BlockHeader.powLimit(Block.RegtestGenesisBlock.hash)))
+        assertFalse(BlockHeader.checkProofOfWork(Block.RegtestGenesisBlock.header, BlockHeader.powLimit(Block.LivenetGenesisBlock.hash)))
+        assertFails { BlockHeader.checkProofOfWork(header, BlockHash(ByteVector32.Zeroes)) }
     }
 
     @Test
@@ -106,9 +152,9 @@ class BlockTestsCommon {
             nonce = 0L
         )
 
-        assertEquals(BlockHeader.calculateNextWorkRequired(header.copy(time = 1262152739, bits = 0x1d00ffff), 1261130161), 0x1d00d86aL)
-        assertEquals(BlockHeader.calculateNextWorkRequired(header.copy(time = 1233061996, bits = 0x1d00ffff), 1231006505), 0x1d00ffffL)
-        assertEquals(BlockHeader.calculateNextWorkRequired(header.copy(time = 1279297671, bits = 0x1c05a3f4), 1279008237), 0x1c0168fdL)
+        assertEquals(0x1d00d86aL, BlockHeader.calculateNextWorkRequired(header.copy(time = 1262152739, bits = 0x1d00ffff), 1261130161))
+        assertEquals(0x1d00ffffL, BlockHeader.calculateNextWorkRequired(header.copy(time = 1233061996, bits = 0x1d00ffff), 1231006505))
+        assertEquals(0x1c0168fdL, BlockHeader.calculateNextWorkRequired(header.copy(time = 1279297671, bits = 0x1c05a3f4), 1279008237))
     }
 
     @Test
@@ -121,7 +167,7 @@ class BlockTestsCommon {
             )
             val (header, matched) = Block.verifyTxOutProof(raw)
             assertEquals(header.blockId, BlockId("000000000000000000030cbb70966693d2516ca868fb490582dcf3dec90250f1"))
-            assertTrue(BlockHeader.checkProofOfWork(header))
+            assertTrue(BlockHeader.checkProofOfWork(header, Chain.Mainnet.chainHash))
             assertEquals(matched, listOf(ByteVector32("89ae0cca6a53d4339705c17766f6cafe2fc3c600453232c776664ef103008c5b").reversed() to 2112))
         }
         run {
@@ -132,7 +178,7 @@ class BlockTestsCommon {
             )
             val (header, matched) = Block.verifyTxOutProof(raw)
             assertEquals(header.blockId, BlockId("000000000000000000030cbb70966693d2516ca868fb490582dcf3dec90250f1"))
-            assertTrue(BlockHeader.checkProofOfWork(header))
+            assertTrue(BlockHeader.checkProofOfWork(header, Chain.Mainnet.chainHash))
             assertEquals(
                 matched,
                 listOf(
@@ -150,7 +196,7 @@ class BlockTestsCommon {
             )
             val (header, matched) = Block.verifyTxOutProof(raw)
             assertEquals(header.blockId, BlockId("0000000000000000000060e32d547b6ae2ded52aadbc6310808e4ae42b08cc6a"))
-            assertTrue(BlockHeader.checkProofOfWork(header))
+            assertTrue(BlockHeader.checkProofOfWork(header, Chain.Mainnet.chainHash))
             assertEquals(
                 matched,
                 listOf(

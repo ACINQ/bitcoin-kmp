@@ -90,13 +90,35 @@ public data class BlockHeader(
     /**
      * Proof of work: hash(header) <= target difficulty
      *
+     * @param powLimit maximum (i.e. easiest) target allowed on this chain, see [BlockHeader.powLimit].
      * @return true if this block header validates its expected proof of work
      */
-    public fun checkProofOfWork(): Boolean {
-        val (target, _, _) = UInt256.decodeCompact(bits)
+    public fun checkProofOfWork(powLimit: UInt256): Boolean {
+        val (target, isNegative, isOverflow) = UInt256.decodeCompact(bits)
+        if (isNegative || isOverflow || target == UInt256.Zero || target > powLimit) return false
         val hash = UInt256(blockId.value.toByteArray())
         return hash <= target
     }
+
+    /**
+     * Proof of work: hash(header) <= target difficulty
+     *
+     * @param chainHash hash of the genesis block of the chain this header belongs to.
+     * @return true if this block header validates its expected proof of work
+     */
+    public fun checkProofOfWork(chainHash: BlockHash): Boolean = checkProofOfWork(powLimit(chainHash))
+
+    /**
+     * Proof of work: hash(header) <= target difficulty, where the target must also be within the range allowed by
+     * mainnet (which is also the range used by testnet3 and testnet4).
+     *
+     * NB: signet and regtest allow much easier targets, so headers from those chains must be checked with
+     * [checkProofOfWork] using their chain hash or proof-of-work limit.
+     *
+     * @return true if this block header validates its expected proof of work
+     */
+    @Deprecated("pass an explicit chain hash or a proof-of-work limit")
+    public fun checkProofOfWork(): Boolean = checkProofOfWork(powLimit(Block.LivenetGenesisBlock.hash))
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     public companion object : BtcSerializer<BlockHeader>() {
@@ -165,13 +187,59 @@ public data class BlockHeader(
         public fun blockProof(header: BlockHeader): UInt256 = blockProof(header.bits)
 
         /**
-         * Proof of work: hash(header) <= target difficulty
+         * Maximum (i.e. easiest) proof-of-work targets allowed on each chain, as defined by bitcoin core's chain params.
+         * Mainnet, testnet3 and testnet4 share the same limit.
+         */
+        private const val PowLimitMainnet: String = "00000000ffff0000000000000000000000000000000000000000000000000000"
+        private const val PowLimitSignet: String = "00000377ae000000000000000000000000000000000000000000000000000000"
+        private const val PowLimitRegtest: String = "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+
+        /**
+         * @param chainHash hash of the genesis block of the chain we're on.
+         * @return the maximum (i.e. easiest) proof-of-work target allowed on that chain. A header claiming a target
+         *         above this limit contains no meaningful work and must be rejected.
+         */
+        @JvmStatic
+        public fun powLimit(chainHash: BlockHash): UInt256 = when (chainHash) {
+            // NB: we return a new instance on every call, because some UInt256 operations mutate their receiver.
+            Block.LivenetGenesisBlock.hash, Block.Testnet3GenesisBlock.hash, Block.Testnet4GenesisBlock.hash -> UInt256(Hex.decode(PowLimitMainnet))
+            Block.SignetGenesisBlock.hash -> UInt256(Hex.decode(PowLimitSignet))
+            Block.RegtestGenesisBlock.hash -> UInt256(Hex.decode(PowLimitRegtest))
+            else -> throw IllegalArgumentException("unknown chain hash $chainHash")
+        }
+
+        /**
+         * Proof of work: hash(header) <= target difficulty, where the target must also be within the range allowed by
+         * mainnet. See [BlockHeader.checkProofOfWork] for the signet/regtest caveat.
          *
          * @param header block header
          * @return true if the input block header validates its expected proof of work
          */
         @JvmStatic
-        public fun checkProofOfWork(header: BlockHeader): Boolean = header.checkProofOfWork()
+        @Deprecated("pass an explicit chain hash or a proof-of-work limit")
+        public fun checkProofOfWork(header: BlockHeader): Boolean = header.checkProofOfWork(Chain.Mainnet.chainHash)
+
+        /**
+         * Proof of work: hash(header) <= target difficulty, where the target must also be within the range allowed by
+         * the chain we're on.
+         *
+         * @param header block header
+         * @param chainHash hash of the genesis block of the chain this header belongs to.
+         * @return true if the input block header validates its expected proof of work
+         */
+        @JvmStatic
+        public fun checkProofOfWork(header: BlockHeader, chainHash: BlockHash): Boolean = header.checkProofOfWork(chainHash)
+
+        /**
+         * Proof of work: hash(header) <= target difficulty, where the target must also be within the range allowed by
+         * the chain we're on.
+         *
+         * @param header block header
+         * @param powLimit maximum (i.e. easiest) target allowed on this chain, see [powLimit].
+         * @return true if the input block header validates its expected proof of work
+         */
+        @JvmStatic
+        public fun checkProofOfWork(header: BlockHeader, powLimit: UInt256): Boolean = header.checkProofOfWork(powLimit)
 
         @JvmStatic
         public fun calculateNextWorkRequired(lastHeader: BlockHeader, lastRetargetTime: Long): Long {
@@ -225,11 +293,22 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
     val blockId: BlockId = header.blockId
 
     /**
-     * Proof of work: hash(block) <= target difficulty
+     * Proof of work: hash(block) <= target difficulty, where the target must also be within the range allowed by
+     * mainnet. See [BlockHeader.checkProofOfWork] for the signet/regtest caveat.
      *
      * @return true if the input block validates its expected proof of work
      */
-    public fun checkProofOfWork(): Boolean = BlockHeader.checkProofOfWork(header)
+    @Deprecated("pass an explicit chain hash or a proof-of-work limit")
+    public fun checkProofOfWork(): Boolean = BlockHeader.checkProofOfWork(header, Chain.Mainnet.chainHash)
+
+    /**
+     * Proof of work: hash(block) <= target difficulty, where the target must also be within the range allowed by the
+     * chain we're on.
+     *
+     * @param chainHash hash of the genesis block of the chain this block belongs to.
+     * @return true if the input block validates its expected proof of work
+     */
+    public fun checkProofOfWork(chainHash: BlockHash): Boolean = BlockHeader.checkProofOfWork(header, chainHash)
 
     public companion object : BtcSerializer<Block>() {
         override fun write(message: Block, out: Output, protocolVersion: Long) {
@@ -274,7 +353,10 @@ public data class Block(@JvmField val header: BlockHeader, @JvmField val tx: Lis
          * @return true if the input block validates its expected proof of work
          */
         @JvmStatic
-        public fun checkProofOfWork(block: Block): Boolean = block.checkProofOfWork()
+        public fun checkProofOfWork(block: Block): Boolean = block.checkProofOfWork(Chain.Mainnet.chainHash)
+
+        @JvmStatic
+        public fun checkProofOfWork(block: Block, chainHash: BlockHash): Boolean = block.checkProofOfWork(chainHash)
 
         /**
          * Verify a tx inclusion proof (a merkle proof that a set of transactions are included in a given block)

@@ -1650,4 +1650,44 @@ class PsbtTestsCommon {
         assertTrue(output.unknown.isEmpty())
     }
 
+    @Test
+    fun `read taproot bip32 derivation with a master fingerprint whose high bit is set`() {
+        // Master key fingerprints are unsigned 32-bit values, so roughly half of all wallets have one whose first byte
+        // is >= 0x80. Sign-extending such a fingerprint yields a negative Long that never compares equal to the
+        // fingerprint a wallet computes for itself, so its own taproot inputs go unrecognized.
+        val fingerprint = 0x8dfc9b34L
+        val path = TaprootBip32DerivationPath(listOf(), fingerprint, KeyPath("m/86'/1'/0'/0/0"))
+        val decoded = TaprootBip32DerivationPath.read(path.write())
+        assertEquals(fingerprint, decoded.masterKeyFingerprint)
+        assertEquals(path.keyPath, decoded.keyPath)
+        assertEquals(path, decoded)
+
+        // And the same through a full PSBT round trip.
+        val seed = ByteVector.fromHex("0101010101010101010101010101010101010101010101010101010101010101")
+        val master = DeterministicWallet.generate(seed)
+        val pub = master.derivePrivateKey("86'/1'/0'/0").extendedPublicKey.derivePublicKey(0).publicKey.xOnly()
+        val utxo = Transaction(
+            version = 2,
+            txIn = listOf(),
+            txOut = listOf(TxOut(100_000.sat(), Script.pay2tr(pub, Crypto.TaprootTweak.KeyPathTweak))),
+            lockTime = 0
+        )
+        val psbt = Psbt(
+            tx = Transaction(
+                version = 2,
+                txIn = listOf(TxIn(OutPoint(utxo, 0), TxIn.SEQUENCE_FINAL)),
+                txOut = listOf(TxOut(90_000.sat(), Script.pay2tr(pub, Crypto.TaprootTweak.KeyPathTweak))),
+                lockTime = 0
+            )
+        ).updateWitnessInput(
+            OutPoint(utxo, 0),
+            utxo.txOut[0],
+            taprootInternalKey = pub,
+            taprootDerivationPaths = mapOf(pub to path)
+        ).right!!
+
+        val reread = Psbt.read(Psbt.write(psbt)).right!!
+        assertEquals(fingerprint, reread.inputs[0].taprootDerivationPaths[pub]!!.masterKeyFingerprint)
+    }
+
 }

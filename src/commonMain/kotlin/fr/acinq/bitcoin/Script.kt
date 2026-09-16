@@ -25,7 +25,6 @@ import fr.acinq.secp256k1.Hex
 import fr.acinq.secp256k1.Secp256k1
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
-import kotlin.math.sign
 
 public object Script {
     public const val MAX_SCRIPT_SIZE: Int = 10000
@@ -868,48 +867,68 @@ public object Script {
         ): List<ByteVector> {
             val stack = inputStack.toMutableList()
             val altstack = mutableListOf<ByteVector>()
-            // conditions is a stack of boolean that is checked by each IF/NOTIF instruction
-            // each time we execute IF/NOTIF, we insert the boolean that is checked by IF/NOTIF into our "conditions" stack
-            // each time we execute ELSE, we flip the head our "conditions" stack
-            // and each time we execute ENDIF we remove the head of our "conditions" stack
-            // if any value in our "conditions" stack is false, it means that we're in an IF branch that is not executed
-            // OP_1 // conditions = []
-            // OP_IF
-            //   OP_CHECKSIG // conditions = [true]
-            //   OP_IF //
-            //     OP_2 // conditions = [false, true] (we assume CHECKSIG failed), this branch will not be executed
-            //   OP_ELSE
-            //     OP_3 // conditions = [true, true]
-            // OP_ELSE
-            //   OP_PUSHDATA("deadbeef") // conditions = [false], this branch will not be executed
-            // OP_ENDIF
-            // OP_CHECKSIG // conditions = []
-            val conditions = mutableListOf<Boolean>()
-            // Number of `false` entries in `conditions`, maintained incrementally so that testing whether we're inside
-            // a non-executed branch is O(1). Scanning `conditions` on every opcode would make script execution
-            // quadratic in the script size: the conditions stack isn't covered by MAX_STACK_SIZE and grows without
-            // bound (e.g. with `OP_1 OP_IF` repeated), and neither the opcode count nor the script size is bounded in
-            // tapscript. Bitcoin core solves this the same way, see its ConditionStack class.
-            var falseConditions = 0
-            fun pushCondition(condition: Boolean) {
-                conditions.add(0, condition)
-                if (!condition) falseConditions++
+
+            /**
+             * This is a copy of the condition stack implementation in bitcoin core, which does
+             * not use an actual stack but just 2 integers.
+             *
+             * Conceptually it acts like a vector of booleans, one for each level of nested
+             * IF/THEN/ELSE, indicating whether we're in the active or inactive branch of
+             * each.
+             *
+             * The elements on the stack cannot be observed individually; we only need to
+             * expose whether the stack is empty and whether or not any false values are
+             * present at all. To implement OP_ELSE, a toggle_top modifier is added, which
+             * flips the last value without returning it.
+             *
+             * This uses an optimized implementation that does not materialize the
+             * actual stack. Instead, it just stores the size of the would-be stack,
+             * and the position of the first false value in it.
+             */
+            // A constant for m_first_false_pos to indicate there are no falses.
+            val NO_FALSE = UInt.MAX_VALUE
+
+            // The size of the implied stack.
+            var stackSize: UInt = 0u
+
+            // The position of the first false value on the implied stack, or NO_FALSE if all true.
+            var firstFalsePos = NO_FALSE;
+
+            fun conditionsEmpty(): Boolean = (stackSize == 0u)
+
+            fun conditionsAllTrue(): Boolean = firstFalsePos == NO_FALSE
+
+            fun conditionsPushBack(f: Boolean) {
+                if (firstFalsePos == NO_FALSE && !f) {
+                    // The stack consists of all true values, and a false is added.
+                    // The first false value will appear at the current size.
+                    firstFalsePos = stackSize;
+                }
+                ++stackSize;
             }
 
-            // Flip the head of the conditions stack (OP_ELSE).
-            fun flipCondition() {
-                val previous = conditions[0]
-                conditions[0] = !previous
-                if (previous) falseConditions++ else falseConditions--
+            fun conditionsPopBack() {
+                require(stackSize > 0u)
+                --stackSize
+                if (firstFalsePos == stackSize) {
+                    // When popping off the first false value, everything becomes true.
+                    firstFalsePos = NO_FALSE;
+                }
             }
 
-            // Drop the head of the conditions stack (OP_ENDIF).
-            fun popCondition() {
-                if (!conditions.removeFirst()) falseConditions--
+            fun conditionsToggleTop() {
+                require(stackSize > 0u)
+                if (firstFalsePos == NO_FALSE) {
+                    // The current stack is all true values; the first false will be the top.
+                    firstFalsePos = stackSize - 1u
+                } else if (firstFalsePos == stackSize - 1u) {
+                    // The top is the first false value; toggling it will make everything true.
+                    firstFalsePos = NO_FALSE
+                } else {
+                    // There is a false value, but not on top. No action is needed as toggling
+                    // anything but the first false value is unobservable.
+                }
             }
-
-            // True if we're inside an IF branch that is not executed.
-            fun inNonExecutedBranch(): Boolean = falseConditions > 0
 
             var opCount = 0
 
@@ -934,51 +953,51 @@ public object Script {
                     op == OP_VERNOTIF -> throw RuntimeException("OP_VERNOTIF is always invalid")
                     op is OP_PUSHDATA && op.data.size() > MAX_SCRIPT_ELEMENT_SIZE -> throw RuntimeException("Push value size limit exceeded")
                     // check whether we are in a non-executed IF branch
-                    op == OP_IF && inNonExecutedBranch() -> {
-                        pushCondition(false)
+                    op == OP_IF && !conditionsAllTrue() -> {
+                        conditionsPushBack(false)
                     }
 
                     op == OP_IF && stack.isEmpty() -> throw RuntimeException("Invalid OP_IF construction")
                     op == OP_IF -> {
                         val stackhead = stack.removeFirst()
                         when {
-                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(true)
-                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(false)
+                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditionsPushBack(true)
+                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditionsPushBack(false)
                             signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> throw RuntimeException("OP_IF argument must be minimal")
                             signatureVersion == SigVersion.SIGVERSION_TAPSCRIPT && stackhead != True && stackhead != False -> throw RuntimeException("OP_IF argument must be minimal")
-                            castToBoolean(stackhead) -> pushCondition(true)
-                            else -> pushCondition(false)
+                            castToBoolean(stackhead) -> conditionsPushBack(true)
+                            else -> conditionsPushBack(false)
                         }
                     }
 
-                    op == OP_NOTIF && inNonExecutedBranch() -> {
-                        pushCondition(true)
+                    op == OP_NOTIF && !conditionsAllTrue() -> {
+                        conditionsPushBack(true)
                     }
 
                     op == OP_NOTIF && stack.isEmpty() -> throw RuntimeException("Invalid OP_NOTIF construction")
                     op == OP_NOTIF -> {
                         val stackhead = stack.removeFirst()
                         when {
-                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(true)
-                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> pushCondition(false)
+                            stackhead == False && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditionsPushBack(true)
+                            stackhead == True && signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> conditionsPushBack(false)
                             signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag and ScriptFlags.SCRIPT_VERIFY_MINIMALIF) != 0 -> throw RuntimeException("OP_NOTIF argument must be minimal")
                             signatureVersion == SigVersion.SIGVERSION_TAPSCRIPT && stackhead != True && stackhead != False -> throw RuntimeException("OP_IF argument must be minimal")
-                            castToBoolean(stackhead) -> pushCondition(false)
-                            else -> pushCondition(true)
+                            castToBoolean(stackhead) -> conditionsPushBack(false)
+                            else -> conditionsPushBack(true)
                         }
                     }
 
-                    op == OP_ELSE && conditions.isEmpty() -> throw RuntimeException("Invalid OP_ELSE construction")
+                    op == OP_ELSE && conditionsEmpty() -> throw RuntimeException("Invalid OP_ELSE construction")
                     op == OP_ELSE -> {
-                        flipCondition()
+                        conditionsToggleTop()
                     }
 
-                    op == OP_ENDIF && conditions.isEmpty() -> throw RuntimeException("Invalid OP_ENDIF construction")
+                    op == OP_ENDIF && conditionsEmpty() -> throw RuntimeException("Invalid OP_ENDIF construction")
                     op == OP_ENDIF -> {
-                        popCondition()
+                        conditionsPopBack()
                     }
 
-                    inNonExecutedBranch() -> {} // do nothing, we're in an IF branch that is not executed
+                    !conditionsAllTrue() -> {} // do nothing, we're in an IF branch that is not executed
 
                     // and now, things that are checked only in an executed IF branch
                     op == OP_0 -> stack.add(0, False)
@@ -1444,7 +1463,7 @@ public object Script {
 
                 require(stack.size + altstack.size <= MAX_STACK_SIZE) { "stack is too large: stack size = ${stack.size} alt stack size = ${altstack.size}" }
             }
-            require(conditions.isEmpty()) { "IF/ENDIF imbalance" }
+            require(conditionsEmpty()) { "IF/ENDIF imbalance" }
             return stack
         }
 

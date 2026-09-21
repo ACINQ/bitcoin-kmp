@@ -22,6 +22,7 @@ import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Input
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.secp256k1.Hex
+import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
 public abstract class BtcSerializer<T> {
@@ -82,6 +83,12 @@ public abstract class BtcSerializer<T> {
     public open fun validate(message: T) {}
 
     public companion object {
+        /**
+         * The maximum size of a serialized object in bytes or number of elements
+         * (for eg vectors) when the size is encoded as CompactSize.
+         */
+        public val MAX_SIZE: ULong = 0x02000000uL
+
         @JvmStatic
         public fun uint8(input: Input): UByte {
             require(input.availableBytes >= 1)
@@ -128,20 +135,27 @@ public abstract class BtcSerializer<T> {
         public fun writeUInt64(input: ULong): ByteArray = Pack.writeInt64LE(input.toLong())
 
         @JvmStatic
-        public fun varint(blob: ByteArray): ULong = varint(ByteArrayInput(blob))
+        @JvmOverloads
+        public fun varint(blob: ByteArray, rangeCheck: Boolean = true): ULong = varint(ByteArrayInput(blob), rangeCheck)
 
+        /**
+         * @param input stream to read from
+         * @param rangeCheck if true, perform the same range check as bitcoin core. Should be set to false when used as a generic number encoding
+         */
         @JvmStatic
-        public fun varint(input: Input): ULong {
+        @JvmOverloads
+        public fun varint(input: Input, rangeCheck: Boolean = true): ULong {
             val first = input.read()
-            return when {
-                first < 0xFD -> first.toULong()
-                first == 0xFD -> uint16(input).toULong()
-                first == 0xFE -> uint32(input).toULong()
-                first == 0xFF -> uint64(input)
+            val value = when {
+                first < 253 -> first.toULong()
+                first == 253 -> uint16(input).toULong().also { require(it >= 253u) { "non-canonical varint ($it encoded on 3 bytes)" } }
+                first == 254 -> uint32(input).toULong().also { require(it >= 0x10000u) { "non-canonical varint ($it encoded on 5 bytes)" } }
                 else -> {
-                    throw IllegalArgumentException("invalid first byte $first for varint type")
+                    uint64(input).also { require(it >= 0x100000000uL) { "non-canonical varint ($it encoded on 9 bytes)" } }
                 }
             }
+            require(!rangeCheck || value <= MAX_SIZE) { "varint $value exceeds the maximum size ($MAX_SIZE)" }
+            return value
         }
 
         @JvmStatic

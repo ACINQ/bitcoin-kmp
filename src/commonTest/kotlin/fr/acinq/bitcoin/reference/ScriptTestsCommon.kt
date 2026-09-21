@@ -77,7 +77,14 @@ class ScriptTestsCommon {
             [["51", 0.00000000], "0x4c 0x22 0x00204ae81572f06e1b88fd5ced7a1a000945432e83e1551e6f721ee9c00b8cc33260", "HASH160 0x14 0x72c44f957fc011d97e3406667dca5b1c930c4026 EQUAL", "P2SH,WITNESS", "WITNESS_MALLEATED_P2SH", "P2SH(P2WSH), redeem script pushed with OP_PUSHDATA1"],
             [ "a P2SH redeem script is a witness program only if the witness program is pushed with a direct push, and the version byte is OP_0 or OP_1-OP_16" ],
             [["51", 0.00000000], "0x23 0x004c204ae81572f06e1b88fd5ced7a1a000945432e83e1551e6f721ee9c00b8cc33260", "HASH160 0x14 0xcdcd15769e99f325875a362b7708e3083e3e13dd EQUAL", "P2SH,WITNESS", "WITNESS_UNEXPECTED", "P2SH redeem script with a non-minimal push of the witness program"],
-            [["51", 0.00000000], "0x22 0x4f204ae81572f06e1b88fd5ced7a1a000945432e83e1551e6f721ee9c00b8cc33260", "HASH160 0x14 0x13fa440633ed7801ce99e82807c91f886db25029 EQUAL", "P2SH,WITNESS", "WITNESS_UNEXPECTED", "P2SH redeem script with OP_1NEGATE as witness version"]
+            [["51", 0.00000000], "0x22 0x4f204ae81572f06e1b88fd5ced7a1a000945432e83e1551e6f721ee9c00b8cc33260", "HASH160 0x14 0x13fa440633ed7801ce99e82807c91f886db25029 EQUAL", "P2SH,WITNESS", "WITNESS_UNEXPECTED", "P2SH redeem script with OP_1NEGATE as witness version"],
+            [ "anyone can spend a P2A output with any witness: an empty witness is a standardness rule, not a consensus rule" ],
+            [[0.00000000], "", "1 0x02 0x4e73", "P2SH,WITNESS", "OK", "P2A with an empty witness"],
+            [["deadbeef", 0.00000000], "", "1 0x02 0x4e73", "P2SH,WITNESS", "OK", "P2A with witness stuffing"],
+            [["deadbeef", 0.00000000], "", "1 0x02 0x4e73", "P2SH,WITNESS,DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM", "OK", "P2A with witness stuffing is not an upgradable witness program"],
+           [[0.00000000], "0x04 0x51024e73", "HASH160 0x14 0x3b68dd0468ddab9d6b7d341e721ec1b386aa29b9 EQUAL", "P2SH,WITNESS", "OK", "P2SH-wrapped P2A is an upgradable witness program, not a P2A output"],
+            [["deadbeef", 0.00000000], "0x04 0x51024e73", "HASH160 0x14 0x3b68dd0468ddab9d6b7d341e721ec1b386aa29b9 EQUAL", "P2SH,WITNESS", "OK", "P2SH-wrapped P2A ignores the witness too"],
+            [[0.00000000], "0x04 0x51024e73", "HASH160 0x14 0x3b68dd0468ddab9d6b7d341e721ec1b386aa29b9 EQUAL", "P2SH,WITNESS,DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM", "DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM", "P2SH-wrapped P2A is discouraged"]
             ]                                  
        """.trimIndent()
         )

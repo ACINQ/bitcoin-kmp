@@ -147,8 +147,9 @@ class TransactionTestsCommon {
             .updateWitness(0, Script.witnessPay2wpkh(priv.publicKey(), sig0.byteVector()))
             .updateWitness(1, Script.witnessPay2anchor)
         Transaction.correctlySpends(childTx, listOf(parentTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-        // The anchor output MUST have an empty witness to be valid.
-        assertFails { Transaction.correctlySpends(childTx.updateWitness(1, ScriptWitness(listOf(ByteVector("deadbeef")))), listOf(parentTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS) }
+        // The anchor output SHOULD have an empty witness: that is a standardness rule, not a consensus rule, so script
+        // verification succeeds but the transaction won't be relayed ("witness stuffing")
+        Transaction.correctlySpends(childTx.updateWitness(1, ScriptWitness(listOf(ByteVector("deadbeef")))), listOf(parentTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
 
     @Test

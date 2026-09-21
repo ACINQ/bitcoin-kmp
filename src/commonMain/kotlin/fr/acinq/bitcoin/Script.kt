@@ -1568,7 +1568,7 @@ public object Script {
                     }
                 }
                 // Standard P2A script (see github.com/bitcoin/bitcoin/pull/30352).
-                witnessVersion == 1L && program.contentEquals(byteArrayOf(0x4e, 0x73)) -> require(witness == witnessPay2anchor) { "P2A output must be spent with an empty witness" }
+                !isP2sh && witnessVersion == 1L && program.contentEquals(byteArrayOf(0x4e, 0x73)) -> {}
                 (scriptFlag and ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM) != 0 -> throw IllegalArgumentException("Witness version $witnessVersion reserved for soft-fork upgrades")
                 // Higher version witness scripts return true for future softfork compatibility
                 else -> {}

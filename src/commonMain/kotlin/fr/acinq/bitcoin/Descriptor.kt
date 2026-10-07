@@ -64,25 +64,33 @@ public object Descriptor {
         return ret.toString()
     }
 
-    private fun getBIP84KeyPath(chainHash: BlockHash): Pair<String, Int> = when (chainHash) {
-        Block.Testnet4GenesisBlock.hash, Block.Testnet3GenesisBlock.hash, Block.RegtestGenesisBlock.hash -> "84'/1'/0'/0" to DeterministicWallet.tpub
-        Block.LivenetGenesisBlock.hash -> "84'/0'/0'/0" to DeterministicWallet.xpub
+    /** BIP84 account path (m/84'/coin_type'/0'), where receive and change addresses are derived at /0/i and /1/i. */
+    private fun getBIP84AccountPath(chainHash: BlockHash): Pair<String, Int> = when (chainHash) {
+        Block.Testnet4GenesisBlock.hash, Block.Testnet3GenesisBlock.hash, Block.RegtestGenesisBlock.hash, Block.SignetGenesisBlock.hash -> "84'/1'/0'" to DeterministicWallet.tpub
+        Block.LivenetGenesisBlock.hash -> "84'/0'/0'" to DeterministicWallet.xpub
         else -> error("invalid chain hash $chainHash")
     }
 
     @JvmStatic
     public fun BIP84Descriptors(chainHash: BlockHash, master: DeterministicWallet.ExtendedPrivateKey): Pair<String, String> {
-        val (keyPath, _) = getBIP84KeyPath(chainHash)
-        val accountPub = master.derivePrivateKey(KeyPath(keyPath)).extendedPublicKey
+        val (accountPath, _) = getBIP84AccountPath(chainHash)
+        val accountPub = master.derivePrivateKey(KeyPath(accountPath)).extendedPublicKey
         val fingerprint = master.fingerprint()
         return BIP84Descriptors(chainHash, fingerprint, accountPub)
     }
 
+    /**
+     * @param fingerprint master key fingerprint.
+     * @param accountPub BIP84 account public key, derived from the master key at m/84'/coin_type'/0'.
+     * @return the (receive, change) descriptors for this account.
+     */
     @JvmStatic
     public fun BIP84Descriptors(chainHash: BlockHash, fingerprint: Long, accountPub: DeterministicWallet.ExtendedPublicKey): Pair<String, String> {
-        val (keyPath, prefix) = getBIP84KeyPath(chainHash)
-        val accountDesc = "wpkh([${fingerprint.toString(16)}/$keyPath]${accountPub.encode(prefix)}/0/*)"
-        val changeDesc = "wpkh([${fingerprint.toString(16)}/$keyPath]${accountPub.encode(prefix)}/1/*)"
+        val (accountPath, prefix) = getBIP84AccountPath(chainHash)
+        // Key origin fingerprints are always 8 hex characters.
+        val keyOrigin = "[${fingerprint.toString(16).padStart(8, '0')}/$accountPath]"
+        val accountDesc = "wpkh($keyOrigin${accountPub.encode(prefix)}/0/*)"
+        val changeDesc = "wpkh($keyOrigin${accountPub.encode(prefix)}/1/*)"
         return Pair(
             "$accountDesc#${checksum(accountDesc)}",
             "$changeDesc#${checksum(changeDesc)}"

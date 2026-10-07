@@ -204,6 +204,9 @@ public object Bitcoin {
         return runCatching { Base58Check.decode(address) }.fold(
             onSuccess = {
                 when {
+                    // Both p2pkh and p2sh addresses encode a 20-bytes hash: anything else would yield an unspendable script.
+                    it.second.size != 20 -> Either.Left(BitcoinError.InvalidAddress)
+
                     it.first == Base58.Prefix.PubkeyAddressTestnet && (chainHash == Block.Testnet4GenesisBlock.hash || chainHash == Block.Testnet3GenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash || chainHash == Block.SignetGenesisBlock.hash) ->
                         Either.Right(Script.pay2pkh(it.second))
 

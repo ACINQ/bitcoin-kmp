@@ -113,6 +113,8 @@ public object DeterministicWallet {
             public fun decode(input: String, parentPath: KeyPath = KeyPath.empty): Pair<Int, ExtendedPrivateKey> {
                 val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
                 require(prefix == xprv || prefix == yprv || prefix == zprv || prefix == tprv || prefix == uprv || prefix == vprv) { "invalid prefix" }
+                // Serialized extended keys are 78 bytes long, including the 4 bytes prefix.
+                require(bin.size == 74) { "invalid extended key length" }
                 val bis = ByteArrayInput(bin)
                 val depth = bis.read()
                 val parent = Pack.int32BE(bis).toLong() and 0xffffffff
@@ -198,6 +200,8 @@ public object DeterministicWallet {
             public fun decode(input: String, parentPath: KeyPath = KeyPath.empty): Pair<Int, ExtendedPublicKey> {
                 val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
                 require(prefix == xpub || prefix == ypub || prefix == zpub || prefix == tpub || prefix == upub || prefix == vpub) { "invalid prefix" }
+                // Serialized extended keys are 78 bytes long, including the 4 bytes prefix.
+                require(bin.size == 74) { "invalid extended key length" }
                 val bis = ByteArrayInput(bin)
                 val depth = bis.read()
                 val parent = Pack.int32BE(bis).toLong() and 0xffffffff

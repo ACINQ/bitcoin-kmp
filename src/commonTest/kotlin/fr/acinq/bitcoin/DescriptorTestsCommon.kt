@@ -27,8 +27,26 @@ class DescriptorTestsCommon {
         val seed = ByteVector.fromHex("817a9c8e6ba36f083d7e68b5ee89ce74fde9ef294a724a5efc5cef2b88db057f")
         val master = DeterministicWallet.generate(seed)
         val (accountDesc, changeDesc) = Descriptor.BIP84Descriptors(Block.RegtestGenesisBlock.hash, master)
-        assertEquals("wpkh([189ef5fe/84'/1'/0'/0]tpubDFTu6FhLqfTBLMd7BvGkyH1h4XBw7XoKWfnNNWw5Sp8V6aC55EhgPTVNAYvBwBXQ8EGnMqaZi3dpdSzhMbD4Z7ivZiaVKNMUkXVjDU1CDuE/0/*)#uysr3s9y", accountDesc)
-        assertEquals("wpkh([189ef5fe/84'/1'/0'/0]tpubDFTu6FhLqfTBLMd7BvGkyH1h4XBw7XoKWfnNNWw5Sp8V6aC55EhgPTVNAYvBwBXQ8EGnMqaZi3dpdSzhMbD4Z7ivZiaVKNMUkXVjDU1CDuE/1/*)#ds4zv94u", changeDesc)
+        assertEquals("wpkh([189ef5fe/84'/1'/0']tpubDDsHdjGe26Kqr5QgesP2HFS7UTJs3uS39Lq66m4AytUmxM1sbe7qppMohp7awxBRAVdriHRUAoBZvfwpyqAhPHKPqmME82jZJ8zfVaHuVi1/0/*)#4eqzu535", accountDesc)
+        assertEquals("wpkh([189ef5fe/84'/1'/0']tpubDDsHdjGe26Kqr5QgesP2HFS7UTJs3uS39Lq66m4AytUmxM1sbe7qppMohp7awxBRAVdriHRUAoBZvfwpyqAhPHKPqmME82jZJ8zfVaHuVi1/1/*)#yd9rpppv", changeDesc)
+        assertEquals(Pair(accountDesc, changeDesc), Descriptor.BIP84Descriptors(Block.SignetGenesisBlock.hash, master))
+    }
+
+    @Test
+    fun `compute BIP84 descriptors -- reference test vector`() {
+        // https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki#test-vectors
+        val seed = MnemonicCode.toSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "")
+        val master = DeterministicWallet.generate(seed)
+        val (_, accountPub) = DeterministicWallet.ExtendedPublicKey.decode("zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs")
+        assertEquals(accountPub.publicKey, master.derivePrivateKey(KeyPath("m/84'/0'/0'")).publicKey)
+        val (accountDesc, changeDesc) = Descriptor.BIP84Descriptors(Block.LivenetGenesisBlock.hash, master)
+        assertEquals("wpkh([73c5da0a/84'/0'/0']xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V/0/*)#wc3n3van", accountDesc)
+        assertEquals("wpkh([73c5da0a/84'/0'/0']xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V/1/*)#lv5jvedt", changeDesc)
+        assertEquals(Pair(accountDesc, changeDesc), Descriptor.BIP84Descriptors(Block.LivenetGenesisBlock.hash, master.fingerprint(), accountPub))
+
+        // Fingerprints are always encoded on 8 hex characters, including leading zeroes.
+        val (paddedDesc, _) = Descriptor.BIP84Descriptors(Block.LivenetGenesisBlock.hash, 0x0a1b2c3dL, accountPub)
+        assertEquals("wpkh([0a1b2c3d/84'/0'/0']xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V/0/*)#hr5fztyr", paddedDesc)
     }
 
 }

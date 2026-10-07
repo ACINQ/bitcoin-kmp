@@ -869,7 +869,12 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                                     val derivationPath = KeyPath((0 until depth).map { i -> Pack.int32LE(it.value.slice(4 * (i + 1), 4 * (i + 2)).toByteArray()).toUInt().toLong() })
                                     when {
                                         derivationPath.lastChildNumber != childNumber -> return Either.Left(ParseFailure.InvalidExtendedPublicKey("<xpub> last child number mismatch"))
-                                        else -> ExtendedPublicKeyWithMaster(prefix, masterKeyFingerprint, DeterministicWallet.ExtendedPublicKey(publicKey, chainCode, depth, derivationPath, parent))
+                                        else -> {
+                                            val extendedPublicKey = runCatching { DeterministicWallet.ExtendedPublicKey(publicKey, chainCode, depth, derivationPath, parent) }.getOrElse { e ->
+                                                return Either.Left(ParseFailure.InvalidExtendedPublicKey(e.message ?: "invalid extended public key"))
+                                            }
+                                            ExtendedPublicKeyWithMaster(prefix, masterKeyFingerprint, extendedPublicKey)
+                                        }
                                     }
                                 }
                             }
@@ -1092,11 +1097,11 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
                 val taprootDerivationPaths = known.filter { it.key[0] == 0x07.toByte() }.map {
                     when {
                         it.key.size() != 33 -> return Either.Left(ParseFailure.InvalidTxOutput("taproot derivation path key must contain exactly 32 bytes"))
-                        else -> {
+                        else -> runCatching {
                             val xonlyPublicKey = XonlyPublicKey(it.key.drop(1).toByteArray().byteVector32())
                             val path = TaprootBip32DerivationPath.read(it.value.toByteArray())
                             xonlyPublicKey to path
-                        }
+                        }.getOrElse { return Either.Left(ParseFailure.InvalidTxOutput("invalid taproot derivation path")) }
                     }
                 }.toMap()
                 createOutput(redeemScript, witnessScript, derivationPaths, taprootInternalKey, taprootDerivationPaths, unknown)
@@ -1186,16 +1191,19 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
 
         private fun readDataEntry(input: fr.acinq.bitcoin.io.Input): Either<ReadEntryFailure, DataEntry> {
             if (input.availableBytes == 0) return Either.Left(ReadEntryFailure.InvalidData)
-            val keyLength = BtcSerializer.varint(input).toInt()
+            val keyLength = readLength(input) ?: return Either.Left(ReadEntryFailure.InvalidData)
             if (keyLength == 0) return Either.Left(ReadEntryFailure.EndOfDataMap)
             val key = input.readNBytes(keyLength) ?: return Either.Left(ReadEntryFailure.InvalidData)
 
             if (input.availableBytes == 0) return Either.Left(ReadEntryFailure.InvalidData)
-            val valueLength = BtcSerializer.varint(input).toInt()
+            val valueLength = readLength(input) ?: return Either.Left(ReadEntryFailure.InvalidData)
             val value = input.readNBytes(valueLength) ?: return Either.Left(ReadEntryFailure.InvalidData)
 
             return Either.Right(DataEntry(ByteVector(key), ByteVector(value)))
         }
+
+        /** Reads a compact size length: varint() throws on truncated, non-canonical or oversized values, which must not escape [read]. */
+        private fun readLength(input: fr.acinq.bitcoin.io.Input): Int? = runCatching { BtcSerializer.varint(input).toInt() }.getOrNull()
     }
 
 }

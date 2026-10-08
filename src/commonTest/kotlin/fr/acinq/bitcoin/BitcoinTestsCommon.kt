@@ -96,6 +96,15 @@ class BitcoinTestsCommon {
         assertEquals(addressToPublicKeyScript(Block.Testnet3GenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))).left, BitcoinError.ChainHashMismatch)
         assertEquals(addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))).left, BitcoinError.ChainHashMismatch)
         assertEquals(addressToPublicKeyScript(Block.SignetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, Crypto.hash160(script))).left, BitcoinError.ChainHashMismatch)
+
+        // invalid hash length: p2sh would yield an unspendable script, p2pkh would throw
+        listOf(0, 19, 21, 32).forEach { size ->
+            val hash = ByteArray(size) { 0x42 }
+            assertEquals(addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddress, hash)).left, BitcoinError.InvalidAddress)
+            assertEquals(addressToPublicKeyScript(Block.Testnet4GenesisBlock.hash, Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, hash)).left, BitcoinError.InvalidAddress)
+            assertEquals(addressToPublicKeyScript(Block.LivenetGenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddress, hash)).left, BitcoinError.InvalidAddress)
+            assertEquals(addressToPublicKeyScript(Block.Testnet4GenesisBlock.hash, Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, hash)).left, BitcoinError.InvalidAddress)
+        }
     }
 
     @Test

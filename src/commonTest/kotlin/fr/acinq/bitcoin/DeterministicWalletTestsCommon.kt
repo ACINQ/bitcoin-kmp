@@ -226,12 +226,26 @@ class DeterministicWalletTestsCommon {
         testCases.forEach { testCase ->
             when {
                 testCase.startsWith("xpub") -> assertFails { DeterministicWallet.ExtendedPublicKey.decode(testCase) }
-                testCase.startsWith("xpriv") -> assertFails { DeterministicWallet.ExtendedPrivateKey.decode(testCase) }
+                testCase.startsWith("xprv") -> assertFails { DeterministicWallet.ExtendedPrivateKey.decode(testCase) }
                 else -> {
                     assertFails { DeterministicWallet.ExtendedPublicKey.decode(testCase) }
                     assertFails { DeterministicWallet.ExtendedPrivateKey.decode(testCase) }
                 }
             }
+        }
+    }
+
+    @Test
+    fun `reject extended keys that are not 78 bytes long`() {
+        val m = generate(ByteVector("000102030405060708090a0b0c0d0e0f"))
+        val xprv = Base58Check.decodeWithIntPrefix(m.encode(testnet = false)).second
+        val xpub = Base58Check.decodeWithIntPrefix(m.extendedPublicKey.encode(testnet = false)).second
+        // A truncated private key used to be padded with zeroes, which yields a different but perfectly valid key.
+        listOf(xprv.dropLast(1).toByteArray(), xprv + byteArrayOf(0)).forEach { bin ->
+            assertFails { DeterministicWallet.ExtendedPrivateKey.decode(Base58Check.encode(DeterministicWallet.xprv, bin)) }
+        }
+        listOf(xpub.dropLast(1).toByteArray(), xpub + byteArrayOf(0)).forEach { bin ->
+            assertFails { DeterministicWallet.ExtendedPublicKey.decode(Base58Check.encode(DeterministicWallet.xpub, bin)) }
         }
     }
 

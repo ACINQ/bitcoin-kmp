@@ -298,12 +298,34 @@ class DeterministicWalletTestsCommon {
     }
 
     @Test
+    fun `reject child numbers that are not unsigned 32-bit integers`() {
+        assertEquals(0x80000000L, hardened(0))
+        assertEquals(0xFFFFFFFFL, hardened(0x7FFFFFFFL))
+        listOf(-1L, 0x80000000L).forEach { index -> assertFails { hardened(index) } }
+
+        assertEquals(KeyPath(listOf(0x7FFFFFFFL, 0xFFFFFFFFL)), KeyPath("m/2147483647/2147483647'"))
+        // Path components are indexes between 0 and 2^31 - 1: 2147483648' used to be parsed as 2^32, which was then
+        // truncated to 0 in serialized keys while still being derived as a hardened child.
+        listOf("m/2147483648'", "m/2147483648h", "m/2147483648", "m/4294967296", "m/-1", "m/-1'", "m//1", "m/'", "m/0''").forEach { path ->
+            assertFails { KeyPath(path) }
+        }
+        listOf(-1L, 0x100000000L).forEach { index -> assertFails { KeyPath(listOf(index)) } }
+
+        val master = generate(ByteVector("000102030405060708090a0b0c0d0e0f"))
+        listOf(-1L, 0x100000000L, 0x100000001L).forEach { index ->
+            assertFails { master.derivePrivateKey(index) }
+            assertFails { master.extendedPublicKey.derivePublicKey(index) }
+        }
+        assertEquals(KeyPath("m/2147483647'"), master.derivePrivateKey(0xFFFFFFFFL).path)
+    }
+
+    @Test
     fun `derive private keys`() {
         val random = Random
         for (i in 0..50) {
             val master = generate(random.nextBytes(32))
             for (j in 0..50) {
-                val index = random.nextLong()
+                val index = random.nextLong(0, 0x100000000L)
                 val priv = master.derivePrivateKey(index)
 
                 val encodedPriv = priv.encode(DeterministicWallet.tprv)

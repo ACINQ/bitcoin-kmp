@@ -17,6 +17,7 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.DeterministicWallet.hardened
+import fr.acinq.bitcoin.DeterministicWallet.hardenedKeyIndex
 import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.io.ByteArrayInput
 import fr.acinq.bitcoin.io.ByteArrayOutput
@@ -30,8 +31,14 @@ import kotlin.jvm.JvmStatic
 public object DeterministicWallet {
     public const val hardenedKeyIndex: Long = 0x80000000L
 
+    /** Child numbers are unsigned 32-bit integers: values outside that range would be silently truncated when serialized. */
+    internal fun isValidChildNumber(index: Long): Boolean = index in 0..0xFFFFFFFFL
+
     @JvmStatic
-    public fun hardened(index: Long): Long = hardenedKeyIndex + index
+    public fun hardened(index: Long): Long {
+        require(index in 0 until hardenedKeyIndex) { "hardened index must be between 0 and 2^31 - 1" }
+        return hardenedKeyIndex + index
+    }
 
     @JvmStatic
     public fun isHardened(index: Long): Boolean = index >= hardenedKeyIndex
@@ -58,6 +65,7 @@ public object DeterministicWallet {
          * @return the derived private key at the specified index
          */
         public fun derivePrivateKey(index: Long): ExtendedPrivateKey {
+            require(isValidChildNumber(index)) { "child number must be between 0 and 2^32 - 1" }
             val I = if (isHardened(index)) {
                 val data = arrayOf(0.toByte()).toByteArray() + secretkeybytes.toByteArray() + Pack.writeInt32BE(index.toInt())
                 Crypto.hmac512(chaincode.toByteArray(), data)
@@ -150,6 +158,7 @@ public object DeterministicWallet {
          * @return the derived public key at the specified index
          */
         public fun derivePublicKey(index: Long): ExtendedPublicKey {
+            require(isValidChildNumber(index)) { "child number must be between 0 and 2^32 - 1" }
             require(!isHardened(index)) { "Cannot derive public keys from public hardened keys" }
 
             val I = Crypto.hmac512(
@@ -262,6 +271,10 @@ public object DeterministicWallet {
 public data class KeyPath(@JvmField val path: List<Long>) {
     public constructor(path: String) : this(computePath(path))
 
+    init {
+        require(path.all { DeterministicWallet.isValidChildNumber(it) }) { "child numbers must be between 0 and 2^32 - 1" }
+    }
+
     public val lastChildNumber: Long get() = if (path.isEmpty()) 0L else path.last()
 
     public fun derive(number: Long): KeyPath = KeyPath(path + listOf(number))
@@ -287,7 +300,13 @@ public data class KeyPath(@JvmField val path: List<Long>) {
 
         @JvmStatic
         public fun computePath(path: String): List<Long> {
-            fun toNumber(value: String): Long = if (value.last() == '\'' || value.last() == 'h') hardened(value.dropLast(1).toLong()) else value.toLong()
+            fun toNumber(value: String): Long {
+                val isHardened = value.endsWith('\'') || value.endsWith('h')
+                // Hardened or not, a path component is an index between 0 and 2^31 - 1, as in Bitcoin Core.
+                val index = (if (isHardened) value.dropLast(1) else value).toLongOrNull()
+                require(index != null && index in 0 until hardenedKeyIndex) { "invalid key path component: '$value'" }
+                return if (isHardened) hardened(index) else index
+            }
 
             val path1 = path.removePrefix("m").removePrefix("/")
             return if (path1.isEmpty()) {

@@ -18,9 +18,11 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.SigHash.SIGHASH_ALL
 import fr.acinq.secp256k1.Hex
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TransactionTestsCommon {
@@ -300,4 +302,401 @@ class TransactionTestsCommon {
         assertEquals(hex, tx.toString())
     }
 
+
+    @Test
+    fun `witness standardness`() {
+        val random = Random
+        val key = PrivateKey(random.nextBytes(32))
+        val pubkey = key.publicKey()
+
+        fun makeTxs(script: List<ScriptElt>): Pair<Transaction, Transaction> {
+            val tx = Transaction(version = 2, listOf(), listOf(TxOut(Satoshi(0), script)), lockTime = 0)
+            val spendingTx = Transaction(version = 2, listOf(TxIn(OutPoint(tx, 0), ByteVector.empty, TxIn.SEQUENCE_FINAL)), listOf(TxOut(Satoshi(0), script)), lockTime = 0)
+            return Pair(tx, spendingTx)
+        }
+
+        // Coinbase transactions are always skipped, even with a witness.
+        run {
+            val coinbase = Transaction(
+                version = 1,
+                listOf(TxIn.coinbase(listOf(OP_1, OP_1))),
+                listOf(TxOut(Satoshi(0), listOf(OP_1))),
+                lockTime = 0
+            ).updateWitness(0, ScriptWitness(listOf(ByteVector32.Zeroes)))
+            assertTrue { coinbase.isCoinbase() }
+            assertTrue { coinbase.isWitnessStandard(mapOf()) }
+        }
+
+        // Legacy outputs: fine without a witness, non-standard with one.
+        run {
+            val legacyScripts = listOf(
+                listOf(OP_PUSHDATA(pubkey), OP_CHECKSIG),
+                Script.pay2pkh(pubkey),
+                listOf(OP_1)
+            )
+            legacyScripts.forEach { script ->
+                val (tx, spendingTx) = makeTxs(script)
+                assertTrue { spendingTx.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+                val spendingTx1 = spendingTx.updateWitness(0, ScriptWitness(listOf(ByteVector.empty)))
+                assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            }
+        }
+
+        // P2A: witness stuffing is non-standard.
+        run {
+            val (tx, spendingTx) = makeTxs(Script.pay2anchor)
+            assertTrue { spendingTx.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            val spendingTx1 = spendingTx.updateWitness(0, ScriptWitness.empty.push(Hex.decode("0x42")))
+            assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+
+        // simple P2SH
+        run {
+            val script = Script.pay2pkh(pubkey)
+            val (tx, spendingTx) = makeTxs(Script.pay2sh(script))
+            val sig = spendingTx.signInput(0, script, SIGHASH_ALL, tx.txOut[0].amount, SigVersion.SIGVERSION_BASE, key)
+            val signedSpendTx = spendingTx.updateSigScript(0, listOf(OP_PUSHDATA(sig), OP_PUSHDATA(pubkey), OP_PUSHDATA(Script.write(script))))
+            signedSpendTx.correctlySpends(listOf(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+            assertTrue { signedSpendTx.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            // The redeem script is not a witness program, so a witness is non-standard.
+            val signedSpendingTx1 = signedSpendTx.updateWitness(0, ScriptWitness(listOf(ByteVector.empty)))
+            assertFalse { signedSpendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+
+        // P2WPKH wrapped in P2SH
+        run {
+            val script = Script.pay2wpkh(pubkey)
+            val (tx, spendingTx) = makeTxs(Script.pay2sh(script))
+            val sig = spendingTx.signInput(0, Script.pay2pkh(pubkey), SIGHASH_ALL, tx.txOut[0].amount, SigVersion.SIGVERSION_WITNESS_V0, key)
+            val signedSpendTx = spendingTx
+                .updateWitness(0, ScriptWitness(listOf(sig.byteVector(), pubkey.value)))
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(script))))
+            signedSpendTx.correctlySpends(listOf(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+            assertTrue { signedSpendTx.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            // Witness without the redeem script in the scriptSig.
+            val spendingTx1 = spendingTx.updateWitness(0, ScriptWitness(listOf(sig.byteVector(), pubkey.value)))
+            assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+
+        // P2SH with a witness must reveal a witness program as redeem script.
+        run {
+            val script = listOf(OP_DROP, OP_1)
+            val (tx, spendingTx) = makeTxs(Script.pay2sh(script))
+            assertTrue { spendingTx.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            // Empty scriptSig, no redeem script.
+            val spendingTx1 = spendingTx.updateWitness(0, ScriptWitness.empty.push(Hex.decode("0x01")))
+            assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            // scriptSig fails evaluation.
+            val spendingTx2 = spendingTx
+                .updateWitness(0, ScriptWitness.empty.push(Hex.decode("0x01")))
+                .updateSigScript(0, listOf(OP_RETURN))
+            assertFalse { spendingTx2.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            // Redeem script is not a witness program.
+            val spendingTx3 = spendingTx
+                .updateWitness(0, ScriptWitness.empty.push(Hex.decode("0x01")))
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(script))))
+            assertFalse { spendingTx3.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            // scriptSig fails evaluation, even after pushing a witness program.
+            val wp = Script.write(Script.pay2wpkh(pubkey))
+            val spendingTx4 = spendingTx
+                .updateWitness(0, ScriptWitness.empty.push(Hex.decode("0x01")))
+                .updateSigScript(0, listOf(OP_PUSHDATA(wp), OP_RETURN))
+            assertFalse { spendingTx4.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            // The redeem script is the last element pushed.
+            val spendingTx5 = spendingTx
+                .updateWitness(0, ScriptWitness.empty.push(Hex.decode("0x01")))
+                .updateSigScript(0, listOf(OP_PUSHDATA(wp), OP_PUSHDATA(Script.write(script))))
+            assertFalse { spendingTx5.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            // Without a witness, the scriptSig is not checked.
+            val spendingTx6 = spendingTx5.updateWitness(0, ScriptWitness.empty)
+            assertTrue { spendingTx6.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+
+        // P2WPKH, native and P2SH-wrapped: no policy limits on the witness.
+        run {
+            val (tx, spendingTx) = makeTxs(Script.pay2wpkh(pubkey))
+            val spendingTx1 = spendingTx.updateWitness(0, ScriptWitness(listOf(ByteArray(1000) { 0x42 }.byteVector(), pubkey.value)))
+            assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+        run {
+            val (tx, spendingTx) = makeTxs(Script.pay2sh(Script.pay2wpkh(pubkey)))
+            val spendingTx1 = spendingTx
+                .updateWitness(0, ScriptWitness(listOf(ByteArray(1000) { 0x42 }.byteVector(), pubkey.value)))
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(Script.pay2wpkh(pubkey)))))
+            assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+
+        // P2WSH, native and P2SH-wrapped: limits on the witness script size
+        val maxSizeScript = List(Script.MAX_STANDARD_P2WSH_SCRIPT_SIZE) { OP_NOP }
+        run {
+            val (tx, spendingTx) = makeTxs(Script.pay2wsh(maxSizeScript))
+
+            val spendingTx1 = spendingTx.updateWitness(0, ScriptWitness.empty.push(maxSizeScript))
+            assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            val spendingTx2 = spendingTx.updateWitness(0, ScriptWitness.empty.push(maxSizeScript + OP_NOP))
+            assertFalse { spendingTx2.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+        run {
+            val (tx, spendingTx) = makeTxs(Script.pay2sh(Script.pay2wsh(maxSizeScript)))
+
+            val spendingTx1 = spendingTx
+                .updateWitness(0, ScriptWitness.empty.push(maxSizeScript))
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(Script.pay2wsh(maxSizeScript)))))
+            assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            val spendingTx2 = spendingTx
+                .updateWitness(0, ScriptWitness.empty.push(maxSizeScript + OP_NOP))
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(Script.pay2wsh(maxSizeScript)))))
+            assertFalse { spendingTx2.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+
+        // P2WSH, native and P2SH-wrapped: limits on the number of stack items and the size of each stack item
+        val witnessScript = listOf(OP_DROP, OP_1)
+        val maxStack = List(Script.MAX_STANDARD_P2WSH_STACK_ITEMS) { ByteVector.fromHex("0x01") }
+        run {
+            val (tx, spendingTx) = makeTxs(Script.pay2wsh(witnessScript))
+
+            val spendingTx1 = spendingTx.updateWitness(0, ScriptWitness(maxStack).push(witnessScript))
+            assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            val spendingTx2 = spendingTx.updateWitness(0, ScriptWitness(maxStack + ByteVector.fromHex(("0x01"))).push(witnessScript))
+            assertFalse { spendingTx2.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            val spendingTx3 = spendingTx.updateWitness(0, ScriptWitness(listOf(ByteArray(Script.MAX_STANDARD_P2WSH_STACK_ITEM_SIZE) { 0x42 }.byteVector())).push(witnessScript))
+            assertTrue { spendingTx3.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            val spendingTx4 = spendingTx.updateWitness(0, ScriptWitness(listOf(ByteArray(Script.MAX_STANDARD_P2WSH_STACK_ITEM_SIZE + 1) { 0x42 }.byteVector())).push(witnessScript))
+            assertFalse { spendingTx4.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            val spendingTx5 = spendingTx.updateWitness(0, ScriptWitness(listOf(ByteVector.fromHex("0x01"), ByteArray(Script.MAX_STANDARD_P2WSH_STACK_ITEM_SIZE + 1) { 0x42 }.byteVector(), ByteVector.fromHex("0x01"))).push(witnessScript))
+            assertFalse { spendingTx5.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+        run {
+            val (tx, spendingTx) = makeTxs(Script.pay2sh(Script.pay2wsh(witnessScript)))
+
+            val spendingTx1 = spendingTx
+                .updateWitness(0, ScriptWitness(maxStack).push(witnessScript))
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(Script.pay2wsh(witnessScript)))))
+            assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            val spendingTx2 = spendingTx
+                .updateWitness(0, ScriptWitness(maxStack + ByteVector.fromHex(("0x01"))).push(witnessScript))
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(Script.pay2wsh(witnessScript)))))
+            assertFalse { spendingTx2.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            val spendingTx3 = spendingTx
+                .updateWitness(0, ScriptWitness(listOf(ByteArray(Script.MAX_STANDARD_P2WSH_STACK_ITEM_SIZE) { 0x42 }.byteVector())).push(witnessScript))
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(Script.pay2wsh(witnessScript)))))
+            assertTrue { spendingTx3.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            val spendingTx4 = spendingTx
+                .updateWitness(0, ScriptWitness(listOf(ByteArray(Script.MAX_STANDARD_P2WSH_STACK_ITEM_SIZE + 1) { 0x42 }.byteVector())).push(witnessScript))
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(Script.pay2wsh(witnessScript)))))
+            assertFalse { spendingTx4.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            val spendingTx5 = spendingTx
+                .updateWitness(0, ScriptWitness(listOf(ByteVector.fromHex("0x01"), ByteArray(Script.MAX_STANDARD_P2WSH_STACK_ITEM_SIZE + 1) { 0x42 }.byteVector(), ByteVector.fromHex("0x01"))).push(witnessScript))
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(Script.pay2wsh(witnessScript)))))
+            assertFalse { spendingTx5.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+
+        val annex = byteArrayOf(Script.ANNEX_TAG.toByte()).byteVector()
+
+        // P2TR key path spend: no limit on the element size, but annexes are non-standard.
+        run {
+            val (tx, spendingTx) = makeTxs(Script.pay2tr(pubkey.xOnly(), Crypto.TaprootTweak.KeyPathTweak))
+            val spendingTx1 = spendingTx.updateWitness(0, ScriptWitness(listOf(ByteArray(1000) { 0x42 }.byteVector())))
+            assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            // A single element is never an annex.
+            val spendingTx2 = spendingTx.updateWitness(0, ScriptWitness(listOf(annex)))
+            assertTrue { spendingTx2.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            val spendingTx3 = spendingTx.updateWitness(0, ScriptWitness(listOf(ByteArray(64) { 0x42 }.byteVector(), annex)))
+            assertFalse { spendingTx3.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+
+        val maxItem = ByteArray(Script.MAX_STANDARD_TAPSCRIPT_STACK_ITEM_SIZE) { 0x42 }.byteVector()
+        val tooBigItem = ByteArray(Script.MAX_STANDARD_TAPSCRIPT_STACK_ITEM_SIZE + 1) { 0x42 }.byteVector()
+        val controlBlock = ByteArray(33) { Script.TAPROOT_LEAF_TAPSCRIPT.toByte() }
+
+        // P2TR script path spend.
+        run {
+            val scriptTree = ScriptTree.Leaf(witnessScript)
+            val (tx, spendingTx) = makeTxs(Script.pay2tr(pubkey.xOnly(), scriptTree))
+
+            // The script itself and the control block are not subject to the stack item size limit.
+            run {
+                val witness = ScriptWitness(listOf(maxItem))
+                    .push(List(1000) { OP_NOP }) // script that is larger than MAX_STANDARD_TAPSCRIPT_STACK_ITEM_SIZE
+                    .push(controlBlock)
+                val spendingTx1 = spendingTx.updateWitness(0, witness)
+                assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            }
+            run {
+                val witness = ScriptWitness(listOf(maxItem))
+                    .push(witnessScript)
+                    .push(ByteArray(33 + 32 * 10) { Script.TAPROOT_LEAF_TAPSCRIPT.toByte() }) // big control block
+                val spendingTx1 = spendingTx.updateWitness(0, witness)
+                assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            }
+
+            // Tapscript stack items are limited in size.
+            run {
+                val witness = ScriptWitness(listOf(tooBigItem))
+                    .push(witnessScript)
+                    .push(controlBlock)
+                val spendingTx1 = spendingTx.updateWitness(0, witness)
+                assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            }
+            run {
+                val witness = ScriptWitness(listOf(maxItem, tooBigItem, maxItem))
+                    .push(witnessScript)
+                    .push(controlBlock)
+                val spendingTx1 = spendingTx.updateWitness(0, witness)
+                assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            }
+
+            // The parity bit of the control block doesn't affect the leaf version.
+            run {
+                val witness = ScriptWitness(listOf(tooBigItem))
+                    .push(witnessScript)
+                    .push(ByteArray(33) { (Script.TAPROOT_LEAF_TAPSCRIPT or 1).toByte() })
+                val spendingTx1 = spendingTx.updateWitness(0, witness)
+                assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            }
+
+            // Stack items for unknown leaf versions are not limited in size.
+            run {
+                val witness = ScriptWitness(listOf(tooBigItem))
+                    .push(witnessScript)
+                    .push(ByteArray(33) { 0xc2.toByte() })
+                val spendingTx1 = spendingTx.updateWitness(0, witness)
+                assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            }
+
+            // An empty control block is non-standard.
+            run {
+                val witness = ScriptWitness(listOf(maxItem))
+                    .push(witnessScript)
+                    .push(ByteArray(0))
+                val spendingTx1 = spendingTx.updateWitness(0, witness)
+                assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            }
+
+            // Annexes are non-standard on the script path too.
+            run {
+                val witness = ScriptWitness(listOf(maxItem))
+                    .push(witnessScript)
+                    .push(controlBlock)
+                    .push(byteArrayOf(Script.ANNEX_TAG.toByte(), 0x42))
+                val spendingTx1 = spendingTx.updateWitness(0, witness)
+                assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+            }
+        }
+
+        // P2SH-wrapped P2TR is not a Taproot spend, so the Taproot policy rules do not apply.
+        run {
+            val p2tr = Script.pay2tr(pubkey.xOnly(), Crypto.TaprootTweak.KeyPathTweak)
+            val (tx, spendingTx) = makeTxs(Script.pay2sh(p2tr))
+
+            val spendingTx1 = spendingTx
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(p2tr))))
+                .updateWitness(0, ScriptWitness.empty.push(ByteArray(64) { 0x42 }).push(annex))
+
+            assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+
+            val spendingTx2 = spendingTx
+                .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(p2tr))))
+                .updateWitness(0, ScriptWitness.empty.push(tooBigItem).push(witnessScript).push(controlBlock))
+
+            assertTrue { spendingTx2.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+        }
+
+        // Undefined witness programs, native and P2SH-wrapped, are not checked here.
+        run {
+            val scripts = listOf(
+                listOf(OP_2, OP_PUSHDATA(pubkey.xOnly())),
+                listOf(OP_1, OP_PUSHDATA(byteArrayOf(0x42, 0x42))),
+            )
+            scripts.forEach { script ->
+                run {
+                    val (tx, spendingTx) = makeTxs(script)
+                    val spendingTx1 = spendingTx
+                        .updateWitness(0, ScriptWitness.empty.push(tooBigItem).push(witnessScript).push(controlBlock).push(annex))
+                    assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+                }
+                run {
+                    val (tx, spendingTx) = makeTxs(Script.pay2sh(script))
+                    val spendingTx1 = spendingTx
+                        .updateWitness(0, ScriptWitness.empty.push(tooBigItem).push(witnessScript).push(controlBlock).push(annex))
+                        .updateSigScript(0, listOf(OP_PUSHDATA(Script.write(script))))
+                    assertTrue { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0])) }
+                }
+            }
+        }
+
+        // Unparseable scriptPubKey with a witness is non-standard (and must not throw).
+        run {
+            val (_, spendingTx) = makeTxs(listOf(OP_1))
+            val prevout = TxOut(Satoshi(0), ByteVector("4c05aa")) // truncated OP_PUSHDATA1
+            val spendingTx1 = spendingTx.updateWitness(0, ScriptWitness.empty.push(byteArrayOf(0x01)))
+            assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to prevout)) }
+        }
+
+        // Non-canonical P2SH-like scriptPubKey (OP_PUSHDATA1 for the hash) is not P2SH, so its witness is non-standard.
+        run {
+            val p2wpkh = Script.write(Script.pay2wpkh(pubkey))
+            val prevout = TxOut(Satoshi(0), ByteVector(byteArrayOf(OP_HASH160.code.toByte(), OP_PUSHDATA1.code.toByte(), 0x14) + Crypto.hash160(p2wpkh) + byteArrayOf(OP_EQUAL.code.toByte())))
+            val (_, spendingTx) = makeTxs(listOf(OP_1))
+            val spendingTx1 = spendingTx
+                .updateSigScript(0, listOf(OP_PUSHDATA(p2wpkh)))
+                .updateWitness(0, ScriptWitness(listOf(ByteArray(64) { 0x42 }.byteVector(), pubkey.value)))
+            assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to prevout)) }
+        }
+
+        // Non-canonical P2A-like scriptPubKey (OP_PUSHDATA1 for the program) is not a witness program, so its witness is non-standard.
+        run {
+            val prevout = TxOut(Satoshi(0), ByteVector("514c024e73"))
+            assertFalse { Script.isPay2Anchor(prevout.publicKeyScript) }
+            val (_, spendingTx) = makeTxs(listOf(OP_1))
+            val spendingTx1 = spendingTx.updateWitness(0, ScriptWitness.empty.push(byteArrayOf(0x42)))
+            assertFalse { spendingTx1.isWitnessStandard(mapOf(spendingTx.txIn[0].outPoint to prevout)) }
+        }
+
+        // A single non-standard input makes the whole transaction non-standard.
+        run {
+            val p2tr = Script.pay2tr(pubkey.xOnly(), Crypto.TaprootTweak.KeyPathTweak)
+            val tx = Transaction(
+                version = 2, listOf(), txOut = listOf(
+                    TxOut(Satoshi(0), p2tr),
+                    TxOut(Satoshi(0), Script.pay2pkh(pubkey)),
+                ),
+                lockTime = 0
+            )
+            val spendingTx = Transaction(
+                version = 2,
+                txIn = listOf(
+                    TxIn(OutPoint(tx, 0), ByteVector.empty, TxIn.SEQUENCE_FINAL),
+                    TxIn(OutPoint(tx, 1), ByteVector.empty, TxIn.SEQUENCE_FINAL)
+                ),
+                txOut = listOf(TxOut(Satoshi(0), p2tr)), lockTime = 0
+            )
+            val mapInputs = mapOf(spendingTx.txIn[0].outPoint to tx.txOut[0], spendingTx.txIn[1].outPoint to tx.txOut[1])
+            val spendingTx1 = spendingTx
+                .updateWitness(0, ScriptWitness.empty.push(maxItem).push(witnessScript).push(controlBlock))
+            assertTrue { spendingTx1.isWitnessStandard(mapInputs) }
+
+            val spendingTx2 = spendingTx1
+                .updateWitness(1, ScriptWitness.empty.push(byteArrayOf(0x01)))
+            assertFalse { spendingTx2.isWitnessStandard(mapInputs) }
+
+            val spendingTx3 = spendingTx
+                .updateWitness(0, ScriptWitness.empty.push(tooBigItem).push(witnessScript).push(controlBlock))
+            assertFalse { spendingTx3.isWitnessStandard(mapInputs) }
+        }
+    }
 }

@@ -20,7 +20,6 @@ import fr.acinq.bitcoin.*
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFails
 import kotlin.test.fail
 
 class TransactionTestsCommon {

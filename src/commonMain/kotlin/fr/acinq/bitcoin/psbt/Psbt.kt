@@ -1166,20 +1166,24 @@ public data class Psbt(@JvmField val global: Global, @JvmField val inputs: List<
             object EndOfDataMap : ReadEntryFailure()
         }
 
-        private tailrec fun readDataMap(input: fr.acinq.bitcoin.io.Input, entries: List<DataEntry> = listOf()): Either<ReadEntryFailure, List<DataEntry>> {
-            return when (val result = readDataEntry(input)) {
-                is Either.Right -> readDataMap(input, entries + result.value)
-                is Either.Left -> when (result.value) {
-                    is ReadEntryFailure.EndOfDataMap -> {
-                        if (entries.map { it.key }.toSet().size != entries.size) {
-                            Either.Left(ReadEntryFailure.DuplicateKeys)
-                        } else {
-                            Either.Right(entries)
+        private fun readDataMap(input: fr.acinq.bitcoin.io.Input): Either<ReadEntryFailure, List<DataEntry>> {
+            // NB: entries are accumulated in a mutable list, copying an immutable list for each entry makes parsing quadratic in the number of entries.
+            val entries = ArrayList<DataEntry>()
+            while (true) {
+                when (val result = readDataEntry(input)) {
+                    is Either.Right -> entries.add(result.value)
+                    is Either.Left -> return when (result.value) {
+                        is ReadEntryFailure.EndOfDataMap -> {
+                            if (entries.map { it.key }.toSet().size != entries.size) {
+                                Either.Left(ReadEntryFailure.DuplicateKeys)
+                            } else {
+                                Either.Right(entries)
+                            }
                         }
-                    }
 
-                    is ReadEntryFailure.InvalidData -> Either.Left(ReadEntryFailure.InvalidData)
-                    else -> Either.Left(result.value)
+                        is ReadEntryFailure.InvalidData -> Either.Left(ReadEntryFailure.InvalidData)
+                        else -> Either.Left(result.value)
+                    }
                 }
             }
         }

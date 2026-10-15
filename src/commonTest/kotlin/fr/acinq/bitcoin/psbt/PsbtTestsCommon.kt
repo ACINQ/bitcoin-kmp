@@ -22,6 +22,7 @@ import fr.acinq.bitcoin.SigHash.SIGHASH_ANYONECANPAY
 import fr.acinq.bitcoin.SigHash.SIGHASH_DEFAULT
 import fr.acinq.bitcoin.SigHash.SIGHASH_NONE
 import fr.acinq.bitcoin.SigHash.SIGHASH_SINGLE
+import fr.acinq.bitcoin.crypto.Pack
 import fr.acinq.bitcoin.utils.Either
 import fr.acinq.bitcoin.utils.flatMap
 import fr.acinq.secp256k1.Hex
@@ -1732,6 +1733,21 @@ class PsbtTestsCommon {
             .finalizeWitnessInput(0, ScriptWitness(listOf(signed.sig)))
             .flatMap { it.extract() }.right!!
         Transaction.correctlySpends(signedTx, mapOf(OutPoint(utxo, 0) to utxo.txOut[0]), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    }
+
+    @Test
+    fun `read psbt with a large number of entries`() {
+        // Parsing must stay linear in the number of entries: a few MB of tiny entries must not stall the reader.
+        val tx = Transaction(
+            version = 2,
+            txIn = listOf(TxIn(OutPoint(TxHash(ByteVector32.Zeroes), 0), TxIn.SEQUENCE_FINAL)),
+            txOut = listOf(TxOut(1000.sat(), Script.pay2wpkh(PrivateKey(ByteVector32.One).publicKey()))),
+            lockTime = 0
+        )
+        val unknown = (0 until 200_000).map { i -> DataEntry(ByteVector(byteArrayOf(0xfc.toByte()) + Pack.writeInt32BE(i)), ByteVector.empty) }
+        val psbt = Psbt(tx).let { it.copy(global = it.global.copy(unknown = unknown)) }
+        val decoded = Psbt.read(Psbt.write(psbt)).right!!
+        assertEquals(unknown, decoded.global.unknown)
     }
 
 }

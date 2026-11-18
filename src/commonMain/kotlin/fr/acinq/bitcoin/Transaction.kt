@@ -793,6 +793,94 @@ public data class Transaction(
         return Crypto.signSchnorr(data, privateKey, null, auxrand32)
     }
 
+    /**
+     * Check all transaction witnesses for standardness
+     * @param spentOutputs outputs spent by this transaction
+     * @return true if all witnesses pass standardness checks
+     */
+    public fun isWitnessStandard(spentOutputs: Map<OutPoint, TxOut>): Boolean {
+        if (isCoinbase())
+            return true // Coinbases are skipped
+
+        for (i in txIn.indices) {
+            // We don't care if witness for this input is empty, since it must not be bloated.
+            // If the script is invalid without witness, it would be caught sooner or later during validation.
+            if (txIn[i].witness.isNull())
+                continue
+
+            val prev = spentOutputs[txIn[i].outPoint] ?: TxOut(Satoshi(-1L), ByteVector.empty)
+
+            // get the scriptPubKey corresponding to this input:
+            var prevScript = prev.publicKeyScript
+
+            // witness stuffing detected
+            if (Script.isPay2Anchor(prevScript)) {
+                return false
+            }
+
+            var p2sh = false
+            if (Script.isPay2sh(prevScript.toByteArray())) {
+                // If the scriptPubKey is P2SH, we try to extract the redeemScript casually by converting the scriptSig
+                // into a stack. We do not check IsPushOnly nor compare the hash as these will be done later anyway.
+                // If the check fails at this stage, we know that this txid must be a bad one.
+                val ctx = Script.Context(this, i, prev.amount, txIn.map { spentOutputs[it.outPoint] ?: TxOut(Satoshi(-1L), ByteVector.empty) })
+                val runner = Script.Runner(ctx, ScriptFlags.SCRIPT_VERIFY_NONE)
+                val stack = runCatching { runner.run(txIn[i].signatureScript.toByteArray(), SigVersion.SIGVERSION_BASE) }.getOrElse { return false }
+                if (stack.isEmpty())
+                    return false
+                // our stack is top-first: the redeem script (last element pushed) is at the head
+                prevScript = stack.first()
+                p2sh = true
+            }
+
+            // Non-witness program must not be associated with any witness
+            val (witnessVersion, witnessProgram) = Script.isWitnessProgram(prevScript.toByteArray()) ?: return false
+
+            // Check P2WSH standard limits
+            if (witnessVersion == 0 && witnessProgram.size == Script.WITNESS_V0_SCRIPTHASH_SIZE) {
+                if (txIn[i].witness.stack.last().size() > Script.MAX_STANDARD_P2WSH_SCRIPT_SIZE)
+                    return false
+                val sizeWitnessStack = txIn[i].witness.stack.size - 1
+                if (sizeWitnessStack > Script.MAX_STANDARD_P2WSH_STACK_ITEMS)
+                    return false
+                for (j in 0 until sizeWitnessStack) {
+                    if (txIn[i].witness.stack[j].size() > Script.MAX_STANDARD_P2WSH_STACK_ITEM_SIZE)
+                        return false
+                }
+            }
+
+            // Check policy limits for Taproot spends:
+            // - MAX_STANDARD_TAPSCRIPT_STACK_ITEM_SIZE limit for stack item size
+            // - No annexes
+            if (witnessVersion == 1 && witnessProgram.size == Script.WITNESS_V1_TAPROOT_SIZE && !p2sh) {
+                // Taproot spend (non-P2SH-wrapped, version 1, witness program size 32; see BIP 341)
+                var stack = txIn[i].witness.stack
+                if (stack.size >= 2 && !stack.last().isEmpty() && stack.last()[0].toInt() == Script.ANNEX_TAG) {
+                    // Annexes are nonstandard as long as no semantics are defined for them.
+                    return false
+                }
+                if (stack.size >= 2) {
+                    // Script path spend (2 or more stack elements after removing optional annex)
+                    val control_block = stack.last()
+                    stack = stack.dropLast(2)
+                    if (control_block.isEmpty()) return false // Empty control block is invalid
+                    if ((control_block[0].toInt() and Script.TAPROOT_LEAF_MASK) == Script.TAPROOT_LEAF_TAPSCRIPT) {
+                        // Leaf version 0xc0 (aka Tapscript, see BIP 342)
+                        if (stack.any { it.size() > Script.MAX_STANDARD_TAPSCRIPT_STACK_ITEM_SIZE })
+                            return false
+                    }
+                } else if (stack.size == 1) {
+                    // Key path spend (1 stack element after removing optional annex)
+                    // (no policy rules apply)
+                } else {
+                    // 0 stack elements; this is already invalid by consensus rules
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
     public fun correctlySpends(previousOutputs: Map<OutPoint, TxOut>, scriptFlags: Int) {
         val prevouts = txIn.map { previousOutputs[it.outPoint]!! }
         for (i in 0 until txIn.count()) {

@@ -74,6 +74,73 @@ class ScriptTestsCommon {
     }
 
     @Test
+    fun `script type checks on raw bytes`() {
+        // Byte-level checks match the exact canonical encoding (like Bitcoin Core), and never throw.
+        val p2pkh = Script.write(Script.pay2pkh(pub))
+        val p2sh = Script.write(Script.pay2sh(Script.pay2pkh(pub)))
+        val p2wpkh = Script.write(Script.pay2wpkh(pub))
+        val p2wsh = Script.write(Script.pay2wsh(Script.pay2pkh(pub)))
+        val p2tr = Script.write(Script.pay2tr(pub.xOnly(), Crypto.TaprootTweak.KeyPathTweak))
+        val p2a = Script.write(Script.pay2anchor)
+
+        // Same script, with the push at pushIndex encoded with OP_PUSHDATA1.
+        fun nonCanonical(script: ByteArray, pushIndex: Int = 1): ByteArray =
+            script.copyOfRange(0, pushIndex) + OP_PUSHDATA1.code.toByte() + script.copyOfRange(pushIndex, script.size)
+
+        // Truncated in the middle of the push at pushIndex: cannot be parsed.
+        fun truncated(script: ByteArray, pushIndex: Int = 1): ByteArray = script.copyOfRange(0, pushIndex + 2)
+
+        assertTrue(Script.isPay2pkh(p2pkh))
+        assertFalse(Script.isPay2pkh(nonCanonical(p2pkh, pushIndex = 2)))
+        assertFalse(Script.isPay2pkh(truncated(p2pkh, pushIndex = 2)))
+        assertFalse(Script.isPay2pkh(p2pkh + OP_NOP.code.toByte()))
+        assertFalse(Script.isPay2pkh(ByteArray(0)))
+
+        assertTrue(Script.isPay2sh(p2sh))
+        assertFalse(Script.isPay2sh(nonCanonical(p2sh)))
+        assertFalse(Script.isPay2sh(truncated(p2sh)))
+        assertFalse(Script.isPay2sh(p2sh + OP_NOP.code.toByte()))
+        assertFalse(Script.isPay2sh(ByteArray(0)))
+
+        assertTrue(Script.isPay2wpkh(p2wpkh))
+        assertFalse(Script.isPay2wpkh(nonCanonical(p2wpkh)))
+        assertFalse(Script.isPay2wpkh(truncated(p2wpkh)))
+        assertFalse(Script.isPay2wpkh(p2wpkh + OP_NOP.code.toByte()))
+        assertFalse(Script.isPay2wpkh(ByteArray(0)))
+
+        assertTrue(Script.isPay2wsh(p2wsh))
+        assertFalse(Script.isPay2wsh(nonCanonical(p2wsh)))
+        assertFalse(Script.isPay2wsh(truncated(p2wsh)))
+        assertFalse(Script.isPay2wsh(p2wsh + OP_NOP.code.toByte()))
+        assertFalse(Script.isPay2wsh(ByteArray(0)))
+
+        assertTrue(Script.isPay2tr(p2tr))
+        assertTrue(Script.isPay2tr(p2tr.byteVector()))
+        assertFalse(Script.isPay2tr(nonCanonical(p2tr)))
+        assertFalse(Script.isPay2tr(nonCanonical(p2tr).byteVector()))
+        assertFalse(Script.isPay2tr(truncated(p2tr)))
+        assertFalse(Script.isPay2tr(truncated(p2tr).byteVector()))
+        assertFalse(Script.isPay2tr(p2tr + OP_NOP.code.toByte()))
+        assertFalse(Script.isPay2tr(ByteArray(0)))
+
+        assertTrue(Script.isPay2Anchor(p2a))
+        assertTrue(Script.isPay2Anchor(p2a.byteVector()))
+        assertFalse(Script.isPay2Anchor(nonCanonical(p2a)))
+        assertFalse(Script.isPay2Anchor(nonCanonical(p2a).byteVector()))
+        assertFalse(Script.isPay2Anchor(truncated(p2a)))
+        assertFalse(Script.isPay2Anchor(truncated(p2a).byteVector()))
+        assertFalse(Script.isPay2Anchor(p2a + OP_NOP.code.toByte()))
+        assertFalse(Script.isPay2Anchor(ByteArray(0)))
+
+        // The List<ScriptElt> overloads are more lenient and accept non-canonical pushes.
+        assertTrue(Script.isPay2pkh(Script.parse(nonCanonical(p2pkh, pushIndex = 2))))
+        assertTrue(Script.isPay2sh(Script.parse(nonCanonical(p2sh))))
+        assertTrue(Script.isPay2wpkh(Script.parse(nonCanonical(p2wpkh))))
+        assertTrue(Script.isPay2wsh(Script.parse(nonCanonical(p2wsh))))
+        assertTrue(Script.isPay2tr(Script.parse(nonCanonical(p2tr))))
+    }
+
+    @Test
     fun `parse if - else - endif`() {
         val tx = Transaction(
             version = 1,

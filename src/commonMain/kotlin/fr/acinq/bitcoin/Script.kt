@@ -31,12 +31,33 @@ public object Script {
     public const val MAX_SCRIPT_ELEMENT_SIZE: Int = 520
     public const val MAX_OPS_PER_SCRIPT: Int = 201
     public const val MAX_STACK_SIZE: Int = 1000
+
+    /** The maximum number of witness stack items in a standard P2WSH script */
+    public const val MAX_STANDARD_P2WSH_STACK_ITEMS: Int = 100
+
+    /** The maximum size in bytes of each witness stack item in a standard P2WSH script */
+    public const val MAX_STANDARD_P2WSH_STACK_ITEM_SIZE: Int = 80
+
+    /** The maximum size in bytes of each witness stack item in a standard BIP 342 script (Taproot, leaf version 0xc0) */
+    public const val MAX_STANDARD_TAPSCRIPT_STACK_ITEM_SIZE: Int = 80
+
+    /** The maximum size in bytes of a standard witnessScript */
+    public const val MAX_STANDARD_P2WSH_SCRIPT_SIZE: Int = 3600
+
+    /** The maximum size of a standard ScriptSig */
+    public const val MAX_STANDARD_SCRIPTSIG_SIZE: Int = 1650
+
     public const val LOCKTIME_THRESHOLD: Long = 500000000L
     public const val WITNESS_V0_SCRIPTHASH_SIZE: Int = 32
     public const val WITNESS_V0_KEYHASH_SIZE: Int = 20
     public const val WITNESS_V1_TAPROOT_SIZE: Int = 32
     public const val TAPROOT_LEAF_MASK: Int = 0xfe
     public const val TAPROOT_LEAF_TAPSCRIPT: Int = 0xc0
+
+    // Tag for input annex. If there are at least two witness elements for a transaction input,
+    // and the first byte of the last element is 0x50, this last element is called annex, and
+    // has meanings independent of the script
+    public const val ANNEX_TAG: Int = 0x50
 
     // Validation weight per passing signature (Tapscript only, see BIP 342).
     public const val VALIDATION_WEIGHT_PER_SIGOP_PASSED: Int = 50
@@ -297,6 +318,22 @@ public object Script {
     @JvmStatic
     public fun isNativeWitnessScript(script: ByteVector): Boolean = runCatching { parse(script) }.map { isNativeWitnessScript(it) }.getOrDefault(false)
 
+    // A witness program is any valid script that consists of a 1-byte push opcode followed by a data push between 2 and 40 bytes.
+    internal fun isWitnessProgram(script: ByteArray): Pair<Int, ByteArray>? = when {
+        script.size !in 4..42 -> null
+        script[0].toInt() != OP_0.code && (script[0].toInt() < OP_1.code || script[0].toInt() > OP_16.code) -> null
+        script[1].toInt() + 2 == script.size -> {
+            val version = when (script[0].toInt()) {
+                OP_0.code -> 0
+                else -> script[0].toInt() - 0x50
+            }
+            val program = script.copyOfRange(2, script.size)
+            version to program
+        }
+
+        else -> null
+    }
+
     @JvmStatic
     public fun pushSize(op: ScriptElt): Int? = when (op) {
         is OP_PUSHDATA -> op.data.size()
@@ -353,7 +390,9 @@ public object Script {
     }
 
     @JvmStatic
-    public fun isPay2pkh(script: ByteArray): Boolean = isPay2pkh(parse(script))
+    public fun isPay2pkh(script: ByteArray): Boolean =
+        script.size == 25 && script[0] == OP_DUP.code.toByte() && script[1] == OP_HASH160.code.toByte() && script[2] == 0x14.toByte() &&
+                script[23] == OP_EQUALVERIFY.code.toByte() && script[24] == OP_CHECKSIG.code.toByte()
 
     @JvmStatic
     public fun isPay2sh(script: List<ScriptElt>): Boolean {
@@ -364,7 +403,7 @@ public object Script {
     }
 
     @JvmStatic
-    public fun isPay2sh(script: ByteArray): Boolean = isPay2sh(parse(script))
+    public fun isPay2sh(script: ByteArray): Boolean = isPayToScript(script)
 
     @JvmStatic
     public fun isPay2wpkh(script: List<ScriptElt>): Boolean {
@@ -375,7 +414,8 @@ public object Script {
     }
 
     @JvmStatic
-    public fun isPay2wpkh(script: ByteArray): Boolean = isPay2wpkh(parse(script))
+    public fun isPay2wpkh(script: ByteArray): Boolean =
+        script.size == 22 && script[0] == OP_0.code.toByte() && script[1] == 0x14.toByte()
 
     @JvmStatic
     public fun isPay2wsh(script: List<ScriptElt>): Boolean {
@@ -386,7 +426,8 @@ public object Script {
     }
 
     @JvmStatic
-    public fun isPay2wsh(script: ByteArray): Boolean = isPay2wsh(parse(script))
+    public fun isPay2wsh(script: ByteArray): Boolean =
+        script.size == 34 && script[0] == OP_0.code.toByte() && script[1] == 0x20.toByte()
 
     @JvmStatic
     public fun isPay2tr(script: List<ScriptElt>): Boolean {
@@ -397,10 +438,20 @@ public object Script {
     }
 
     @JvmStatic
-    public fun isPay2tr(script: ByteArray): Boolean = isPay2tr(parse(script))
+    public fun isPay2tr(script: ByteArray): Boolean =
+        script.size == 34 && script[0] == OP_1.code.toByte() && script[1] == 0x20.toByte()
 
     @JvmStatic
     public fun isPay2tr(script: ByteVector): Boolean = isPay2tr(script.toByteArray())
+
+    @JvmStatic
+    public fun isPay2Anchor(script: List<ScriptElt>): Boolean = script == pay2anchor
+
+    @JvmStatic
+    public fun isPay2Anchor(script: ByteArray): Boolean = script.contentEquals(write(pay2anchor))
+
+    @JvmStatic
+    public fun isPay2Anchor(script: ByteVector): Boolean = script.contentEquals(write(pay2anchor))
 
     @JvmStatic
     public fun pay2trOutputKey(script: List<ScriptElt>): XonlyPublicKey? {
@@ -1595,22 +1646,6 @@ public object Script {
          * @return true if the scripts were successfully verified
          */
         public fun verifyScripts(scriptSig: ByteArray, scriptPubKey: ByteArray, witness: ScriptWitness): Boolean {
-            // A witness program is any valid script that consists of a 1-byte push opcode followed by a data push between 2 and 40 bytes.
-            fun isWitnessProgram(script: ByteArray): Pair<Int, ByteArray>? = when {
-                script.size !in 4..42 -> null
-                script[0].toInt() != OP_0.code && (script[0].toInt() < OP_1.code || script[0].toInt() > OP_16.code) -> null
-                script[1].toInt() + 2 == script.size -> {
-                    val version = when (script[0].toInt()) {
-                        OP_0.code -> 0
-                        else -> script[0].toInt() - 0x50
-                    }
-                    val program = script.copyOfRange(2, script.size)
-                    version to program
-                }
-
-                else -> null
-            }
-
             val ssig = parse(scriptSig)
             if (((scriptFlag and ScriptFlags.SCRIPT_VERIFY_SIGPUSHONLY) != 0) && !isPushOnly(ssig)) throw RuntimeException("signature script is not PUSH-only")
             val stack = run(scriptSig, listOf(), signatureVersion = SigVersion.SIGVERSION_BASE)

@@ -150,6 +150,15 @@ class CryptoTestsCommon {
     }
 
     @Test
+    fun `reject invalid signature`() {
+        val priv = PrivateKey(Random.nextBytes(ByteArray(32)))
+        val data = Crypto.sha256("this is a test".encodeToByteArray())
+        val sig = Hex.decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").byteVector64()
+        assertFalse(Crypto.verifySignature(data, sig, priv.publicKey()))
+        assertFalse(Crypto.verifySignatureSchnorr(data.byteVector32(), sig, priv.publicKey().xOnly()))
+    }
+
+    @Test
     fun `strict DER validation rejects high-bit length bytes without crashing`() {
         val sig = ByteArray(73)
         sig[0] = 0x30

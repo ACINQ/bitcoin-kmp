@@ -145,12 +145,14 @@ public object Crypto {
      * @return true is signature is valid for this data with this public key
      */
     @JvmStatic
-    public fun verifySignature(data: ByteArray, signature: ByteVector64, publicKey: PublicKey): Boolean {
-        return Secp256k1.verify(
+    public fun verifySignature(data: ByteArray, signature: ByteVector64, publicKey: PublicKey): Boolean = try {
+        Secp256k1.verify(
             signature.toByteArray(),
             data,
             publicKey.value.toByteArray()
         )
+    } catch (_: Throwable) {
+        false
     }
 
     /**
@@ -187,10 +189,12 @@ public object Crypto {
     }
 
     @JvmStatic
-    public fun verifySignatureSchnorr(data: ByteVector32, signature: ByteVector, publicKey: XonlyPublicKey): Boolean {
-        return Secp256k1.verifySchnorr(signature.toByteArray(), data.toByteArray(), publicKey.value.toByteArray())
+    public fun verifySignatureSchnorr(data: ByteVector32, signature: ByteVector, publicKey: XonlyPublicKey): Boolean = try {
+        Secp256k1.verifySchnorr(signature.toByteArray(), data.toByteArray(), publicKey.value.toByteArray())
+    } catch (_: Throwable) {
+        false
     }
-    
+
     @JvmStatic
     public fun isDERSignature(sig: ByteArray): Boolean {
         // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S] [sighash]

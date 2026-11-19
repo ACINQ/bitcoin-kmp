@@ -1750,4 +1750,39 @@ class PsbtTestsCommon {
         assertEquals(unknown, decoded.global.unknown)
     }
 
+    @Test
+    fun `malformed psbts are rejected without throwing`() {
+        // Psbt.read reports malformed input through Either: callers parsing untrusted PSBTs must never see an exception.
+        val pub = PrivateKey(ByteVector32.One).publicKey()
+        val tx = Transaction(
+            version = 2,
+            txIn = listOf(TxIn(OutPoint(TxHash(ByteVector32.Zeroes), 0), TxIn.SEQUENCE_FINAL)),
+            txOut = listOf(TxOut(1000.sat(), Script.pay2wpkh(pub))),
+            lockTime = 0
+        )
+        // An empty PSBT ends with the global, input and output separators.
+        val emptyPsbt = Psbt.write(Psbt(tx)).toHex()
+        assertTrue(emptyPsbt.endsWith("000000"))
+        val globalEntries = emptyPsbt.dropLast(6)
+
+        // Lengths that BtcSerializer.varint refuses: non-canonical, truncated and above MAX_SIZE.
+        // Each is tried as the key length and as the value length (after a valid 1-byte key) in the global, input and output maps.
+        val mapPrefixes = listOf(globalEntries, globalEntries + "00", globalEntries + "00" + "00")
+        listOf("fd0100", "fd01", "fe00000004").forEach { length ->
+            mapPrefixes.forEach { prefix ->
+                assertEquals(Either.Left(ParseFailure.InvalidContent), Psbt.read(ByteVector(prefix + length)))
+                assertEquals(Either.Left(ParseFailure.InvalidContent), Psbt.read(ByteVector(prefix + "01" + "fc" + length)))
+            }
+        }
+
+        // PSBT_GLOBAL_XPUB whose public key is not a valid point.
+        val xpub = "0488b21e" + "00" + "00000000" + "00000000" + ByteVector32.Zeroes.toHex() + "04" + ByteVector32.Zeroes.toHex()
+        val invalidXpub = globalEntries + "4f" + "01" + xpub + "04" + "00000000" + "00" + "00" + "00"
+        assertEquals(Either.Left(ParseFailure.InvalidExtendedPublicKey("public key is invalid")), Psbt.read(ByteVector(invalidXpub)))
+
+        // PSBT_OUT_TAP_BIP32_DERIVATION announcing a leaf hash that isn't there.
+        val invalidOutputDerivation = globalEntries + "00" + "00" + "21" + "07" + pub.xOnly().value.toHex() + "01" + "01" + "00"
+        assertEquals(Either.Left(ParseFailure.InvalidTxOutput("invalid taproot derivation path")), Psbt.read(ByteVector(invalidOutputDerivation)))
+    }
+
 }
